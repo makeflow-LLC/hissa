@@ -8,6 +8,7 @@ import { getAllLessons } from "@/lib/teachers";
 import { getStudentsForTeacher } from "@/lib/students";
 import { useTeacherAuth } from "@/lib/useTeacherAuth";
 import { useLessonDrafts } from "@/lib/useLessonDrafts";
+import { mergeTeacherProfile, useTeacherProfile } from "@/lib/useTeacherProfile";
 
 export default function DashboardPage() {
   const { teacher, loaded } = useTeacherAuth();
@@ -30,6 +31,8 @@ export default function DashboardPage() {
 
 function DashboardContent({ teacher }: { teacher: Teacher }) {
   const { drafts, loaded: draftsLoaded, removeDraft } = useLessonDrafts(teacher.slug);
+  const { overrides } = useTeacherProfile(teacher.slug);
+  const profile = mergeTeacherProfile(teacher, overrides);
 
   const students = getStudentsForTeacher(teacher);
   const allLessons = getAllLessons(teacher);
@@ -40,19 +43,30 @@ function DashboardContent({ teacher }: { teacher: Teacher }) {
     <main className="container">
       <section className="dashboard-header">
         <div className="dashboard-welcome">
-          <div className="teacher-avatar" style={{ background: teacher.gradient }}>
-            {teacher.initials}
-          </div>
+          {profile.avatar ? (
+            // صورة data URL من localStorage — خارج نطاق next/image
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={profile.avatar} alt={profile.name} className="teacher-avatar-img" />
+          ) : (
+            <div className="teacher-avatar" style={{ background: teacher.gradient }}>
+              {teacher.initials}
+            </div>
+          )}
           <div>
-            <h1 className="dashboard-title">مرحباً، {teacher.name} 👋</h1>
+            <h1 className="dashboard-title">مرحباً، {profile.name} 👋</h1>
             <p className="dashboard-subtitle">
-              {teacher.subject} — {teacher.stage} · هذه لوحة التحكم الخاصة بك
+              {teacher.subject} — {profile.stages.join(" / ")} · هذه لوحة التحكم الخاصة بك
             </p>
           </div>
         </div>
-        <Link href="/dashboard/new-lesson" className="btn btn-primary btn-lg">
-          ＋ تصميم حصة جديدة
-        </Link>
+        <div className="dashboard-header-actions">
+          <Link href="/dashboard/new-lesson" className="btn btn-primary btn-lg">
+            ＋ تصميم حصة جديدة
+          </Link>
+          <Link href="/dashboard/profile" className="btn btn-outline">
+            ⚙️ الملف الشخصي
+          </Link>
+        </div>
       </section>
 
       <section className="dashboard-stats">
@@ -167,10 +181,10 @@ function DashboardContent({ teacher }: { teacher: Teacher }) {
       </section>
 
       <section className="dashboard-section">
-        <h2 className="section-title">📝 حصصك الجديدة (مسودات)</h2>
+        <h2 className="section-title">📝 حصصك الجديدة</h2>
         {!draftsLoaded || drafts.length === 0 ? (
           <p className="drafts-empty">
-            لا توجد مسودات بعد —{" "}
+            لا توجد حصص مصممة بعد —{" "}
             <Link href="/dashboard/new-lesson" className="back-link">
               صمّم حصتك الأولى
             </Link>
@@ -178,35 +192,62 @@ function DashboardContent({ teacher }: { teacher: Teacher }) {
           </p>
         ) : (
           <ul className="drafts-list">
-            {drafts.map((d) => (
-              <li key={d.id} className="draft-row">
-                <span className="draft-emoji" aria-hidden="true">
-                  {d.emoji}
-                </span>
-                <span className="draft-body">
-                  <span className="draft-title">
-                    {d.title}
-                    <span
-                      className={`badge ${
-                        d.kind === "live" ? "badge-live" : "badge-success"
-                      }`}
-                    >
-                      {d.kind === "live" ? "حصة مباشرة" : "درس مسجّل"}
+            {drafts.map((d) => {
+              const imageCount = d.media.filter((m) => m.kind === "image").length;
+              const fileCount = d.media.filter((m) => m.kind === "file").length;
+              const hasVideo = d.media.some((m) => m.kind === "video");
+              return (
+                <li key={d.id} className="draft-row">
+                  <span className="draft-emoji" aria-hidden="true">
+                    {d.emoji}
+                  </span>
+                  <span className="draft-body">
+                    <span className="draft-title">
+                      {d.title}
+                      <span
+                        className={`badge ${
+                          d.kind === "live" ? "badge-live" : "badge-success"
+                        }`}
+                      >
+                        {d.kind === "live" ? "حصة مباشرة" : "درس مسجّل"}
+                      </span>
                     </span>
+                    <span className="draft-meta">
+                      {d.unitTitle} · ⏱ {d.duration} · أُنشئت في {d.createdAt}
+                    </span>
+                    {(d.media.length > 0 || d.quiz.length > 0) && (
+                      <span className="draft-extras">
+                        {hasVideo && <span className="badge badge-muted">🎞️ فيديو</span>}
+                        {imageCount > 0 && (
+                          <span className="badge badge-muted">🖼️ {imageCount} صور</span>
+                        )}
+                        {fileCount > 0 && (
+                          <span className="badge badge-muted">📎 {fileCount} ملفات</span>
+                        )}
+                        {d.quiz.length > 0 && (
+                          <span className="badge badge-muted">❓ {d.quiz.length} أسئلة</span>
+                        )}
+                      </span>
+                    )}
                   </span>
-                  <span className="draft-meta">
-                    {d.unitTitle} · ⏱ {d.duration} · أُنشئت في {d.createdAt}
+                  <span className="draft-actions">
+                    <Link
+                      href={`/teacher/${teacher.slug}/lesson-draft/${d.id}`}
+                      className="btn btn-outline btn-sm"
+                    >
+                      عرض
+                    </Link>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => removeDraft(d.id)}
+                    >
+                      حذف
+                    </button>
                   </span>
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  onClick={() => removeDraft(d.id)}
-                >
-                  حذف
-                </button>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

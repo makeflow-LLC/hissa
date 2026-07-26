@@ -3,22 +3,35 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { STAGES, subjects, teachers, type Stage } from "@/lib/teachers";
+import { mergeTeacherProfile, useAllProfileOverrides } from "@/lib/useTeacherProfile";
 import Stars from "@/components/Stars";
+
+const ALL_SLUGS = teachers.map((t) => t.slug);
 
 export default function TeacherDirectory() {
   const [query, setQuery] = useState("");
   const [stage, setStage] = useState<Stage | "">("");
   const [subject, setSubject] = useState("");
+  const overridesMap = useAllProfileOverrides(ALL_SLUGS);
+
+  const merged = useMemo(
+    () =>
+      teachers.map((t) => ({
+        teacher: t,
+        profile: mergeTeacherProfile(t, overridesMap[t.slug] ?? {}),
+      })),
+    [overridesMap]
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim();
-    return teachers.filter(
-      (t) =>
-        (!q || t.name.includes(q)) &&
-        (!stage || t.stage === stage) &&
-        (!subject || t.subject === subject)
+    return merged.filter(
+      ({ teacher, profile }) =>
+        (!q || profile.name.includes(q) || teacher.name.includes(q)) &&
+        (!stage || profile.stages.includes(stage)) &&
+        (!subject || teacher.subject === subject)
     );
-  }, [query, stage, subject]);
+  }, [merged, query, stage, subject]);
 
   return (
     <>
@@ -63,17 +76,27 @@ export default function TeacherDirectory() {
         <p className="empty-state">لا توجد نتائج مطابقة — جرّب تعديل البحث أو الفلاتر.</p>
       ) : (
         <div className="teachers-grid">
-          {filtered.map((t) => {
+          {filtered.map(({ teacher: t, profile }) => {
             const lessonCount = t.units.reduce((n, u) => n + u.lessons.length, 0);
             return (
               <article key={t.slug} className="teacher-card">
-                <div className="teacher-avatar" style={{ background: t.gradient }}>
-                  {t.initials}
-                </div>
-                <h2 className="teacher-name">{t.name}</h2>
+                {profile.avatar ? (
+                  // صورة data URL من localStorage — خارج نطاق next/image
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={profile.avatar} alt={profile.name} className="teacher-avatar-img" />
+                ) : (
+                  <div className="teacher-avatar" style={{ background: t.gradient }}>
+                    {t.initials}
+                  </div>
+                )}
+                <h2 className="teacher-name">{profile.name}</h2>
                 <div className="teacher-tags">
                   <span className="tag tag-subject">{t.subject}</span>
-                  <span className="tag tag-stage">{t.stage}</span>
+                  {profile.stages.map((s) => (
+                    <span key={s} className="tag tag-stage">
+                      {s}
+                    </span>
+                  ))}
                 </div>
                 <div className="teacher-rating">
                   <Stars rating={t.rating} />

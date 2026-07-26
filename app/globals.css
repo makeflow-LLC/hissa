@@ -1479,6 +1479,390 @@ body {
   margin-top: 0.75rem;
 }
 
+/* ===== الصور الشخصية المرفوعة ===== */
+
+.teacher-avatar-img {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: var(--shadow);
+}
+
+.profile-avatar-img {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: var(--shadow-hover);
+}
+
+.avatar-edit {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.avatar-preview {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: var(--shadow);
+}
+
+.avatar-preview-fallback {
+  width: 96px;
+  height: 96px;
+  font-size: 1.8rem;
+}
+
+.avatar-edit-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+/* ===== زر واتساب ===== */
+
+.btn-whatsapp {
+  background: #25d366;
+  color: #fff;
+}
+
+.btn-whatsapp:hover {
+  background: #1faa52;
+}
+
+/* ===== منتقي المراحل ===== */
+
+.stages-picker {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.stage-option {
+  font-weight: 700;
+  background: #f8fafc;
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  padding: 0.45rem 1.2rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.stage-option:hover {
+  border-color: var(--primary);
+}
+
+.stage-option-active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+
+.stage-option input {
+  accent-color: var(--primary);
+}
+
+/* ===== أقسام النموذج ورفع الملفات ===== */
+
+.form-section {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.1rem 1.2rem 1.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-section-title {
+  font-weight: 800;
+  padding: 0 0.5rem;
+}
+
+.form-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.form-success {
+  color: var(--success);
+  background: var(--success-soft);
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.upload-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  color: var(--primary-dark);
+  background: var(--primary-soft);
+  border: 2px dashed var(--primary);
+  border-radius: 12px;
+  padding: 0.75rem 1.2rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  align-self: flex-start;
+}
+
+.upload-box:hover {
+  background: #e0e7ff;
+}
+
+.upload-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.upload-chips {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.upload-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.88rem;
+}
+
+.upload-chip-name {
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: ltr;
+  text-align: end;
+}
+
+.upload-chip-size {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.upload-chip-remove {
+  font: inherit;
+  border: none;
+  background: #fef2f2;
+  color: #dc2626;
+  border-radius: 8px;
+  width: 1.7rem;
+  height: 1.7rem;
+  cursor: pointer;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.upload-chip-remove:hover {
+  background: #fee2e2;
+}
+
+/* ===== بنّاء أسئلة الاختبار ===== */
+
+.question-card {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.question-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.question-number {
+  font-weight: 800;
+  color: var(--primary-dark);
+}
+
+.question-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.question-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.question-option input[type="radio"] {
+  accent-color: var(--success);
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+}
+
+.question-option .search-input {
+  flex: 1;
+}
+
+/* ===== عرض الاختبار للطالب ===== */
+
+.quiz {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+.quiz-prompt {
+  font-weight: 800;
+  margin-bottom: 0.6rem;
+}
+
+.quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.quiz-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: #f8fafc;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.quiz-option:hover {
+  border-color: var(--primary);
+}
+
+.quiz-option input {
+  accent-color: var(--primary);
+}
+
+.quiz-option-selected {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.quiz-option-correct {
+  border-color: var(--success);
+  background: var(--success-soft);
+}
+
+.quiz-option-wrong {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.quiz-result {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.quiz-score {
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
+/* ===== الحصص الجديدة (المصممة) ===== */
+
+.unit-new {
+  border: 1px solid #c7d2fe;
+  background: linear-gradient(180deg, #eef2ff 0%, #ffffff 55%);
+}
+
+.unit-number-new {
+  background: var(--primary);
+  color: #fff;
+}
+
+.lesson-row-thumb-draft {
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+}
+
+.lesson-quiz-badge {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--primary-dark);
+  white-space: nowrap;
+}
+
+.badge-new {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+
+.unit-chip-new {
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  color: #fff;
+  margin-inline-start: 0.4rem;
+}
+
+.video-poster-draft {
+  background: linear-gradient(135deg, #475569, #1e293b);
+  cursor: default;
+}
+
+.gallery-photo {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+.dashboard-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.draft-extras {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.3rem;
+}
+
+.draft-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
 /* ===== التجاوب مع الموبايل ===== */
 
 @media (max-width: 720px) {
@@ -1518,8 +1902,24 @@ body {
     flex-wrap: wrap;
   }
 
-  .draft-row .btn {
+  .draft-actions {
     width: 100%;
+  }
+
+  .draft-actions .btn {
+    flex: 1;
+  }
+
+  .dashboard-header-actions {
+    width: 100%;
+  }
+
+  .dashboard-header-actions .btn {
+    flex: 1;
+  }
+
+  .avatar-edit {
+    justify-content: center;
   }
 
   .live-card {

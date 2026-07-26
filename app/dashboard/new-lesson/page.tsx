@@ -1,13 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Teacher } from "@/lib/teachers";
 import { useTeacherAuth } from "@/lib/useTeacherAuth";
-import { useLessonDrafts } from "@/lib/useLessonDrafts";
+import {
+  useLessonDrafts,
+  type DraftMedia,
+  type DraftMediaKind,
+  type QuizQuestion,
+} from "@/lib/useLessonDrafts";
+import { saveMedia, formatSize } from "@/lib/mediaStore";
 
 const EMOJI_CHOICES = ["📚", "🎬", "🧪", "📐", "✏️", "🌍", "💡", "🎯", "🧠", "⚡"];
+
+interface QuestionDraft {
+  key: number;
+  prompt: string;
+  options: string[];
+  correctIndex: number;
+}
+
+const emptyQuestion = (key: number): QuestionDraft => ({
+  key,
+  prompt: "",
+  options: ["", "", "", ""],
+  correctIndex: 0,
+});
 
 export default function NewLessonPage() {
   const { teacher, loaded } = useTeacherAuth();
@@ -29,7 +49,6 @@ export default function NewLessonPage() {
 }
 
 function NewLessonForm({ teacher }: { teacher: Teacher }) {
-  const router = useRouter();
   const { addDraft } = useLessonDrafts(teacher.slug);
 
   const [kind, setKind] = useState<"recorded" | "live">("recorded");
@@ -39,20 +58,74 @@ function NewLessonForm({ teacher }: { teacher: Teacher }) {
   const [duration, setDuration] = useState("٤٥ دقيقة");
   const [emoji, setEmoji] = useState(EMOJI_CHOICES[0]);
   const [detail, setDetail] = useState("");
+
+  const [images, setImages] = useState<File[]>([]);
+  const [video, setVideo] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+
+  const [questions, setQuestions] = useState<QuestionDraft[]>([]);
+  const questionKey = useRef(0);
+
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [saved, setSaved] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  function updateQuestion(key: number, patch: Partial<QuestionDraft>) {
+    setQuestions((qs) => qs.map((q) => (q.key === key ? { ...q, ...patch } : q)));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    addDraft({
-      kind,
-      title: title.trim(),
-      description: description.trim(),
-      unitTitle: kind === "recorded" ? unitTitle : "حصة مباشرة",
-      duration,
-      emoji,
-      detail: detail.trim(),
-    });
-    setSaved(true);
+    setSaving(true);
+    setSaveError("");
+    try {
+      const media: DraftMedia[] = [];
+      const uploads: { file: File; kind: DraftMediaKind }[] = [
+        ...images.map((f) => ({ file: f, kind: "image" as const })),
+        ...(video ? [{ file: video, kind: "video" as const }] : []),
+        ...files.map((f) => ({ file: f, kind: "file" as const })),
+      ];
+      for (const { file, kind: mediaKind } of uploads) {
+        const id = `media-${crypto.randomUUID()}`;
+        await saveMedia(id, file);
+        media.push({
+          id,
+          kind: mediaKind,
+          name: file.name,
+          mime: file.type,
+          size: formatSize(file.size),
+        });
+      }
+
+      const quiz: QuizQuestion[] = questions
+        .map((q) => {
+          const options = q.options.map((o) => o.trim()).filter(Boolean);
+          return {
+            id: `q-${q.key}`,
+            prompt: q.prompt.trim(),
+            options,
+            correctIndex: Math.min(q.correctIndex, Math.max(options.length - 1, 0)),
+          };
+        })
+        .filter((q) => q.prompt && q.options.length >= 2);
+
+      addDraft({
+        kind,
+        title: title.trim(),
+        description: description.trim(),
+        unitTitle: kind === "recorded" ? unitTitle : "حصة مباشرة",
+        duration,
+        emoji,
+        detail: detail.trim(),
+        media,
+        quiz,
+      });
+      setSaved(true);
+    } catch {
+      setSaveError("تعذّر حفظ الملفات المرفوعة — جرّب ملفات أصغر أو أعد المحاولة.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (saved) {
@@ -64,12 +137,15 @@ function NewLessonForm({ teacher }: { teacher: Teacher }) {
           </span>
           <h1 className="login-title">تم حفظ الحصة بنجاح!</h1>
           <p className="login-subtitle">
-            حُفظت «{title}» كمسودة في لوحة التحكم، وستظهر لطلابك فور ربط المنصة
-            بالباكند.
+            حُفظت «{title}» وأصبحت ظاهرة الآن في بروفايلك ضمن قسم{" "}
+            {kind === "recorded" ? "«الدروس المسجّلة»" : "«الحصص المباشرة»"}.
           </p>
           <div className="save-success-actions">
-            <Link href="/dashboard" className="btn btn-primary">
-              العودة للوحة التحكم
+            <Link href={`/teacher/${teacher.slug}`} className="btn btn-primary">
+              عرضها في البروفايل
+            </Link>
+            <Link href="/dashboard" className="btn btn-outline">
+              لوحة التحكم
             </Link>
             <button
               type="button"
@@ -79,6 +155,10 @@ function NewLessonForm({ teacher }: { teacher: Teacher }) {
                 setTitle("");
                 setDescription("");
                 setDetail("");
+                setImages([]);
+                setVideo(null);
+                setFiles([]);
+                setQuestions([]);
               }}
             >
               ＋ تصميم حصة أخرى
@@ -99,7 +179,8 @@ function NewLessonForm({ teacher }: { teacher: Teacher }) {
 
       <h1 className="dashboard-title">تصميم حصة جديدة</h1>
       <p className="dashboard-subtitle form-page-subtitle">
-        صمّم درساً مسجّلاً يُضاف لمنهجك أو حصة مباشرة يحجزها طلابك.
+        صمّم درساً مسجّلاً يُضاف لمنهجك أو حصة مباشرة يحجزها طلابك — ستظهر الحصة
+        في بروفايلك فور الحفظ.
       </p>
 
       <form onSubmit={handleSubmit} className="lesson-form">
@@ -229,9 +310,186 @@ function NewLessonForm({ teacher }: { teacher: Teacher }) {
           )}
         </label>
 
+        {/* ===== المرفقات والوسائط ===== */}
+        <fieldset className="form-section">
+          <legend className="form-section-title">📎 الوسائط والمرفقات</legend>
+
+          {kind === "recorded" && (
+            <div className="form-field">
+              <span className="form-label">فيديو الدرس</span>
+              <label className="upload-box">
+                <input
+                  type="file"
+                  accept="video/*"
+                  className="upload-input"
+                  onChange={(e) => setVideo(e.target.files?.[0] ?? null)}
+                />
+                🎞️ {video ? "استبدال الفيديو" : "اختر ملف فيديو"}
+              </label>
+              {video && (
+                <ul className="upload-chips">
+                  <li className="upload-chip">
+                    <span className="upload-chip-name">{video.name}</span>
+                    <span className="upload-chip-size">{formatSize(video.size)}</span>
+                    <button
+                      type="button"
+                      className="upload-chip-remove"
+                      onClick={() => setVideo(null)}
+                      aria-label={`إزالة ${video.name}`}
+                    >
+                      ✕
+                    </button>
+                  </li>
+                </ul>
+              )}
+            </div>
+          )}
+
+          <div className="form-field">
+            <span className="form-label">صور ورسومات توضيحية</span>
+            <label className="upload-box">
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                className="upload-input"
+                onChange={(e) => {
+                  // نلتقط الملفات فوراً: تفريغ value يمسح FileList قبل أن
+                  // تُنفَّذ دالة التحديث المؤجلة
+                  const picked = Array.from(e.target.files ?? []);
+                  setImages((prev) => [...prev, ...picked]);
+                  e.target.value = "";
+                }}
+              />
+              🖼️ أضف صوراً (يمكن اختيار أكثر من صورة)
+            </label>
+            {images.length > 0 && (
+              <ul className="upload-chips">
+                {images.map((f, i) => (
+                  <li key={`${f.name}-${i}`} className="upload-chip">
+                    <span className="upload-chip-name">{f.name}</span>
+                    <span className="upload-chip-size">{formatSize(f.size)}</span>
+                    <button
+                      type="button"
+                      className="upload-chip-remove"
+                      onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
+                      aria-label={`إزالة ${f.name}`}
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="form-field">
+            <span className="form-label">ملفات ومرفقات (PDF، أوراق عمل…)</span>
+            <label className="upload-box">
+              <input
+                type="file"
+                multiple
+                className="upload-input"
+                onChange={(e) => {
+                  const picked = Array.from(e.target.files ?? []);
+                  setFiles((prev) => [...prev, ...picked]);
+                  e.target.value = "";
+                }}
+              />
+              📄 أضف ملفات مرفقة
+            </label>
+            {files.length > 0 && (
+              <ul className="upload-chips">
+                {files.map((f, i) => (
+                  <li key={`${f.name}-${i}`} className="upload-chip">
+                    <span className="upload-chip-name">{f.name}</span>
+                    <span className="upload-chip-size">{formatSize(f.size)}</span>
+                    <button
+                      type="button"
+                      className="upload-chip-remove"
+                      onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
+                      aria-label={`إزالة ${f.name}`}
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </fieldset>
+
+        {/* ===== أسئلة الاختبار ===== */}
+        <fieldset className="form-section">
+          <legend className="form-section-title">❓ أسئلة الاختبار</legend>
+          <p className="form-hint">
+            أضف أسئلة اختيار من متعدد يحلها الطالب في نهاية الحصة (اختياري).
+          </p>
+
+          {questions.map((q, qi) => (
+            <div key={q.key} className="question-card">
+              <div className="question-head">
+                <span className="question-number">السؤال {qi + 1}</span>
+                <button
+                  type="button"
+                  className="upload-chip-remove"
+                  onClick={() => setQuestions((qs) => qs.filter((x) => x.key !== q.key))}
+                  aria-label={`حذف السؤال ${qi + 1}`}
+                >
+                  ✕
+                </button>
+              </div>
+              <input
+                type="text"
+                className="search-input"
+                value={q.prompt}
+                onChange={(e) => updateQuestion(q.key, { prompt: e.target.value })}
+                placeholder="نص السؤال"
+              />
+              <div className="question-options">
+                {q.options.map((opt, oi) => (
+                  <label key={oi} className="question-option">
+                    <input
+                      type="radio"
+                      name={`correct-${q.key}`}
+                      checked={q.correctIndex === oi}
+                      onChange={() => updateQuestion(q.key, { correctIndex: oi })}
+                      title="حدد الإجابة الصحيحة"
+                    />
+                    <input
+                      type="text"
+                      className="search-input"
+                      value={opt}
+                      onChange={(e) =>
+                        updateQuestion(q.key, {
+                          options: q.options.map((o, j) => (j === oi ? e.target.value : o)),
+                        })
+                      }
+                      placeholder={`الخيار ${oi + 1}${oi < 2 ? " *" : " (اختياري)"}`}
+                    />
+                  </label>
+                ))}
+              </div>
+              <p className="form-hint">حدد الدائرة بجانب الإجابة الصحيحة.</p>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={() =>
+              setQuestions((qs) => [...qs, emptyQuestion(questionKey.current++)])
+            }
+          >
+            ＋ أضف سؤالاً
+          </button>
+        </fieldset>
+
+        {saveError && <p className="form-error">{saveError}</p>}
+
         <div className="form-actions">
-          <button type="submit" className="btn btn-primary btn-lg">
-            حفظ الحصة
+          <button type="submit" className="btn btn-primary btn-lg" disabled={saving}>
+            {saving ? "جارٍ الحفظ…" : "حفظ الحصة"}
           </button>
           <Link href="/dashboard" className="btn btn-outline">
             إلغاء
