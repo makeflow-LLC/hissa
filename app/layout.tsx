@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import NavbarActions from "@/components/NavbarActions";
 import "./globals.css";
 
@@ -25,14 +26,16 @@ export default function RootLayout({
               منصة حصة
             </Link>
             <span className="navbar-tagline">مدرستك الرقمية</span>
-            <NavbarActions />
+            <Suspense fallback={<span className="navbar-actions" />}>
+              <NavbarActions />
+            </Suspense>
           </div>
         </header>
         {children}
         <footer className="footer">
           <p className="footer-brand">🎓 منصة حصة</p>
           <p className="footer-text">
-            دروس مسجّلة وحصص مباشرة مع أفضل المعلّمين — تعلّم في أي وقت ومن أي مكان.
+            دروس مسجّلة وحصص مباشرة مع أفضل المعلّمين — مجانية تماماً للطالب.
           </p>
         </footer>
       </body>
