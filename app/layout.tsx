@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import NavbarActions from "@/components/NavbarActions";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -24,6 +25,7 @@ export default function RootLayout({
               منصة حصة
             </Link>
             <span className="navbar-tagline">مدرستك الرقمية</span>
+            <NavbarActions />
           </div>
         </header>
         {children}

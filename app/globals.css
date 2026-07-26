@@ -1034,6 +1034,451 @@ body {
   align-self: center;
 }
 
+/* ===== أزرار الشريط العلوي ===== */
+
+.navbar-actions {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.3rem;
+}
+
+.btn-sm {
+  padding: 0.4rem 0.95rem;
+  font-size: 0.88rem;
+}
+
+.btn-lg {
+  padding: 0.75rem 1.9rem;
+  font-size: 1.05rem;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* ===== صفحة الدخول ===== */
+
+.login-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  max-width: 26rem;
+  margin: 2.5rem auto;
+  padding: 2.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.6rem;
+}
+
+.login-avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 1.7rem;
+  font-weight: 800;
+  box-shadow: inset 0 -2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.login-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.login-subtitle {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.login-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  text-align: start;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.form-label {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.form-error {
+  color: #dc2626;
+  background: #fef2f2;
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.88rem;
+}
+
+.login-hint {
+  margin-top: 0.75rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  background: var(--primary-soft);
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+}
+
+.login-hint code {
+  font-weight: 700;
+  color: var(--primary-dark);
+}
+
+/* ===== لوحة التحكم ===== */
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.75rem;
+}
+
+.dashboard-welcome {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.dashboard-title {
+  font-size: clamp(1.35rem, 4vw, 1.8rem);
+  font-weight: 800;
+}
+
+.dashboard-subtitle {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.form-page-subtitle {
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 1rem;
+  margin-bottom: 2.25rem;
+}
+
+.stat-box-success {
+  background: var(--success-soft);
+}
+
+.stat-box-success .stat-value {
+  color: var(--success);
+}
+
+.dashboard-section {
+  margin-bottom: 2.25rem;
+}
+
+/* إنجاز الوحدات */
+
+.units-progress-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1rem;
+}
+
+.unit-progress-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.2rem 1.3rem;
+}
+
+.unit-progress-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.8rem;
+}
+
+.unit-progress-title {
+  font-size: 1.02rem;
+  font-weight: 800;
+}
+
+.unit-progress-meta {
+  margin-top: 0.55rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* جدول الطلاب */
+
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+}
+
+.students-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 40rem;
+}
+
+.students-table th {
+  text-align: start;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 700;
+  padding: 0.85rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.students-table td {
+  padding: 0.8rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.students-table tr:last-child td {
+  border-bottom: none;
+}
+
+.student-name {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.table-muted {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.18rem 0.7rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.badge-success {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.badge-muted {
+  background: #f1f5f9;
+  color: var(--text-muted);
+}
+
+.badge-live {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.table-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 9rem;
+}
+
+.progress-track-sm {
+  height: 8px;
+  flex: 1;
+}
+
+.table-progress-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--primary-dark);
+  white-space: nowrap;
+}
+
+/* المسودات */
+
+.drafts-empty {
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.drafts-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.draft-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.8rem 1rem;
+  box-shadow: var(--shadow);
+}
+
+.draft-emoji {
+  font-size: 1.6rem;
+}
+
+.draft-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.draft-title {
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.draft-meta {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* ===== نموذج تصميم حصة ===== */
+
+.lesson-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.kind-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.kind-option {
+  font: inherit;
+  font-weight: 700;
+  background: #f8fafc;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  align-items: center;
+  text-align: center;
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.kind-option:hover {
+  border-color: var(--primary);
+}
+
+.kind-option-active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+
+.kind-hint {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 7rem;
+  font-family: inherit;
+}
+
+.emoji-picker {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.emoji-option {
+  font-size: 1.25rem;
+  background: #f8fafc;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  width: 2.6rem;
+  height: 2.6rem;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+
+.emoji-option:hover {
+  transform: scale(1.08);
+}
+
+.emoji-option-active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.save-success-icon {
+  font-size: 3rem;
+}
+
+.save-success-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+
 /* ===== التجاوب مع الموبايل ===== */
 
 @media (max-width: 720px) {
@@ -1048,6 +1493,33 @@ body {
 
   .navbar-tagline {
     display: none;
+  }
+
+  .dashboard-header {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .dashboard-welcome {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .kind-toggle {
+    grid-template-columns: 1fr;
+  }
+
+  .form-actions .btn {
+    flex: 1;
+  }
+
+  .draft-row {
+    flex-wrap: wrap;
+  }
+
+  .draft-row .btn {
+    width: 100%;
   }
 
   .live-card {
