@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { STAGES, subjects, teachers, type Stage } from "@/lib/teachers";
+import Stars from "@/components/Stars";
 
 export default function TeacherDirectory() {
   const [query, setQuery] = useState("");
@@ -62,21 +63,32 @@ export default function TeacherDirectory() {
         <p className="empty-state">لا توجد نتائج مطابقة — جرّب تعديل البحث أو الفلاتر.</p>
       ) : (
         <div className="teachers-grid">
-          {filtered.map((t) => (
-            <article key={t.slug} className="teacher-card">
-              <div className="teacher-avatar" style={{ background: t.gradient }}>
-                {t.initials}
-              </div>
-              <h2 className="teacher-name">{t.name}</h2>
-              <div className="teacher-tags">
-                <span className="tag tag-subject">{t.subject}</span>
-                <span className="tag tag-stage">{t.stage}</span>
-              </div>
-              <Link href={`/teacher/${t.slug}`} className="btn btn-primary">
-                عرض البروفايل
-              </Link>
-            </article>
-          ))}
+          {filtered.map((t) => {
+            const lessonCount = t.units.reduce((n, u) => n + u.lessons.length, 0);
+            return (
+              <article key={t.slug} className="teacher-card">
+                <div className="teacher-avatar" style={{ background: t.gradient }}>
+                  {t.initials}
+                </div>
+                <h2 className="teacher-name">{t.name}</h2>
+                <div className="teacher-tags">
+                  <span className="tag tag-subject">{t.subject}</span>
+                  <span className="tag tag-stage">{t.stage}</span>
+                </div>
+                <div className="teacher-rating">
+                  <Stars rating={t.rating} />
+                  <span className="teacher-rating-value">{t.rating}</span>
+                  <span className="teacher-rating-count">({t.ratingCount})</span>
+                </div>
+                <p className="teacher-counts">
+                  🎬 {lessonCount} درساً مسجّلاً · 🔴 {t.liveSessions.length} حصص مباشرة
+                </p>
+                <Link href={`/teacher/${t.slug}`} className="btn btn-primary">
+                  عرض البروفايل
+                </Link>
+              </article>
+            );
+          })}
         </div>
       )}
     </>
