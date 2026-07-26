@@ -44,7 +44,11 @@ There is no test suite; `npm run build` is the verification gate (compile + Type
 
 ## Supabase (in progress)
 
-The project is being migrated from browser-local state to Supabase (see `docs/supabase-setup.md` on the `claude/supabase-guide` branch for the full plan). Current state:
+The project is being migrated from browser-local state to Supabase (see `docs/supabase-setup.md` for the full plan). **The live project exists and is seeded** — project ref `mexpmtuqhvnphgeqqjuf`, region `eu-central-1`, URL `https://mexpmtuqhvnphgeqqjuf.supabase.co`. Both migrations plus the six mock teachers (12 units / 30 lessons / 90 attachments / 18 live sessions) are already applied; RLS is enabled on every table and the security advisor is clean. The app itself does **not** read from it yet — that is the next phase.
+
+Note: this sandbox's network policy blocks `*.supabase.co`, so `npm run seed` and any runtime query fail here with "Host not in allowlist". Schema/data changes from inside a session must go through the Supabase MCP tools; the user's own machine is unaffected.
+
+Current state:
 
 - `lib/supabase/client.ts` / `lib/supabase/server.ts` — browser and server clients (`@supabase/ssr`). Not yet imported by any page; the app still runs entirely on mock data + localStorage until later phases.
 - `supabase/migrations/0001_init.sql` — schema: `teachers` (incl. profile-override fields as real columns), `units`, `lessons` (drafts become `status='draft'`), `lesson_attachments`, `quiz_questions`, `live_sessions`, `profiles`, `subscriptions`, `lesson_progress`.

@@ -47,7 +47,7 @@ create table public.lessons (
   duration    text not null default '',
   emoji       text not null default '📚',
   gradient    text not null default '',
-  -- رابط الفيديو: عينة تجريبية الآن، وលاحقاً معرف Bunny Stream
+  -- رابط الفيديو: عينة تجريبية الآن، ولاحقاً معرف Bunny Stream
   video_url   text,
   -- أقسام الشرح [{heading, paragraphs[]}] والمعرض [{emoji, caption, gradient, image_path}]
   sections    jsonb not null default '[]',
