@@ -42,6 +42,15 @@ There is no test suite; `npm run build` is the verification gate (compile + Type
 - **Placeholder media**: teacher/lesson/gallery imagery is CSS-only (gradient blocks + initials/emoji stored in the data). Lesson videos use Google's public sample MP4s (`SAMPLE_VIDEOS`). Attachments link to three real placeholder PDFs in `public/files/` shared by all lessons.
 - **Styling** lives entirely in `app/globals.css` using plain CSS with custom properties (no Tailwind/CSS modules). Mobile breakpoint is 720px.
 
+## Supabase (in progress)
+
+The project is being migrated from browser-local state to Supabase (see `docs/supabase-setup.md` on the `claude/supabase-guide` branch for the full plan). Current state:
+
+- `lib/supabase/client.ts` / `lib/supabase/server.ts` — browser and server clients (`@supabase/ssr`). Not yet imported by any page; the app still runs entirely on mock data + localStorage until later phases.
+- `supabase/migrations/0001_init.sql` — schema: `teachers` (incl. profile-override fields as real columns), `units`, `lessons` (drafts become `status='draft'`), `lesson_attachments`, `quiz_questions`, `live_sessions`, `profiles`, `subscriptions`, `lesson_progress`.
+- `supabase/migrations/0002_rls.sql` — RLS enabled on every table; published content is public-read for now (matches current app behavior), owner-write via `teachers.owner_id = auth.uid()`. A commented subscriber-only read policy is included for when paid subscriptions land.
+- `scripts/seed.ts` (`npm run seed`, runs via tsx) — idempotent seed that ports the six mock teachers from `lib/teachers.ts`. Requires `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` in `.env.local` (template: `.env.example`; never commit real keys — `.gitignore` covers `.env*`).
+
 ## Conventions
 
 - Path alias `@/*` maps to the repository root (see `tsconfig.json`).
