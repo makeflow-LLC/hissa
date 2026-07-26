@@ -4,30 +4,352 @@
   box-sizing: border-box;
 }
 
+:root {
+  --primary: #4f46e5;
+  --primary-dark: #4338ca;
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --surface: #ffffff;
+  --border: #e2e8f0;
+  --radius: 16px;
+  --shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 4px 16px rgba(15, 23, 42, 0.06);
+  --shadow-hover: 0 4px 8px rgba(15, 23, 42, 0.1), 0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
 html,
 body {
-  height: 100%;
+  min-height: 100%;
 }
 
 body {
   font-family: "Segoe UI", Tahoma, "Noto Kufi Arabic", "Noto Sans Arabic",
     Arial, sans-serif;
   background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
-  color: #1e293b;
+  color: var(--text);
   -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
 }
 
-.hero {
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+/* ===== الصفحة الرئيسية ===== */
+
+.hero-header {
+  text-align: center;
+  padding: 2rem 0 2.5rem;
+}
+
+.site-title {
+  font-size: clamp(2.25rem, 6vw, 3.5rem);
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--primary), #8b5cf6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.site-subtitle {
+  margin-top: 0.75rem;
+  font-size: clamp(1rem, 2.5vw, 1.2rem);
+  color: var(--text-muted);
+}
+
+/* ===== البحث والفلترة ===== */
+
+.filters {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+  position: sticky;
+  top: 0.75rem;
+  z-index: 10;
+  background: rgba(248, 250, 252, 0.92);
+  backdrop-filter: blur(8px);
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.search-input,
+.filter-select {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.65rem 1rem;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.search-input:focus,
+.filter-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+.filter-select {
+  cursor: pointer;
+  min-width: 9.5rem;
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 4rem 1rem;
+  font-size: 1.1rem;
+}
+
+/* ===== بطاقات المعلّمين ===== */
+
+.teachers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.25rem;
+}
+
+.teacher-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.75rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.85rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.teacher-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-hover);
+}
+
+.teacher-avatar {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 1.75rem;
+  font-weight: 800;
+  box-shadow: inset 0 -2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.teacher-name {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.teacher-tags {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.tag {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.25rem 0.8rem;
+  border-radius: 999px;
+}
+
+.tag-subject {
+  background: #eef2ff;
+  color: var(--primary-dark);
+}
+
+.tag-stage {
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+/* ===== الأزرار ===== */
+
+.btn {
+  font: inherit;
+  font-weight: 700;
+  border: none;
+  border-radius: 10px;
+  padding: 0.6rem 1.5rem;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+}
+
+.btn-primary:active {
+  transform: scale(0.97);
+}
+
+/* ===== صفحة البروفايل ===== */
+
+.breadcrumb {
+  margin-bottom: 1.5rem;
+}
+
+.back-link {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.profile-header {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 2.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.9rem;
+  margin-bottom: 2.5rem;
+}
+
+.profile-avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 2.4rem;
+  font-weight: 800;
+  box-shadow: inset 0 -2px 10px rgba(0, 0, 0, 0.12);
+}
+
+.profile-name {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 800;
+}
+
+.profile-bio {
+  max-width: 42rem;
+  color: var(--text-muted);
+}
+
+.section-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 1.25rem;
+}
+
+/* ===== بطاقات الحصص ===== */
+
+.lessons-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.lesson-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
   display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  padding: 1rem;
+  gap: 1.25rem;
+  transition: box-shadow 0.2s;
 }
 
-.title {
-  font-size: clamp(3rem, 10vw, 6rem);
-  font-weight: 800;
-  text-align: center;
-  letter-spacing: -0.02em;
+.lesson-card:hover {
+  box-shadow: var(--shadow-hover);
+}
+
+.lesson-image {
+  width: 96px;
+  height: 96px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 2.4rem;
+  flex-shrink: 0;
+  color: #fff;
+}
+
+.lesson-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.lesson-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.lesson-description {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+}
+
+.lesson-duration {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--primary-dark);
+  background: #eef2ff;
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.btn-book {
+  flex-shrink: 0;
+}
+
+/* ===== التجاوب مع الموبايل ===== */
+
+@media (max-width: 720px) {
+  .filters {
+    grid-template-columns: 1fr;
+    position: static;
+  }
+
+  .filter-select {
+    min-width: 0;
+  }
+
+  .lesson-card {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .lesson-image {
+    width: 100%;
+    height: 120px;
+  }
+
+  .btn-book {
+    width: 100%;
+  }
 }
