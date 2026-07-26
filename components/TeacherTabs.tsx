@@ -2,24 +2,29 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { Teacher } from "@/lib/teachers";
-import { useLessonProgress } from "@/lib/useLessonProgress";
+import type { TeacherProfile } from "@/lib/data/types";
 import { useLessonDrafts } from "@/lib/useLessonDrafts";
+import EnrollButton from "@/components/EnrollButton";
 
-export default function TeacherTabs({ teacher }: { teacher: Teacher }) {
+export default function TeacherTabs({
+  profile,
+  isAuthed,
+}: {
+  profile: TeacherProfile;
+  isAuthed: boolean;
+}) {
+  const { teacher, units, liveSessions, completedLessonIds, enrolledSessionIds } = profile;
   const [tab, setTab] = useState<"recorded" | "live">("recorded");
-  const { completed, loaded, isCompleted } = useLessonProgress(teacher.slug);
+  // حصص صمّمها المعلم محلياً في متصفحه (ميزة تجريبية قائمة على localStorage)
   const { drafts, loaded: draftsLoaded } = useLessonDrafts(teacher.slug);
-
   const recordedDrafts = draftsLoaded ? drafts.filter((d) => d.kind === "recorded") : [];
   const liveDrafts = draftsLoaded ? drafts.filter((d) => d.kind === "live") : [];
 
-  const totalLessons = teacher.units.reduce((n, u) => n + u.lessons.length, 0);
-  const doneCount = loaded
-    ? teacher.units
-        .flatMap((u) => u.lessons)
-        .filter((l) => completed.includes(l.id)).length
-    : 0;
+  const done = new Set(completedLessonIds);
+  const totalLessons = units.reduce((n, u) => n + u.lessons.length, 0);
+  const doneCount = units
+    .flatMap((u) => u.lessons)
+    .filter((l) => done.has(l.id)).length;
   const progressPct = totalLessons ? Math.round((doneCount / totalLessons) * 100) : 0;
 
   return (
@@ -43,30 +48,32 @@ export default function TeacherTabs({ teacher }: { teacher: Teacher }) {
           onClick={() => setTab("live")}
         >
           🔴 الحصص المباشرة
-          <span className="tab-count">{teacher.liveSessions.length + liveDrafts.length}</span>
+          <span className="tab-count">{liveSessions.length + liveDrafts.length}</span>
         </button>
       </div>
 
       {tab === "recorded" ? (
         <div>
-          <div className="progress-card">
-            <div className="progress-labels">
-              <span className="progress-title">تقدّمك في المنهج</span>
-              <span className="progress-value">
-                أنجزت {doneCount} من {totalLessons} دروس ({progressPct}٪)
-              </span>
+          {isAuthed && (
+            <div className="progress-card">
+              <div className="progress-labels">
+                <span className="progress-title">تقدّمك في المنهج</span>
+                <span className="progress-value">
+                  أنجزت {doneCount} من {totalLessons} دروس ({progressPct}٪)
+                </span>
+              </div>
+              <div
+                className="progress-track"
+                role="progressbar"
+                aria-valuenow={doneCount}
+                aria-valuemin={0}
+                aria-valuemax={totalLessons}
+                aria-label="نسبة إنجاز الدروس"
+              >
+                <div className="progress-fill" style={{ width: `${progressPct}%` }} />
+              </div>
             </div>
-            <div
-              className="progress-track"
-              role="progressbar"
-              aria-valuenow={doneCount}
-              aria-valuemin={0}
-              aria-valuemax={totalLessons}
-              aria-label="نسبة إنجاز الدروس"
-            >
-              <div className="progress-fill" style={{ width: `${progressPct}%` }} />
-            </div>
-          </div>
+          )}
 
           {recordedDrafts.length > 0 && (
             <section className="unit unit-new">
@@ -88,7 +95,10 @@ export default function TeacherTabs({ teacher }: { teacher: Teacher }) {
                       href={`/teacher/${teacher.slug}/lesson-draft/${d.id}`}
                       className="lesson-row"
                     >
-                      <span className="lesson-row-thumb lesson-row-thumb-draft" aria-hidden="true">
+                      <span
+                        className="lesson-row-thumb lesson-row-thumb-draft"
+                        aria-hidden="true"
+                      >
                         {d.emoji}
                       </span>
                       <span className="lesson-row-body">
@@ -98,7 +108,9 @@ export default function TeacherTabs({ teacher }: { teacher: Teacher }) {
                       <span className="lesson-row-meta">
                         <span className="lesson-duration">⏱ {d.duration}</span>
                         {d.quiz.length > 0 && (
-                          <span className="lesson-quiz-badge">❓ {d.quiz.length} أسئلة</span>
+                          <span className="lesson-quiz-badge">
+                            ❓ {d.quiz.length} أسئلة
+                          </span>
                         )}
                       </span>
                     </Link>
@@ -108,10 +120,8 @@ export default function TeacherTabs({ teacher }: { teacher: Teacher }) {
             </section>
           )}
 
-          {teacher.units.map((unit, ui) => {
-            const unitDone = loaded
-              ? unit.lessons.filter((l) => completed.includes(l.id)).length
-              : 0;
+          {units.map((unit, ui) => {
+            const unitDone = unit.lessons.filter((l) => done.has(l.id)).length;
             return (
               <section key={unit.id} className="unit">
                 <header className="unit-header">
@@ -122,43 +132,55 @@ export default function TeacherTabs({ teacher }: { teacher: Teacher }) {
                     </h3>
                     <p className="unit-description">{unit.description}</p>
                   </div>
-                  <span className="unit-progress">
-                    {unitDone}/{unit.lessons.length} منجز
-                  </span>
+                  {isAuthed && (
+                    <span className="unit-progress">
+                      {unitDone}/{unit.lessons.length} منجز
+                    </span>
+                  )}
                 </header>
                 <ol className="unit-lessons">
-                  {unit.lessons.map((lesson, li) => (
-                    <li key={lesson.id}>
-                      <Link
-                        href={`/teacher/${teacher.slug}/lesson/${lesson.id}`}
-                        className={`lesson-row ${
-                          isCompleted(lesson.id) ? "lesson-row-done" : ""
-                        }`}
-                      >
-                        <span
-                          className="lesson-row-thumb"
-                          style={{ background: lesson.gradient }}
-                          aria-hidden="true"
+                  {unit.lessons.map((lesson, li) => {
+                    const isDone = done.has(lesson.id);
+                    const locked = !isAuthed && !lesson.is_free_preview;
+                    return (
+                      <li key={lesson.id}>
+                        <Link
+                          href={`/teacher/${teacher.slug}/lesson/${lesson.id}`}
+                          className={`lesson-row ${isDone ? "lesson-row-done" : ""} ${
+                            locked ? "lesson-row-locked" : ""
+                          }`}
                         >
-                          {lesson.emoji}
-                        </span>
-                        <span className="lesson-row-body">
-                          <span className="lesson-row-title">
-                            {li + 1}. {lesson.title}
+                          <span
+                            className="lesson-row-thumb"
+                            style={{ background: lesson.gradient }}
+                            aria-hidden="true"
+                          >
+                            {locked ? "🔒" : lesson.emoji}
                           </span>
-                          <span className="lesson-row-description">
-                            {lesson.description}
+                          <span className="lesson-row-body">
+                            <span className="lesson-row-title">
+                              {li + 1}. {lesson.title}
+                            </span>
+                            <span className="lesson-row-description">
+                              {lesson.description}
+                            </span>
                           </span>
-                        </span>
-                        <span className="lesson-row-meta">
-                          <span className="lesson-duration">⏱ {lesson.duration}</span>
-                          {isCompleted(lesson.id) && (
-                            <span className="lesson-done-badge">✓ منجز</span>
-                          )}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
+                          <span className="lesson-row-meta">
+                            <span className="lesson-duration">⏱ {lesson.duration}</span>
+                            {lesson.is_free_preview && (
+                              <span className="badge badge-free">🎁 عيّنة مجانية</span>
+                            )}
+                            {isDone && <span className="lesson-done-badge">✓ منجز</span>}
+                            {locked && (
+                              <span className="lesson-locked-badge">
+                                سجّل الدخول للمشاهدة
+                              </span>
+                            )}
+                          </span>
+                        </Link>
+                      </li>
+                    );
+                  })}
                 </ol>
               </section>
             );
@@ -183,31 +205,47 @@ export default function TeacherTabs({ teacher }: { teacher: Teacher }) {
                   <span className="lesson-duration">⏱ {d.duration}</span>
                 </div>
               </div>
-              <button type="button" className="btn btn-primary btn-book">
-                احجز
-              </button>
             </article>
           ))}
-          {teacher.liveSessions.map((s) => (
+
+          {liveSessions.map((s) => (
             <article key={s.id} className="live-card">
-              <div className="live-thumb" style={{ background: s.gradient }} aria-hidden="true">
+              <div
+                className="live-thumb"
+                style={{ background: s.gradient }}
+                aria-hidden="true"
+              >
                 {s.emoji}
               </div>
               <div className="live-body">
                 <h3 className="live-title">
                   {s.title}
                   <span className="live-badge">مباشر</span>
+                  {s.is_paid ? (
+                    <span className="badge badge-paid">
+                      💰 {s.price} {s.currency}
+                    </span>
+                  ) : (
+                    <span className="badge badge-free">مجانية</span>
+                  )}
                 </h3>
                 <p className="live-description">{s.description}</p>
                 <div className="live-meta">
                   <span className="live-schedule">📅 {s.schedule}</span>
                   <span className="lesson-duration">⏱ {s.duration}</span>
-                  <span className="live-seats">🪑 متبقٍ {s.seatsLeft} مقعداً</span>
+                  <span className="live-seats">🪑 متبقٍ {s.seats_left} مقعداً</span>
                 </div>
               </div>
-              <button type="button" className="btn btn-primary btn-book">
-                احجز
-              </button>
+              <EnrollButton
+                sessionId={s.id}
+                teacherSlug={teacher.slug}
+                isPaid={s.is_paid}
+                price={Number(s.price)}
+                currency={s.currency}
+                enrolledStatus={enrolledSessionIds[s.id]}
+                isAuthed={isAuthed}
+                whatsapp={teacher.whatsapp}
+              />
             </article>
           ))}
         </div>

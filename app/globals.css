@@ -1863,6 +1863,345 @@ body {
   flex-shrink: 0;
 }
 
+/* ===== طبقات الوصول: الزائر والطالب ===== */
+
+.hero-cta {
+  margin-top: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  max-width: 40rem;
+  margin-inline: auto;
+}
+
+.hero-cta-text {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.visitor-banner {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  color: #92400e;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.visitor-banner .btn {
+  margin-inline-start: auto;
+}
+
+.lesson-row-locked {
+  opacity: 0.75;
+}
+
+.lesson-row-locked:hover {
+  opacity: 1;
+}
+
+.lesson-locked-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #b45309;
+  background: #fffbeb;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.badge-free {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.badge-paid {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.badge-warn {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.stat-box-warn {
+  background: #fffbeb;
+}
+
+.stat-box-warn .stat-value {
+  color: #b45309;
+}
+
+.unit-chip-free {
+  background: var(--success-soft);
+  color: var(--success);
+  margin-inline-start: 0.4rem;
+}
+
+/* لوحة الدرس المقفل */
+
+.locked-panel {
+  background: var(--surface);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 3rem 1.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 2rem;
+}
+
+.locked-icon {
+  font-size: 3rem;
+}
+
+.locked-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.locked-text {
+  color: var(--text-muted);
+  max-width: 34rem;
+}
+
+.locked-hint {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.locked-inline {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+  padding: 0.9rem 1.1rem;
+  color: #92400e;
+  font-size: 0.92rem;
+}
+
+/* ===== أزرار الطالب ===== */
+
+.btn-google {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-google:hover {
+  background: #f8fafc;
+  border-color: var(--primary);
+}
+
+.btn-following {
+  background: var(--success-soft);
+  color: var(--success);
+  border: 1px solid #bbf7d0;
+}
+
+.profile-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.enroll-state,
+.enroll-state-col {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 12rem;
+}
+
+.price-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.enroll-msg-ok,
+.enroll-msg-err {
+  font-size: 0.8rem;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.enroll-msg-ok {
+  color: var(--success);
+}
+
+.enroll-msg-err {
+  color: #dc2626;
+}
+
+.pending-note {
+  margin-top: 0.5rem;
+  background: #fffbeb;
+  border-radius: 10px;
+  padding: 0.5rem 0.8rem;
+  color: #92400e;
+  font-size: 0.85rem;
+}
+
+/* ===== صفحة الدخول ===== */
+
+.login-emoji {
+  font-size: 2.6rem;
+}
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: 0.35rem 0;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.login-alt {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+/* ===== الشريط العلوي ===== */
+
+.navbar-link {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.navbar-link:hover {
+  color: var(--primary);
+}
+
+.navbar-user {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===== لوحة الطالب ===== */
+
+.follow-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.follow-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.follow-avatar-initials {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.plain-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.plain-link:hover {
+  color: var(--primary);
+}
+
+.unit-mini-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin: 0.9rem 0;
+}
+
+.unit-mini {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+
+.unit-mini-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+.unit-mini-track {
+  width: 5rem;
+  height: 6px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.unit-mini-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), #8b5cf6);
+  border-radius: 999px;
+}
+
+.unit-mini-count {
+  font-weight: 700;
+  color: var(--primary-dark);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.finished-note {
+  text-align: center;
+  color: var(--success);
+  font-weight: 700;
+  background: var(--success-soft);
+  border-radius: 10px;
+  padding: 0.6rem;
+  font-size: 0.9rem;
+}
+
 /* ===== التجاوب مع الموبايل ===== */
 
 @media (max-width: 720px) {
@@ -1920,6 +2259,30 @@ body {
 
   .avatar-edit {
     justify-content: center;
+  }
+
+  .visitor-banner {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .visitor-banner .btn {
+    margin-inline-start: 0;
+  }
+
+  .enroll-state-col,
+  .enroll-state {
+    max-width: none;
+    width: 100%;
+  }
+
+  .navbar-user {
+    display: none;
+  }
+
+  .navbar-link {
+    display: none;
   }
 
   .live-card {

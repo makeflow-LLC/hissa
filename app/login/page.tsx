@@ -1,88 +1,154 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { teachers } from "@/lib/teachers";
-import { useTeacherAuth, DEMO_PASSWORD } from "@/lib/useTeacherAuth";
+import { Suspense, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
-  const { teacher, loaded, login } = useTeacherAuth();
-  const router = useRouter();
-  const [slug, setSlug] = useState(teachers[0].slug);
-  const [password, setPassword] = useState("");
+  return (
+    <Suspense
+      fallback={
+        <main className="container container-narrow">
+          <p className="empty-state">جارٍ التحميل…</p>
+        </main>
+      }
+    >
+      <LoginCard />
+    </Suspense>
+  );
+}
+
+function LoginCard() {
+  const params = useSearchParams();
+  const next = params.get("next") ?? "/dashboard";
+  const urlError = params.get("error");
+
+  const [email, setEmail] = useState("");
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState<"google" | "email" | null>(null);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (loaded && teacher) router.replace("/dashboard");
-  }, [loaded, teacher, router]);
+  const callbackUrl = () =>
+    `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
 
-  const selected = teachers.find((t) => t.slug === slug) ?? teachers[0];
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (login(slug, password)) {
-      router.push("/dashboard");
-    } else {
-      setError("كلمة المرور غير صحيحة — جرّب كلمة المرور التجريبية الموضحة بالأسفل.");
+  async function signInWithGoogle() {
+    setBusy("google");
+    setError("");
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: callbackUrl() },
+    });
+    if (error) {
+      setError(
+        "تعذّر الدخول بجوجل. إن لم يكن مزوّد جوجل مُفعّلاً في المشروع، استخدم الرابط السحري بالبريد."
+      );
+      setBusy(null);
     }
+  }
+
+  async function sendMagicLink(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy("email");
+    setError("");
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: { emailRedirectTo: callbackUrl() },
+    });
+    setBusy(null);
+    if (error) {
+      setError("تعذّر إرسال الرابط — تأكد من صحة البريد وحاول مرة أخرى.");
+      return;
+    }
+    setSent(true);
+  }
+
+  if (sent) {
+    return (
+      <main className="container container-narrow">
+        <div className="login-card">
+          <span className="save-success-icon" aria-hidden="true">
+            📬
+          </span>
+          <h1 className="login-title">تحقّق من بريدك</h1>
+          <p className="login-subtitle">
+            أرسلنا رابط دخول إلى <strong dir="ltr">{email}</strong>. اضغط الرابط من
+            نفس الجهاز لتسجيل الدخول — لا تحتاج كلمة مرور.
+          </p>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={() => setSent(false)}
+          >
+            إرسال لبريد آخر
+          </button>
+        </div>
+      </main>
+    );
   }
 
   return (
     <main className="container container-narrow">
       <div className="login-card">
-        <div className="login-avatar" style={{ background: selected.gradient }}>
-          {selected.initials}
-        </div>
-        <h1 className="login-title">دخول المعلّمين</h1>
+        <span className="login-emoji" aria-hidden="true">
+          🎓
+        </span>
+        <h1 className="login-title">دخول الطلاب</h1>
         <p className="login-subtitle">
-          ادخل إلى لوحة التحكم لمتابعة طلابك وتصميم حصصك الجديدة
+          الوصول مجاني تماماً للطالب. سجّل الدخول لتشاهد كل الدروس، وتحمّل
+          المرفقات، وتسجّل في الحصص، ويُحفظ تقدّمك.
         </p>
 
-        <form onSubmit={handleSubmit} className="login-form">
-          <label className="form-field">
-            <span className="form-label">اختر حسابك</span>
-            <select
-              className="filter-select"
-              value={slug}
-              onChange={(e) => {
-                setSlug(e.target.value);
-                setError("");
-              }}
-            >
-              {teachers.map((t) => (
-                <option key={t.slug} value={t.slug}>
-                  {t.name} — {t.subject} ({t.stage})
-                </option>
-              ))}
-            </select>
-          </label>
+        {(error || urlError) && <p className="form-error">{error || urlError}</p>}
 
+        <button
+          type="button"
+          className="btn btn-google btn-block"
+          onClick={signInWithGoogle}
+          disabled={busy !== null}
+        >
+          {busy === "google" ? "جارٍ التحويل…" : "الدخول بحساب جوجل"}
+        </button>
+
+        <div className="login-divider">
+          <span>أو</span>
+        </div>
+
+        <form onSubmit={sendMagicLink} className="login-form">
           <label className="form-field">
-            <span className="form-label">كلمة المرور</span>
+            <span className="form-label">البريد الإلكتروني</span>
             <input
-              type="password"
+              type="email"
+              dir="ltr"
               className="search-input"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setError("");
-              }}
-              placeholder="••••••"
-              autoComplete="current-password"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
               required
             />
           </label>
-
-          {error && <p className="form-error">{error}</p>}
-
-          <button type="submit" className="btn btn-primary btn-block">
-            تسجيل الدخول
+          <button
+            type="submit"
+            className="btn btn-primary btn-block"
+            disabled={busy !== null}
+          >
+            {busy === "email" ? "جارٍ الإرسال…" : "أرسل لي رابط دخول"}
           </button>
         </form>
 
         <p className="login-hint">
-          🔑 نسخة تجريبية بدون باكند — كلمة المرور لأي حساب:{" "}
-          <code dir="ltr">{DEMO_PASSWORD}</code>
+          🔒 بلا كلمات مرور: نرسل لك رابطاً سحرياً بالبريد. الدخول بالجوال
+          (رسالة تحقّق) سيُضاف عند توفّر مزوّد رسائل.
+        </p>
+
+        <p className="login-alt">
+          معلّم؟{" "}
+          <Link href="/teacher-login" className="back-link">
+            دخول المعلّمين من هنا
+          </Link>
         </p>
       </div>
     </main>

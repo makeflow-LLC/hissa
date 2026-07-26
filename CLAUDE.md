@@ -4,7 +4,21 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-"منصة حصة" (Hissa Platform) is an Arabic-language, RTL digital-school platform built with Next.js. Students browse a searchable teacher directory; each teacher profile offers a curriculum of recorded lessons organized into units (with per-student progress tracking) plus bookable live sessions. Each recorded lesson has a full lesson page: video player, formatted explanation, illustration gallery, and downloadable attachments.
+"منصة حصة" (Hissa Platform) is an Arabic-language, RTL digital-school platform built with Next.js and Supabase. Students browse a searchable teacher directory; each teacher profile offers a curriculum of recorded lessons organized into units plus enrollable live sessions.
+
+**Business model:** the platform is **free for students** — no payments ever flow through it. Teachers set their own pricing per live session; a paid session creates an enrollment with status `pending_payment` and the teacher settles it directly with the student over WhatsApp.
+
+**Access tiers:**
+
+| | Visitor (not signed in) | Signed-in student |
+|---|---|---|
+| Directory, search, filter, any profile | ✅ | ✅ |
+| Lesson titles + descriptions | ✅ | ✅ |
+| Full lesson content (video, explanation, gallery) | ❌ — except the one lesson flagged `is_free_preview` per teacher | ✅ all lessons |
+| Attachments, quizzes | ❌ | ✅ |
+| Enroll in sessions, follow teachers, save progress | ❌ | ✅ |
+
+Locked rows show a "سجّل الدخول للمشاهدة" badge; locked lesson pages show a full sign-in panel.
 
 ## Commands
 
@@ -13,50 +27,96 @@ npm install        # install dependencies
 npm run dev        # development server on http://localhost:3000
 npm run build      # production build (also type-checks)
 npm run start      # serve the production build
+npm run seed       # port lib/teachers.ts mock data into Supabase (needs service-role key)
 ```
 
-There is no test suite; `npm run build` is the verification gate (compile + TypeScript check + static generation).
+There is no test suite; `npm run build` is the verification gate (compile + TypeScript check). Database security is verified by role-switching SQL run through the Supabase MCP tools (see "Verifying access tiers").
+
+## Supabase
+
+Live project ref `mexpmtuqhvnphgeqqjuf`, region `eu-central-1`, URL `https://mexpmtuqhvnphgeqqjuf.supabase.co`. Schema, RLS and the six seeded teachers (12 units / 30 lessons / 90 attachments / 18 live sessions) are all applied.
+
+Required in `.env.local` (never commit — `.gitignore` covers `.env*`; template in `.env.example`):
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://mexpmtuqhvnphgeqqjuf.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<publishable key>
+SUPABASE_SERVICE_ROLE_KEY=<secret key>   # npm run seed only — never NEXT_PUBLIC_
+```
+
+> **Sandbox note:** this environment's network policy blocks `*.supabase.co`, so `npm run seed` and any runtime query fail here with "Host not in allowlist". Schema/data changes from inside a session must go through the Supabase MCP tools. Pages degrade to a server-rendered `ConnectionNotice` instead of crashing, so `npm run build` and route smoke tests still work offline.
+
+### Tables
+
+`teachers`, `units`, `lessons`, `lesson_attachments`, `quiz_questions`, `live_sessions`, `profiles`, `subscriptions`, `enrollments`, `follows`, `lesson_progress`.
+
+- `lessons.is_free_preview` — the one visitor-visible lesson per teacher (seeded as unit 0 / position 0).
+- `live_sessions.is_paid` / `price` / `currency` — teacher-set pricing, default free.
+- `enrollments.status` — `enrolled` | `pending_payment` | `cancelled`.
+- `lesson_progress` — one row per completed lesson (`completed`, `completed_at`).
+- `subscriptions` is legacy and unused by the app; `follows` is what "تابع هذا المعلم" writes.
+
+### Migrations (`supabase/migrations/`)
+
+| File | Purpose |
+|---|---|
+| `0001_init.sql` | base schema + indexes |
+| `0002_rls.sql` | RLS on every table; owner-write via `teachers.owner_id = auth.uid()` |
+| `0003_student_access.sql` | pricing/preview columns, `enrollments`, `follows`, RLS, `handle_new_user` trigger |
+| `0004_visitor_column_gating.sql` | **column privileges** hiding lesson content from `anon` + `get_free_preview_content()` RPC |
+| `0005_lock_down_trigger_function.sql` | revoke API execute on the trigger function |
+
+### How visitor gating is enforced
+
+RLS filters rows, not columns — so content hiding uses **column privileges**: `anon` may select only lesson metadata (`title`, `description`, `duration`, …) and is denied `sections`, `gallery`, `video_url`. `authenticated` gets full select. The single escape hatch is the `security definer` function `get_free_preview_content(lesson_id)`, which returns content **only** for rows where `is_free_preview = true`. Attachments and quizzes require `auth.uid() is not null` via RLS.
+
+The gate therefore cannot be bypassed by calling the REST API directly — do not "fix" it by loosening these grants.
+
+Supabase's security advisor flags `get_free_preview_content` as an anon-executable `security definer` function. **That warning is expected and intentional** — it is the free-preview gate.
+
+### Verifying access tiers
+
+Security is verified with SQL that switches `role` and `request.jwt.claims` to impersonate `anon` and two distinct students, asserting: visitor reads titles but not content, sees zero attachments/quizzes, and can open only the free preview; a signed-in student reads all content and 90 attachments; and student B sees none of student A's enrollments/follows/progress and cannot insert rows under A's id. Re-run this after any RLS or grant change, then drop the temporary test functions and test `auth.users` rows.
 
 ## Architecture
 
-- **Next.js 15 App Router** with React 19 and TypeScript. All pages are statically generated.
-- **RTL/Arabic-first**: the root layout (`app/layout.tsx`) sets `lang="ar" dir="rtl"` and renders the shared navbar/footer. All UI text is Arabic; keep new UI text in Arabic and layout direction-aware (prefer logical CSS properties — `inset-inline-start`, `padding-inline-start` — or direction-neutral flex/grid).
-- **`lib/teachers.ts`** — the single source of truth for all data and types: `Teacher`, `Unit`, `RecordedLesson` (with `sections`, `gallery`, `attachments`), `LiveSession`, the `STAGES` tuple, and the mock data for six teachers (each: 2 units / 5 recorded lessons / 3 live sessions, plus `rating`/`ratingCount`). The `lesson()` helper expands compact drafts into full lessons (sample video URL rotation, standard section headings, gallery gradients, shared attachment files). Helpers: `getTeacherBySlug()`, `getAllLessons()` (curriculum order), `getLessonContext()` (lesson + prev/next).
-- **`lib/students.ts`** — mock students per teacher, generated deterministically from the teacher slug (same list every render; no randomness that could break hydration). Each student has subscription status and sequential curriculum progress (`completedLessonIds`).
-- **Routes**:
-  - `app/page.tsx` — home: hero + `TeacherDirectory`.
-  - `app/teacher/[slug]/page.tsx` — profile: header with stats (lesson count, live count, star rating) + `TeacherTabs`.
-  - `app/teacher/[slug]/lesson/[lessonId]/page.tsx` — lesson page: breadcrumb, `VideoPlayer`, content sections, gallery, attachments, prev/next navigation, `LessonCompleteButton`, unit lesson list. Both dynamic routes use `generateStaticParams` and `notFound()`; `params` is a `Promise` in Next 15 and must be awaited.
-  - `app/teacher/[slug]/lesson-draft/[draftId]/page.tsx` — public page for a teacher-designed lesson (client-rendered, `use(params)`, no `generateStaticParams` — drafts live in the visitor's browser): uploaded video player, explanation, image gallery, downloadable attachments, and an interactive `QuizSection`.
-  - `app/login/page.tsx` — mock teacher sign-in (client page): pick a teacher account + demo password (`DEMO_PASSWORD` = "123456" in `lib/useTeacherAuth.ts`).
-  - `app/dashboard/page.tsx` — teacher dashboard (client page, redirects to `/login` when signed out): stats (lessons, live sessions, students, active subscribers), per-unit student-completion overview, students table with progress bars, and designed lessons (view/delete).
-  - `app/dashboard/new-lesson/page.tsx` — "design a new lesson" form (recorded lesson or live session) with media uploads (video/images/files → IndexedDB) and a multiple-choice quiz builder; saves via `useLessonDrafts`. Saved lessons appear on the teacher's public profile (in `TeacherTabs`).
-  - `app/dashboard/profile/page.tsx` — teacher profile editor: avatar/logo upload (canvas-resized to 256px data URL), display name, bio, optional WhatsApp number (shows a wa.me button on the profile), and multi-select teaching stages. Stored via `useTeacherProfile` and merged over base data everywhere (`mergeTeacherProfile`).
-- **Client components**: `TeacherDirectory` (search/filter state + profile overrides), `TeacherTabs` (recorded/live tabs + progress bars + designed-lesson sections), `TeacherProfileHeader` (profile header with overrides + WhatsApp button), `VideoPlayer` (poster → HTML5 video), `QuizSection` (interactive quiz), `LessonCompleteButton`, `NavbarActions`. `Stars` is a server-renderable rating display.
-- **Local state (no backend)** — all "use client" hooks read localStorage after mount to avoid hydration mismatch, and cross-component instances sync via custom window events:
-  - `lib/useLessonProgress.ts`: completed-lesson ids per teacher under `hissa-progress:<teacherSlug>`.
-  - `lib/useTeacherAuth.ts`: mock teacher session under `hissa-teacher-session` (slug only; shared demo password); event `hissa-auth-change`.
-  - `lib/useLessonDrafts.ts`: teacher-designed lessons under `hissa-drafts:<teacherSlug>` (with `media` refs + `quiz`); event `hissa-drafts-change`.
-  - `lib/useTeacherProfile.ts`: profile overrides under `hissa-teacher-profile:<teacherSlug>`; event `hissa-profile-change`.
-  - `lib/mediaStore.ts`: uploaded media blobs (video/images/files) in IndexedDB db `hissa-media` — localStorage is too small for these; drafts store `{id, name, mime, size}` refs only.
-- **Placeholder media**: teacher/lesson/gallery imagery is CSS-only (gradient blocks + initials/emoji stored in the data). Lesson videos use Google's public sample MP4s (`SAMPLE_VIDEOS`). Attachments link to three real placeholder PDFs in `public/files/` shared by all lessons.
-- **Styling** lives entirely in `app/globals.css` using plain CSS with custom properties (no Tailwind/CSS modules). Mobile breakpoint is 720px.
+- **Next.js 15 App Router**, React 19, TypeScript. **All data-backed routes are `force-dynamic`** — output depends on auth state, so static/ISR caching would serve the wrong tier. Do not add `generateStaticParams` back to these routes.
+- **RTL/Arabic-first**: root layout sets `lang="ar" dir="rtl"`. Keep new UI text Arabic and direction-aware (logical CSS properties or direction-neutral flex/grid).
+- **`middleware.ts` + `lib/supabase/middleware.ts`** — refreshes the Supabase session cookie on every request. Without it a student's token expires without renewal and the server sees an anonymous visitor.
+- **`lib/supabase/client.ts` / `server.ts`** — browser and server clients (`@supabase/ssr`).
+- **`lib/data/types.ts` / `queries.ts`** — the only place that reads Supabase. `getCurrentUser()` and `getStudentName()` **fail closed** (any error ⇒ treated as visitor) because they run inside the root layout; a throw there would take down every page including the error boundary. Page-level queries throw and each page catches into `ConnectionNotice`.
+- **`app/actions/student.ts`** — server actions: `enrollInSession` (free ⇒ `enrolled`, paid ⇒ `pending_payment`), `cancelEnrollment`, `toggleFollow`, `toggleLessonComplete`. Each re-validates auth server-side and calls `revalidatePath`.
 
-## Supabase (in progress)
+### Routes
 
-The project is being migrated from browser-local state to Supabase (see `docs/supabase-setup.md` for the full plan). **The live project exists and is seeded** — project ref `mexpmtuqhvnphgeqqjuf`, region `eu-central-1`, URL `https://mexpmtuqhvnphgeqqjuf.supabase.co`. Both migrations plus the six mock teachers (12 units / 30 lessons / 90 attachments / 18 live sessions) are already applied; RLS is enabled on every table and the security advisor is clean. The app itself does **not** read from it yet — that is the next phase.
+| Route | Notes |
+|---|---|
+| `app/page.tsx` | home directory; passes teacher cards to `TeacherDirectory` |
+| `app/teacher/[slug]/page.tsx` | profile: header, follow button, WhatsApp, visitor banner, `TeacherTabs` |
+| `app/teacher/[slug]/lesson/[lessonId]/page.tsx` | lesson; renders locked panel when gated |
+| `app/teacher/[slug]/lesson-draft/[draftId]/page.tsx` | teacher-designed lesson (localStorage demo, client-rendered) |
+| `app/login/page.tsx` | **student** sign-in: Google OAuth + email magic link |
+| `app/auth/callback/route.ts` | exchanges the OAuth/magic-link code for a session |
+| `app/auth/signout/route.ts` | POST sign-out |
+| `app/dashboard/page.tsx` | **student** dashboard: حصصي / معلّميّ / تقدّمي + "أكمل التعلّم" |
+| `app/teacher-login/page.tsx` | teacher demo sign-in (was `/login`) |
+| `app/teacher-dashboard/**` | teacher demo dashboard, new-lesson designer, profile editor (was `/dashboard/**`) |
 
-Note: this sandbox's network policy blocks `*.supabase.co`, so `npm run seed` and any runtime query fail here with "Host not in allowlist". Schema/data changes from inside a session must go through the Supabase MCP tools; the user's own machine is unaffected.
+Auth providers: **email magic link works out of the box**; **Google OAuth must be enabled** in Supabase → Authentication → Providers with the callback URL added to redirect URLs. Phone/WhatsApp OTP is deliberately deferred until an SMS provider exists.
 
-Current state:
+### Client vs server components
 
-- `lib/supabase/client.ts` / `lib/supabase/server.ts` — browser and server clients (`@supabase/ssr`). Not yet imported by any page; the app still runs entirely on mock data + localStorage until later phases.
-- `supabase/migrations/0001_init.sql` — schema: `teachers` (incl. profile-override fields as real columns), `units`, `lessons` (drafts become `status='draft'`), `lesson_attachments`, `quiz_questions`, `live_sessions`, `profiles`, `subscriptions`, `lesson_progress`.
-- `supabase/migrations/0002_rls.sql` — RLS enabled on every table; published content is public-read for now (matches current app behavior), owner-write via `teachers.owner_id = auth.uid()`. A commented subscriber-only read policy is included for when paid subscriptions land.
-- `scripts/seed.ts` (`npm run seed`, runs via tsx) — idempotent seed that ports the six mock teachers from `lib/teachers.ts`. Requires `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` in `.env.local` (template: `.env.example`; never commit real keys — `.gitignore` covers `.env*`).
+Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`.
+
+### Still browser-local (teacher demo side)
+
+The teacher area was **not** migrated and remains a localStorage demo: `lib/useTeacherAuth.ts` (shared demo password `123456`), `lib/useLessonDrafts.ts` + `lib/mediaStore.ts` (IndexedDB media), `lib/useTeacherProfile.ts`, and `lib/students.ts` (deterministic mock students). `lib/teachers.ts` is kept as the seed source for `scripts/seed.ts`.
+
+**Known consequence:** teacher profile edits in `/teacher-dashboard/profile` no longer appear on the public profile, because that page now reads `teachers` from Supabase. Fixing this needs real teacher auth (populating `teachers.owner_id`) — the owner-write RLS policies are already in place for it.
 
 ## Conventions
 
 - Path alias `@/*` maps to the repository root (see `tsconfig.json`).
-- The "احجز" (book) buttons on live sessions are presentational only — there is no booking backend yet. Teacher auth is likewise a demo: any teacher account + the shared demo password, session in localStorage.
-- Arabic-Indic numerals (٩٠ دقيقة) are used inside data strings; UI-computed numbers render as Latin digits.
+- Arabic-Indic numerals (٩٠ دقيقة) appear inside data strings; UI-computed numbers render as Latin digits.
+- Styling lives entirely in `app/globals.css` (plain CSS + custom properties, no Tailwind/CSS modules). Mobile breakpoint is 720px.
+- Placeholder media is CSS-only (gradients + initials/emoji). Lesson videos are Google's public sample MP4s; attachments point at three real PDFs in `public/files/`.

@@ -52,7 +52,7 @@ export default function ProfileSettingsPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (loaded && !teacher) router.replace("/login");
+    if (loaded && !teacher) router.replace("/teacher-login");
   }, [loaded, teacher, router]);
 
   if (!loaded || !teacher) {
@@ -128,7 +128,7 @@ function ProfileForm({ teacher }: { teacher: Teacher }) {
   return (
     <main className="container container-narrow">
       <nav className="breadcrumb">
-        <Link href="/dashboard" className="back-link">
+        <Link href="/teacher-dashboard" className="back-link">
           → لوحة التحكم
         </Link>
       </nav>
