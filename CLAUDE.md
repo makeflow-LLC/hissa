@@ -27,14 +27,18 @@ There is no test suite; `npm run build` is the verification gate (compile + Type
   - `app/page.tsx` — home: hero + `TeacherDirectory`.
   - `app/teacher/[slug]/page.tsx` — profile: header with stats (lesson count, live count, star rating) + `TeacherTabs`.
   - `app/teacher/[slug]/lesson/[lessonId]/page.tsx` — lesson page: breadcrumb, `VideoPlayer`, content sections, gallery, attachments, prev/next navigation, `LessonCompleteButton`, unit lesson list. Both dynamic routes use `generateStaticParams` and `notFound()`; `params` is a `Promise` in Next 15 and must be awaited.
+  - `app/teacher/[slug]/lesson-draft/[draftId]/page.tsx` — public page for a teacher-designed lesson (client-rendered, `use(params)`, no `generateStaticParams` — drafts live in the visitor's browser): uploaded video player, explanation, image gallery, downloadable attachments, and an interactive `QuizSection`.
   - `app/login/page.tsx` — mock teacher sign-in (client page): pick a teacher account + demo password (`DEMO_PASSWORD` = "123456" in `lib/useTeacherAuth.ts`).
-  - `app/dashboard/page.tsx` — teacher dashboard (client page, redirects to `/login` when signed out): stats (lessons, live sessions, students, active subscribers), per-unit student-completion overview, students table with progress bars, and saved lesson drafts.
-  - `app/dashboard/new-lesson/page.tsx` — "design a new lesson" form (recorded lesson or live session); saves drafts via `useLessonDrafts`.
-- **Client components**: `TeacherDirectory` (search/filter state), `TeacherTabs` (recorded/live tabs + progress bars), `VideoPlayer` (poster → HTML5 video), `LessonCompleteButton`, `NavbarActions` (login/dashboard/logout buttons in the navbar). `Stars` is a server-renderable rating display.
-- **Local state (no backend)** — all "use client" hooks read localStorage after mount to avoid hydration mismatch:
+  - `app/dashboard/page.tsx` — teacher dashboard (client page, redirects to `/login` when signed out): stats (lessons, live sessions, students, active subscribers), per-unit student-completion overview, students table with progress bars, and designed lessons (view/delete).
+  - `app/dashboard/new-lesson/page.tsx` — "design a new lesson" form (recorded lesson or live session) with media uploads (video/images/files → IndexedDB) and a multiple-choice quiz builder; saves via `useLessonDrafts`. Saved lessons appear on the teacher's public profile (in `TeacherTabs`).
+  - `app/dashboard/profile/page.tsx` — teacher profile editor: avatar/logo upload (canvas-resized to 256px data URL), display name, bio, optional WhatsApp number (shows a wa.me button on the profile), and multi-select teaching stages. Stored via `useTeacherProfile` and merged over base data everywhere (`mergeTeacherProfile`).
+- **Client components**: `TeacherDirectory` (search/filter state + profile overrides), `TeacherTabs` (recorded/live tabs + progress bars + designed-lesson sections), `TeacherProfileHeader` (profile header with overrides + WhatsApp button), `VideoPlayer` (poster → HTML5 video), `QuizSection` (interactive quiz), `LessonCompleteButton`, `NavbarActions`. `Stars` is a server-renderable rating display.
+- **Local state (no backend)** — all "use client" hooks read localStorage after mount to avoid hydration mismatch, and cross-component instances sync via custom window events:
   - `lib/useLessonProgress.ts`: completed-lesson ids per teacher under `hissa-progress:<teacherSlug>`.
-  - `lib/useTeacherAuth.ts`: mock teacher session under `hissa-teacher-session` (slug only; shared demo password).
-  - `lib/useLessonDrafts.ts`: teacher-created lesson drafts under `hissa-drafts:<teacherSlug>`.
+  - `lib/useTeacherAuth.ts`: mock teacher session under `hissa-teacher-session` (slug only; shared demo password); event `hissa-auth-change`.
+  - `lib/useLessonDrafts.ts`: teacher-designed lessons under `hissa-drafts:<teacherSlug>` (with `media` refs + `quiz`); event `hissa-drafts-change`.
+  - `lib/useTeacherProfile.ts`: profile overrides under `hissa-teacher-profile:<teacherSlug>`; event `hissa-profile-change`.
+  - `lib/mediaStore.ts`: uploaded media blobs (video/images/files) in IndexedDB db `hissa-media` — localStorage is too small for these; drafts store `{id, name, mime, size}` refs only.
 - **Placeholder media**: teacher/lesson/gallery imagery is CSS-only (gradient blocks + initials/emoji stored in the data). Lesson videos use Google's public sample MP4s (`SAMPLE_VIDEOS`). Attachments link to three real placeholder PDFs in `public/files/` shared by all lessons.
 - **Styling** lives entirely in `app/globals.css` using plain CSS with custom properties (no Tailwind/CSS modules). Mobile breakpoint is 720px.
 
