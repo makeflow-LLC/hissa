@@ -7,9 +7,12 @@ import type {
   LessonPage,
   LiveSessionRow,
   QuizQuestionRow,
+  StudentProfile,
   TeacherCard,
+  TeacherMessage,
   TeacherProfile,
   TeacherRow,
+  TeacherStudent,
   UnitWithLessons,
 } from "@/lib/data/types";
 
@@ -542,6 +545,7 @@ export interface TeacherUnit {
     emoji: string;
     status: string;
     is_free_preview: boolean;
+    is_restricted: boolean;
     position: number;
   }[];
 }
@@ -558,6 +562,7 @@ export interface TeacherLive {
   is_paid: boolean;
   price: number;
   currency: string;
+  is_restricted: boolean;
 }
 
 export interface TeacherContent {
@@ -590,12 +595,12 @@ export async function getMyTeacherContent(): Promise<TeacherContent | null> {
       .order("position"),
     supabase
       .from("lessons")
-      .select("id, unit_id, title, description, duration, emoji, status, is_free_preview, position")
+      .select("id, unit_id, title, description, duration, emoji, status, is_free_preview, is_restricted, position")
       .eq("teacher_id", teacher.id)
       .order("position"),
     supabase
       .from("live_sessions")
-      .select("id, title, description, schedule, duration, seats_left, emoji, status, is_paid, price, currency")
+      .select("id, title, description, schedule, duration, seats_left, emoji, status, is_paid, price, currency, is_restricted")
       .eq("teacher_id", teacher.id)
       .order("created_at"),
   ]);
@@ -625,7 +630,7 @@ export async function getMyLesson(lessonId: string) {
   const { data } = await supabase
     .from("lessons")
     .select(
-      "id, unit_id, title, description, duration, emoji, video_url, sections, is_free_preview, status, teachers!inner(owner_id)"
+      "id, unit_id, title, description, duration, emoji, video_url, sections, is_free_preview, is_restricted, status, teachers!inner(owner_id)"
     )
     .eq("id", lessonId)
     .maybeSingle();
@@ -649,7 +654,7 @@ export async function getMyLessonForEdit(lessonId: string) {
   const { data } = await supabase
     .from("lessons")
     .select(
-      "id, unit_id, title, description, duration, emoji, video_url, sections, is_free_preview, status, teachers!inner(owner_id)"
+      "id, unit_id, title, description, duration, emoji, video_url, sections, is_free_preview, is_restricted, status, teachers!inner(owner_id)"
     )
     .eq("id", lessonId)
     .maybeSingle();
@@ -689,6 +694,7 @@ export async function getMyLessonForEdit(lessonId: string) {
     video_url: (row.video_url as string | null) ?? null,
     status: String(row.status ?? "published"),
     is_free_preview: Boolean(row.is_free_preview),
+    is_restricted: Boolean(row.is_restricted),
     sections,
     quiz: (quizRows ?? []).map((q) => ({
       prompt: String(q.prompt ?? ""),
@@ -710,7 +716,7 @@ export async function getMyLive(sessionId: string) {
   const { data } = await supabase
     .from("live_sessions")
     .select(
-      "id, title, description, schedule, duration, seats_left, emoji, is_paid, price, currency, status, teachers!inner(owner_id)"
+      "id, title, description, schedule, duration, seats_left, emoji, is_paid, price, currency, is_restricted, status, teachers!inner(owner_id)"
     )
     .eq("id", sessionId)
     .maybeSingle();
@@ -721,4 +727,159 @@ export async function getMyLive(sessionId: string) {
   const owner = Array.isArray(row.teachers) ? row.teachers[0] : row.teachers;
   if (owner?.owner_id !== user.id) return null;
   return row;
+}
+
+/* ============== بيانات الطالب ورسائل المعلّم والمنح ============== */
+
+const STUDENT_PROFILE_COLS =
+  "id, full_name, avatar_url, grade, school, city, age, phone, whatsapp, guardian_phone, profile_done";
+
+/** ملف الطالب الحالي (null للزائر أو عند فشل الاتصال) */
+export async function getMyStudentProfile(): Promise<StudentProfile | null> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data } = await supabase
+      .from("profiles")
+      .select(STUDENT_PROFILE_COLS)
+      .eq("id", user.id)
+      .maybeSingle();
+    return (data as StudentProfile) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** الرسائل الواردة للطالب الحالي مع اسم المعلّم المرسِل */
+export async function getMyMessages(): Promise<
+  (TeacherMessage & { teacherName: string; teacherSlug: string })[]
+> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+    const { data } = await supabase
+      .from("teacher_messages")
+      .select("id, teacher_id, student_id, body, created_at, teachers(name, slug)")
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    return (data ?? []).map((m) => {
+      const row = m as Record<string, unknown> & {
+        teachers: { name: string; slug: string } | { name: string; slug: string }[];
+      };
+      const t = Array.isArray(row.teachers) ? row.teachers[0] : row.teachers;
+      return {
+        id: String(row.id),
+        teacher_id: String(row.teacher_id),
+        student_id: (row.student_id as string | null) ?? null,
+        body: String(row.body ?? ""),
+        created_at: String(row.created_at),
+        teacherName: t?.name ?? "معلّم",
+        teacherSlug: t?.slug ?? "",
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * طلاب المعلّم الحالي (من يتابعونه) مع تقدّمهم في منهجه ومنحهم.
+ * سياسات 0008 تسمح للمعلّم بقراءة ملفات متابعيه وتقدّمهم في دروسه هو فقط.
+ */
+export async function getMyStudents(): Promise<TeacherStudent[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return [];
+
+  const { data: follows } = await supabase
+    .from("follows")
+    .select("student_id, created_at")
+    .eq("teacher_id", teacher.id)
+    .order("created_at", { ascending: false });
+  const followRows = (follows ?? []) as { student_id: string; created_at: string }[];
+  if (followRows.length === 0) return [];
+
+  const studentIds = followRows.map((f) => f.student_id);
+
+  const [profilesRes, lessonsRes, grantsRes] = await Promise.all([
+    supabase.from("profiles").select(STUDENT_PROFILE_COLS).in("id", studentIds),
+    supabase
+      .from("lessons")
+      .select("id")
+      .eq("teacher_id", teacher.id)
+      .eq("status", "published"),
+    supabase
+      .from("student_grants")
+      .select("id, student_id, lesson_id, session_id")
+      .eq("teacher_id", teacher.id),
+  ]);
+
+  const myLessonIds = (lessonsRes.data ?? []).map((l) => l.id as string);
+  const totalLessons = myLessonIds.length;
+
+  // تقدّم متابعيه في دروسه فقط
+  let progress: { student_id: string; lesson_id: string }[] = [];
+  if (totalLessons > 0) {
+    const { data } = await supabase
+      .from("lesson_progress")
+      .select("student_id, lesson_id")
+      .in("lesson_id", myLessonIds)
+      .in("student_id", studentIds);
+    progress = (data ?? []) as { student_id: string; lesson_id: string }[];
+  }
+
+  const profileById = new Map(
+    ((profilesRes.data ?? []) as StudentProfile[]).map((p) => [p.id, p])
+  );
+
+  return followRows.map((f) => {
+    const done = progress.filter((p) => p.student_id === f.student_id).length;
+    const profile =
+      profileById.get(f.student_id) ??
+      ({
+        id: f.student_id,
+        full_name: "طالب",
+        avatar_url: null,
+        grade: "",
+        school: "",
+        city: "",
+        age: null,
+        phone: null,
+        whatsapp: null,
+        guardian_phone: null,
+        profile_done: false,
+      } as StudentProfile);
+
+    return {
+      profile,
+      followedAt: f.created_at,
+      completedLessons: done,
+      totalLessons,
+      progressPct: totalLessons ? Math.round((done / totalLessons) * 100) : 0,
+      grants: ((grantsRes.data ?? []) as {
+        id: string;
+        student_id: string;
+        lesson_id: string | null;
+        session_id: string | null;
+      }[])
+        .filter((g) => g.student_id === f.student_id)
+        .map((g) => ({ id: g.id, lesson_id: g.lesson_id, session_id: g.session_id })),
+    };
+  });
 }

@@ -3236,3 +3236,173 @@ body {
     gap: 6px;
   }
 }
+
+/* ============================================================
+   شريط تثبيت التطبيق (PWA)
+   ============================================================ */
+
+.install-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--primary-soft);
+  border-bottom: 1px solid var(--border);
+}
+
+.install-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.install-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.install-text strong {
+  color: var(--primary-dark);
+}
+.install-text span {
+  color: var(--text-muted);
+}
+
+.install-close {
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.install-close:hover {
+  background: var(--surface);
+}
+
+@media (max-width: 720px) {
+  .install-bar {
+    padding: 9px 12px;
+    gap: 8px;
+  }
+  .install-text {
+    font-size: 0.78rem;
+  }
+}
+
+/* ============================================================
+   طلاب المعلّم والرسائل وبيانات الطالب
+   ============================================================ */
+
+.students-list { display: flex; flex-direction: column; gap: 14px; }
+
+.student-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.student-main { display: flex; align-items: center; gap: 12px; }
+
+.student-avatar {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.student-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-soft);
+  font-size: 1.3rem;
+}
+
+.student-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.student-name { font-weight: 700; color: var(--text); }
+.student-meta { color: var(--text-muted); font-size: 0.85rem; }
+
+.student-contacts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 3px; }
+.student-contact {
+  font-size: 0.8rem;
+  color: var(--primary-dark);
+  text-decoration: none;
+  background: var(--primary-soft);
+  padding: 2px 9px;
+  border-radius: 999px;
+}
+.student-contact:hover { text-decoration: underline; }
+
+.student-progress { display: flex; flex-direction: column; gap: 6px; }
+
+.grants-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.grant-row { display: flex; align-items: center; gap: 6px; }
+
+.student-actions {
+  border-top: 1px dashed var(--border);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.student-actions-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.student-action-form { display: flex; flex-direction: column; gap: 8px; }
+
+.broadcast-form { display: flex; flex-direction: column; gap: 10px; }
+.broadcast-form .btn { align-self: flex-start; }
+
+.messages-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.message-row {
+  border: 1px solid var(--border);
+  border-inline-start: 4px solid var(--primary);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+}
+.message-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.message-from { font-weight: 700; color: var(--primary-dark); text-decoration: none; }
+.message-from:hover { text-decoration: underline; }
+.message-date { color: var(--text-muted); font-size: 0.8rem; }
+.message-body { margin: 0; line-height: 1.9; white-space: pre-wrap; }
+
+.form-fieldset {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin: 0;
+}
+.form-fieldset legend { padding: 0 8px; }
+
+.form-success {
+  color: var(--success);
+  background: var(--success-soft);
+  padding: 8px 12px;
+  border-radius: 10px;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 720px) {
+  .broadcast-form .btn { align-self: stretch; }
+  .student-main { align-items: flex-start; }
+}

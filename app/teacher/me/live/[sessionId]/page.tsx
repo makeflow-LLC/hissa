@@ -32,6 +32,7 @@ export default async function EditLivePage({
     is_paid: Boolean(row.is_paid),
     price: Number(row.price ?? 0),
     currency: String(row.currency ?? "EGP"),
+    is_restricted: Boolean(row.is_restricted),
   };
 
   return (

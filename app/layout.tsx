@@ -1,8 +1,18 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import NavbarActions from "@/components/NavbarActions";
+import InstallApp from "@/components/InstallApp";
+import ServiceWorker from "@/components/ServiceWorker";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  themeColor: "#4f46e5",
+  width: "device-width",
+  initialScale: 1,
+  // يسمح بالتكبير — منعه يضرّ إمكانية الوصول
+  maximumScale: 5,
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://hissa.sbs"),
@@ -12,7 +22,19 @@ export const metadata: Metadata = {
   },
   description:
     "منصة حصة منصة تعليمية عربية تربط الطلاب بالمعلّمين: تصفّح دليل المعلّمين، شاهد الدروس المسجّلة، وسجّل في الحصص المباشرة. الوصول مجاني تماماً للطالب.",
-  icons: { icon: "/logo.svg", apple: "/logo.svg" },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "حصة",
+    statusBarStyle: "default",
+  },
+  icons: {
+    icon: [
+      { url: "/logo.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
   openGraph: {
     title: "منصة حصة",
     description: "مدرستك الرقمية: دروس مسجّلة وحصص مباشرة، مجانية تماماً للطالب.",
@@ -46,7 +68,9 @@ export default function RootLayout({
             </Suspense>
           </div>
         </header>
+        <InstallApp />
         {children}
+        <ServiceWorker />
         <footer className="footer">
           <p className="footer-brand">
             {/* eslint-disable-next-line @next/next/no-img-element */}

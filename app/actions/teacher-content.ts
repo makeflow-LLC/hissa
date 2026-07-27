@@ -189,6 +189,7 @@ export async function saveLesson(
   const status =
     String(formData.get("status") ?? "published") === "draft" ? "draft" : "published";
   const isFreePreview = formData.get("is_free_preview") === "on";
+  const isRestricted = formData.get("is_restricted") === "on";
   const sections = parseSections(String(formData.get("sections") ?? "[]"));
   const quiz = parseQuiz(String(formData.get("quiz") ?? "[]"));
 
@@ -215,6 +216,7 @@ export async function saveLesson(
     status,
     sections,
     is_free_preview: isFreePreview,
+    is_restricted: isRestricted,
   };
 
   let savedId = lessonId;
@@ -342,6 +344,7 @@ export async function saveLive(
     is_paid: isPaid,
     price,
     currency,
+    is_restricted: formData.get("is_restricted") === "on",
   };
 
   if (sessionId) {
