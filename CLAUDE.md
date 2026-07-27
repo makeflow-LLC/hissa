@@ -97,8 +97,13 @@ Security is verified with SQL that switches `role` and `request.jwt.claims` to i
 | `app/auth/callback/route.ts` | exchanges the OAuth/magic-link code for a session |
 | `app/auth/signout/route.ts` | POST sign-out |
 | `app/dashboard/page.tsx` | **student** dashboard: حصصي / معلّميّ / تقدّمي + "أكمل التعلّم" |
-| `app/teacher-login/page.tsx` | teacher demo sign-in (was `/login`) |
-| `app/teacher-dashboard/**` | teacher demo dashboard, new-lesson designer, profile editor (was `/dashboard/**`) |
+| `app/teacher/join/page.tsx` | **real** teacher signup landing → `/login?role=teacher` |
+| `app/teacher/onboarding/page.tsx` | create/edit real teacher profile (`TeacherProfileForm` → `saveTeacherProfile` action) |
+| `app/teacher/me/page.tsx` | teacher hub: profile summary, stats, share panel, edit |
+| `app/teacher-login/page.tsx` | teacher **demo** sign-in (legacy localStorage, was `/login`) |
+| `app/teacher-dashboard/**` | teacher **demo** content designer (localStorage, was `/dashboard/**`) |
+
+**Real teacher accounts** (Supabase Auth, same Google/magic-link as students): a user is a teacher iff they own a `teachers` row (`owner_id = auth.uid()`). `saveTeacherProfile` (`app/actions/teacher.ts`) creates/updates that row — name, subject, stages, qualification, `experience_years`, bio, whatsapp, avatar (resized data URL in `avatar_url`), auto-generated unique slug (reserved words blocked). New `teachers` columns: `qualification`, `experience_years`, `is_published` (directory shows published only; RLS: public read = published-or-owner, plus owner INSERT). `getMyTeacher()` / `isCurrentUserTeacher()` drive the navbar and teacher pages. The public profile (`/teacher/[slug]`) and directory read these fields. NOTE: the localStorage teacher demo (`/teacher-dashboard`, `/teacher-login`) still exists in parallel for the content designer; migrating content creation onto real accounts is the next step.
 | `app/privacy/page.tsx` · `app/terms/page.tsx` | Arabic legal pages, linked from the footer |
 
 Brand: `public/logo.svg` is a hand-built SVG reconstruction of the platform logo (mortarboard + ring + two figures), used in the navbar, footer, and as favicon/OG icon. `metadataBase` is `https://hissa.sbs` (the live custom domain). Contact email placeholder in the legal pages is `support@hissa.sbs`.

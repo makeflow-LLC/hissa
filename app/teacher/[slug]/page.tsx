@@ -74,6 +74,22 @@ export default async function TeacherProfilePage({
             </span>
           ))}
         </div>
+
+        {(teacher.qualification || teacher.experience_years > 0) && (
+          <div className="profile-credentials">
+            {teacher.qualification && (
+              <span className="credential">
+                <span aria-hidden="true">🎓</span> {teacher.qualification}
+              </span>
+            )}
+            {teacher.experience_years > 0 && (
+              <span className="credential">
+                <span aria-hidden="true">⏳</span> خبرة {teacher.experience_years} سنة
+              </span>
+            )}
+          </div>
+        )}
+
         <p className="profile-bio">{teacher.bio}</p>
 
         <div className="profile-actions">

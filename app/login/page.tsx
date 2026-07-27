@@ -21,7 +21,8 @@ export default function LoginPage() {
 
 function LoginCard() {
   const params = useSearchParams();
-  const next = params.get("next") ?? "/dashboard";
+  const isTeacher = params.get("role") === "teacher";
+  const next = params.get("next") ?? (isTeacher ? "/teacher/onboarding" : "/dashboard");
   const urlError = params.get("error");
 
   const [email, setEmail] = useState("");
@@ -114,10 +115,11 @@ function LoginCard() {
         <span className="login-emoji" aria-hidden="true">
           🎓
         </span>
-        <h1 className="login-title">دخول الطلاب</h1>
+        <h1 className="login-title">{isTeacher ? "انضم كمعلّم" : "دخول الطلاب"}</h1>
         <p className="login-subtitle">
-          الوصول مجاني تماماً للطالب. سجّل الدخول لتشاهد كل الدروس، وتحمّل
-          المرفقات، وتسجّل في الحصص، ويُحفظ تقدّمك.
+          {isTeacher
+            ? "أنشئ حسابك كمعلّم بضغطة، ثم افتح ملفك الشخصي وابدأ بنشر دروسك وحصصك للطلاب."
+            : "الوصول مجاني تماماً للطالب. سجّل الدخول لتشاهد كل الدروس، وتحمّل المرفقات، وتسجّل في الحصص، ويُحفظ تقدّمك."}
         </p>
 
         {(error || urlError) && <p className="form-error">{error || urlError}</p>}
@@ -164,10 +166,21 @@ function LoginCard() {
         </p>
 
         <p className="login-alt">
-          معلّم؟{" "}
-          <Link href="/teacher-login" className="back-link">
-            دخول المعلّمين من هنا
-          </Link>
+          {isTeacher ? (
+            <>
+              طالب؟{" "}
+              <Link href="/login" className="back-link">
+                دخول الطلاب من هنا
+              </Link>
+            </>
+          ) : (
+            <>
+              معلّم؟{" "}
+              <Link href="/teacher/join" className="back-link">
+                انضم كمعلّم من هنا
+              </Link>
+            </>
+          )}
         </p>
       </div>
     </main>

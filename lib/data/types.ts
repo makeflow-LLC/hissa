@@ -27,6 +27,13 @@ export interface TeacherRow {
   whatsapp: string | null;
   rating: number;
   rating_count: number;
+  qualification: string;
+  experience_years: number;
+}
+
+/** ملف المعلّم الحالي (المسجّل بحسابه) — لصفحات إدارة بروفايله */
+export interface MyTeacher extends TeacherRow {
+  is_published: boolean;
 }
 
 /** بطاقة المعلم في الدليل: بيانات المعلم + عدّادات محتواه */
