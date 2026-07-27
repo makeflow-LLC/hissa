@@ -19,10 +19,17 @@ export default async function Home() {
 
   return (
     <main className="container">
+      {/* الاسم والغرض — يطابق اسم شاشة موافقة جوجل ويشرح وظيفة التطبيق */}
       <section className="hero-header">
         <h1 className="site-title">منصة حصة</h1>
         <p className="site-subtitle">
-          اكتشف أفضل المعلّمين واحجز حصصك بسهولة في كل المواد والمراحل
+          منصة حصة منصة تعليمية عربية تربط الطلاب بالمعلّمين: تصفّح دليل
+          المعلّمين، شاهد الدروس المسجّلة، وسجّل في الحصص المباشرة — والوصول
+          مجاني تماماً للطالب.
+        </p>
+        <p className="site-subtitle-en" lang="en" dir="ltr">
+          Hissa (منصة حصة) is an Arabic online learning platform that connects
+          students with teachers to browse lessons and enroll in live classes.
         </p>
         {!user && teachers && (
           <div className="hero-cta">
@@ -37,11 +44,51 @@ export default async function Home() {
         )}
       </section>
 
-      {teachers ? (
-        <TeacherDirectory teachers={teachers} />
-      ) : (
-        <ConnectionNotice detail={error} />
-      )}
+      {/* كيف تعمل المنصة — لتوضيح الغرض لمراجع جوجل وللزائر */}
+      <section className="about-section" aria-label="ما هي منصة حصة">
+        <h2 className="about-title">كيف تعمل منصة حصة؟</h2>
+        <div className="about-grid">
+          <article className="about-card">
+            <span className="about-icon" aria-hidden="true">
+              🔎
+            </span>
+            <h3 className="about-card-title">تصفّح المعلّمين</h3>
+            <p className="about-card-text">
+              ابحث في دليل المعلّمين وفلتر حسب المرحلة والمادة، وشاهد عناوين
+              الدروس ونبذة كل معلّم مجاناً.
+            </p>
+          </article>
+          <article className="about-card">
+            <span className="about-icon" aria-hidden="true">
+              🔑
+            </span>
+            <h3 className="about-card-title">سجّل الدخول مجاناً</h3>
+            <p className="about-card-text">
+              أنشئ حسابك بضغطة عبر جوجل أو رابط بريدك. نستخدم دخولك فقط لإنشاء
+              حسابك وحفظ تقدّمك — بلا أي رسوم.
+            </p>
+          </article>
+          <article className="about-card">
+            <span className="about-icon" aria-hidden="true">
+              🎓
+            </span>
+            <h3 className="about-card-title">تعلّم وتابع تقدّمك</h3>
+            <p className="about-card-text">
+              شاهد كل الدروس المسجّلة، حمّل المرفقات، وسجّل في الحصص المباشرة،
+              ويُحفظ تقدّمك في منهج كل معلّم.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section aria-label="دليل المعلّمين">
+        <h2 className="about-title">دليل المعلّمين</h2>
+        {teachers ? (
+          <TeacherDirectory teachers={teachers} />
+        ) : (
+          <ConnectionNotice detail={error} />
+        )}
+      </section>
     </main>
   );
 }
