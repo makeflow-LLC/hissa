@@ -110,6 +110,8 @@ Server: pages, `NavbarActions` (reads the session directly so there is no signed
 
 The teacher area was **not** migrated and remains a localStorage demo: `lib/useTeacherAuth.ts` (shared demo password `123456`), `lib/useLessonDrafts.ts` + `lib/mediaStore.ts` (IndexedDB media), `lib/useTeacherProfile.ts`, and `lib/students.ts` (deterministic mock students). `lib/teachers.ts` is kept as the seed source for `scripts/seed.ts`.
 
+The teacher dashboard shows a **`ShareProfile`** panel (`components/ShareProfile.tsx`): the teacher's public profile URL (`window.location.origin + /teacher/<slug>`, so it's correct on any domain), a scannable QR code generated client-side with the `qrcode` package (downloadable PNG), a copy button, and WhatsApp/Telegram share links.
+
 **Known consequence:** teacher profile edits in `/teacher-dashboard/profile` no longer appear on the public profile, because that page now reads `teachers` from Supabase. Fixing this needs real teacher auth (populating `teachers.owner_id`) — the owner-write RLS policies are already in place for it.
 
 ## Conventions
