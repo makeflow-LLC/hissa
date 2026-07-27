@@ -36,16 +36,35 @@ function LoginCard() {
     setBusy("google");
     setError("");
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
+
+    // skipBrowserRedirect: نبني الرابط أولاً بدل مغادرة الصفحة فوراً،
+    // حتى نتحقق أن المزوّد مفعّل ولا يرى الطالب استجابة JSON خاماً
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: callbackUrl() },
+      options: { redirectTo: callbackUrl(), skipBrowserRedirect: true },
     });
-    if (error) {
-      setError(
-        "تعذّر الدخول بجوجل. إن لم يكن مزوّد جوجل مُفعّلاً في المشروع، استخدم الرابط السحري بالبريد."
-      );
+
+    if (error || !data?.url) {
+      setError("تعذّر بدء الدخول بجوجل. جرّب الرابط السحري بالبريد بالأسفل.");
       setBusy(null);
+      return;
     }
+
+    try {
+      // المزوّد المعطّل يعيد 400؛ التحويل الناجح يعيد استجابة مبهمة (status 0)
+      const probe = await fetch(data.url, { redirect: "manual" });
+      if (probe.status === 400) {
+        setError(
+          "الدخول بجوجل غير مفعّل في المنصة بعد. استخدم الرابط السحري بالبريد بالأسفل — يعمل فوراً."
+        );
+        setBusy(null);
+        return;
+      }
+    } catch {
+      /* حجب CORS يمنع الفحص — نكمل التحويل كالمعتاد */
+    }
+
+    window.location.href = data.url;
   }
 
   async function sendMagicLink(e: React.FormEvent) {
