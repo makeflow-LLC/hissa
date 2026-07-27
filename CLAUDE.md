@@ -63,6 +63,20 @@ SUPABASE_SERVICE_ROLE_KEY=<secret key>   # npm run seed only — never NEXT_PUBL
 | `0003_student_access.sql` | pricing/preview columns, `enrollments`, `follows`, RLS, `handle_new_user` trigger |
 | `0004_visitor_column_gating.sql` | **column privileges** hiding lesson content from `anon` + `get_free_preview_content()` RPC |
 | `0005_lock_down_trigger_function.sql` | revoke API execute on the trigger function |
+| `0006_teacher_accounts.sql` | `qualification`, `experience_years`, `is_published` + owner INSERT policy |
+| `0007_lesson_media_storage.sql` | `lesson-media` storage bucket + owner-folder upload policies |
+
+### Rich lesson content (the `sections` column)
+
+Lesson explanations are authored in a TipTap editor (`components/RichTextEditor.tsx`) and stored as **HTML inside the existing `sections` JSONB column** — `[{heading, html}]`. Storing it there is deliberate: `sections` is already denied to `anon` by `0004`'s column privileges, so rich content inherits the visitor gate for free. **Do not move lesson content to a new column** without also revoking that column from `anon` and adding it to `get_free_preview_content()`.
+
+The legacy shape `[{heading, paragraphs[]}]` still renders — `ContentSection` has both fields optional and the lesson page falls back to `paragraphs` when `html` is absent.
+
+**Sanitizing is mandatory and happens twice** (`lib/sanitize.ts`). Teacher signup is open to anyone, so lesson HTML is untrusted input rendered into students' browsers; unsanitized it is a session-stealing XSS hole. `sanitizeLessonHtml()` runs in `saveLesson` before the write *and* again in the lesson page before `dangerouslySetInnerHTML`, so safety never depends on what is already stored. The allowlist covers formatting, lists, tables and images; it drops scripts, event handlers, `javascript:`/`data:` URLs, iframes and forms, and **restricts `<img src>` to the project's own Supabase host** so teachers cannot beacon-track students with external images.
+
+Images upload from the browser to the `lesson-media` bucket at `<auth.uid()>/<uuid>.jpg` (resized to ≤1280px client-side). The storage policy keys on that first path segment, so a teacher can only write inside their own folder. The bucket is public-read: URLs live inside the gated `sections` column and are UUID-random, but anyone holding a URL can open the image — an accepted trade-off, since the gate exists to encourage signup rather than to protect secrets.
+
+TipTap only ships in the teacher's authoring bundle (~318 kB on `/teacher/me/lessons/*`); the student lesson page renders server-side HTML and stays ~108 kB.
 
 ### How visitor gating is enforced
 
@@ -108,7 +122,7 @@ Security is verified with SQL that switches `role` and `request.jwt.claims` to i
 
 **Teacher content** lives in Supabase, written by `app/actions/teacher-content.ts`: `createUnit` / `renameUnit` / `deleteUnit`, `saveLesson` / `deleteLesson`, `saveLive` / `deleteLive`. Every action re-resolves the caller's own `teachers` row and scopes each write by `teacher_id`, so a signed-in user can only touch their own curriculum (owner-write RLS from `0002_rls.sql` is the second line of defence — no migration was needed for this feature). Notes:
 
-- `saveLesson` replaces `quiz_questions` wholesale (delete + insert) and enforces **one** `is_free_preview` lesson per teacher by clearing the flag on the teacher's other lessons.
+- `saveLesson` replaces `quiz_questions` wholesale (delete + insert), enforces **one** `is_free_preview` lesson per teacher by clearing the flag on the teacher's other lessons, and sanitizes every section's HTML (see "Rich lesson content").
 - `status` is `draft` | `published`; public queries filter `status = 'published'`, so drafts never reach students.
 - `VideoPlayer` embeds YouTube links (`youtube-nocookie`, watch/youtu.be/embed/shorts forms) and falls back to a `<video>` element for direct MP4 URLs.
 
@@ -118,7 +132,7 @@ Auth providers: **email magic link works out of the box**; **Google OAuth must b
 
 ### Client vs server components
 
-Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`.
+Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`, `RichTextEditor`.
 
 `ShareProfile` (`components/ShareProfile.tsx`) on `/teacher/me`: the teacher's public profile URL (`window.location.origin + /teacher/<slug>`, so it's correct on any domain), a scannable QR code generated client-side with the `qrcode` package (downloadable PNG), a copy button, and WhatsApp/Telegram share links.
 
