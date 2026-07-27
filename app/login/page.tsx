@@ -94,8 +94,13 @@ function LoginCard() {
           </span>
           <h1 className="login-title">تحقّق من بريدك</h1>
           <p className="login-subtitle">
-            أرسلنا رابط دخول إلى <strong dir="ltr">{email}</strong>. اضغط الرابط من
-            نفس الجهاز لتسجيل الدخول — لا تحتاج كلمة مرور.
+            أرسلنا رابط دخول إلى <strong dir="ltr">{email}</strong>. لا تحتاج كلمة
+            مرور — فقط اضغط الرابط.
+          </p>
+          <p className="login-note">
+            📱 <strong>مهم:</strong> افتح الرابط من <strong>نفس المتصفح</strong> الذي
+            طلبته منه. إن فتحه تطبيق البريد في نافذته الخاصة ولم ينجح الدخول، انسخ
+            الرابط والصقه في متصفحك.
           </p>
           <button
             type="button"

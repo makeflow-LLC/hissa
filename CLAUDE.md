@@ -141,6 +141,10 @@ Both roles sign in through `/login`; `?role=teacher` only switches the copy and 
 
 Brand: `public/logo.svg` is a hand-built SVG reconstruction of the platform logo (mortarboard + ring + two figures), used in the navbar, footer, and as favicon/OG icon. `metadataBase` is `https://hissa.sbs` (the live custom domain). Contact email placeholder in the legal pages is `support@hissa.sbs`.
 
+**Magic-link flows — two routes, and the reason there are two.** `createBrowserClient` defaults to **PKCE**: the browser that requests the link stores a `code_verifier` cookie, and `/auth/callback` needs that cookie to call `exchangeCodeForSession`. Open the link in a *different* browser — a mail app's in-app webview, or the default browser when the request came from the installed PWA — and the cookie is absent, producing "PKCE code verifier not found in storage". That is not a misconfiguration; `@supabase/ssr` is already used on both sides.
+
+`/auth/confirm` is the cross-device answer: it calls `verifyOtp({ type, token_hash })`, which needs nothing stored beforehand and therefore works from any browser. `/auth/callback` accepts `token_hash` too, and maps verifier failures to an Arabic instruction instead of leaking the raw English SDK error to users. **Using it requires the Supabase email template to link to `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=magiclink`** (Authentication → Email Templates); until that is changed, links keep using the PKCE `?code=` form and stay same-browser-only.
+
 Auth providers: **email magic link works out of the box**; **Google OAuth must be enabled** in Supabase → Authentication → Providers with the callback URL added to redirect URLs. Phone/WhatsApp OTP is deliberately deferred until an SMS provider exists.
 
 ### Client vs server components
