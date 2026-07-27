@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/supabase/config";
 
 /**
  * تحديث كوكيز جلسة Supabase على كل طلب.
@@ -9,12 +10,7 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  // بيئة بلا إعداد Supabase (بناء بدون مفاتيح) — نمرّر الطلب كما هو
-  if (!url || !key) return response;
-
-  const supabase = createServerClient(url, key, {
+  const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -31,8 +27,12 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  // مهم: getUser() هو ما يجدّد التوكن ويكتب الكوكيز المحدّثة
-  await supabase.auth.getUser();
+  try {
+    // مهم: getUser() هو ما يجدّد التوكن ويكتب الكوكيز المحدّثة
+    await supabase.auth.getUser();
+  } catch {
+    /* فشل الشبكة لا يمنع عرض الصفحة — الصفحات تتعامل مع غياب الجلسة */
+  }
 
   return response;
 }

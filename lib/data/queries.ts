@@ -96,11 +96,13 @@ export async function getTeacherProfile(
 ): Promise<TeacherProfile | null> {
   const supabase = await createClient();
 
-  const { data: teacher } = await supabase
+  const { data: teacher, error } = await supabase
     .from("teachers")
     .select(TEACHER_COLS)
     .eq("slug", slug)
     .maybeSingle();
+  // فشل الاتصال ≠ معلم غير موجود: نرمي الخطأ فتعرض الصفحة ConnectionNotice
+  if (error) throw error;
   if (!teacher) return null;
 
   const {
@@ -191,11 +193,13 @@ export async function getLessonPage(
 ): Promise<LessonPage | null> {
   const supabase = await createClient();
 
-  const { data: teacher } = await supabase
+  const { data: teacher, error } = await supabase
     .from("teachers")
     .select(TEACHER_COLS)
     .eq("slug", slug)
     .maybeSingle();
+  // فشل الاتصال ≠ معلم غير موجود
+  if (error) throw error;
   if (!teacher) return null;
 
   // كل دروس المعلم بترتيب المنهج (وحدة ثم موضع) لحساب السابق/التالي

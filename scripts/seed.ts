@@ -23,12 +23,15 @@ if (existsSync(envPath)) {
   }
 }
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const url =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  "https://mexpmtuqhvnphgeqqjuf.supabase.co";
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!url || !serviceKey) {
+if (!serviceKey) {
+  console.error("❌ ينقص SUPABASE_SERVICE_ROLE_KEY في ملف .env.local");
   console.error(
-    "❌ ينقص NEXT_PUBLIC_SUPABASE_URL أو SUPABASE_SERVICE_ROLE_KEY في ملف .env.local"
+    "   تجده في: Supabase Dashboard → Project Settings → API → service_role"
   );
   process.exit(1);
 }

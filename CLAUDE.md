@@ -36,11 +36,9 @@ There is no test suite; `npm run build` is the verification gate (compile + Type
 
 Live project ref `mexpmtuqhvnphgeqqjuf`, region `eu-central-1`, URL `https://mexpmtuqhvnphgeqqjuf.supabase.co`. Schema, RLS and the six seeded teachers (12 units / 30 lessons / 90 attachments / 18 live sessions) are all applied.
 
-Required in `.env.local` (never commit — `.gitignore` covers `.env*`; template in `.env.example`):
+**`.env.local` is optional for running the app**: the project URL and publishable (anon) key are baked into `lib/supabase/config.ts` as defaults — they are public by design (sent to every browser); RLS is the security boundary. Env vars, when present, override the defaults. The one secret that must live only in `.env.local` (never commit — `.gitignore` covers `.env*`; template in `.env.example`):
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=https://mexpmtuqhvnphgeqqjuf.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<publishable key>
 SUPABASE_SERVICE_ROLE_KEY=<secret key>   # npm run seed only — never NEXT_PUBLIC_
 ```
 
