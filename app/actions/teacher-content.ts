@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { sanitizeLessonHtml, stripTags } from "@/lib/sanitize";
 
 /**
  * إجراءات إدارة محتوى المعلّم — تكتب في جداول units / lessons /
@@ -108,7 +109,7 @@ export async function deleteUnit(formData: FormData): Promise<void> {
 
 interface SectionInput {
   heading: string;
-  paragraphs: string[];
+  html: string;
 }
 interface QuizInput {
   prompt: string;
@@ -116,6 +117,17 @@ interface QuizInput {
   correct_index: number;
 }
 
+/** هل بقي في HTML المعقَّم محتوى فعلي (نص أو صورة أو جدول)؟ */
+function htmlHasContent(html: string): boolean {
+  if (/<(img|table|hr)\b/i.test(html)) return true;
+  return html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0;
+}
+
+/**
+ * يقرأ أقسام الشرح ويعقّمها. المحتوى يصل كـ HTML من محرّر المعلّم،
+ * وهو مُدخَل غير موثوق يُعرض على متصفّحات الطلاب — فلا يُخزَّن أبداً
+ * قبل المرور على sanitizeLessonHtml.
+ */
 function parseSections(raw: string): SectionInput[] {
   try {
     const arr = JSON.parse(raw) as unknown;
@@ -123,13 +135,12 @@ function parseSections(raw: string): SectionInput[] {
     return arr
       .map((s) => {
         const o = s as Record<string, unknown>;
-        const heading = String(o.heading ?? "").trim();
-        const paragraphs = Array.isArray(o.paragraphs)
-          ? (o.paragraphs as unknown[]).map((p) => String(p).trim()).filter(Boolean)
-          : [];
-        return { heading, paragraphs };
+        return {
+          heading: stripTags(String(o.heading ?? "")),
+          html: sanitizeLessonHtml(String(o.html ?? "")),
+        };
       })
-      .filter((s) => s.heading || s.paragraphs.length > 0);
+      .filter((s) => s.heading || htmlHasContent(s.html));
   } catch {
     return [];
   }

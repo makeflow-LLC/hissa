@@ -2901,3 +2901,258 @@ body {
     justify-content: flex-end;
   }
 }
+
+/* ============================================================
+   محرّر النص الغني (RichTextEditor) — شريط الأدوات ومساحة الكتابة
+   ============================================================ */
+
+.rte {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.rte-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--primary-soft);
+}
+
+.rte-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-inline-end: 6px;
+  border-inline-end: 1px solid var(--border);
+}
+.rte-group:last-of-type {
+  border-inline-end: 0;
+}
+
+.rte-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  line-height: 1.6;
+}
+.rte-btn:hover {
+  background: var(--surface);
+  border-color: var(--border);
+}
+.rte-btn-active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.rte-btn-upload {
+  position: relative;
+  overflow: hidden;
+}
+
+.rte-select {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.rte-error {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+}
+
+.rte-loading {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.rte-content {
+  min-height: 180px;
+  padding: 14px;
+  outline: none;
+  line-height: 1.9;
+}
+.rte-content:focus {
+  outline: none;
+}
+/* نص إرشادي للمحرّر الفارغ */
+.rte-content p.is-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: inline-start;
+  color: var(--text-muted);
+  pointer-events: none;
+  height: 0;
+}
+
+/* ============================================================
+   عرض المحتوى المنسّق في صفحة الدرس (.rich-content)
+   نفس القواعد تخدم داخل المحرّر (.rte-content)
+   ============================================================ */
+
+.rich-content,
+.rte-content {
+  color: var(--text);
+}
+
+.rich-content p,
+.rte-content p {
+  margin: 0 0 0.9em;
+  line-height: 1.9;
+}
+
+.rich-content h2,
+.rich-content h3,
+.rich-content h4,
+.rte-content h2,
+.rte-content h3,
+.rte-content h4 {
+  margin: 1.2em 0 0.5em;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.rich-content h2,
+.rte-content h2 {
+  font-size: 1.3rem;
+}
+.rich-content h3,
+.rte-content h3 {
+  font-size: 1.15rem;
+}
+.rich-content h4,
+.rte-content h4 {
+  font-size: 1.03rem;
+}
+
+/* القوائم: الحشو من جهة البداية ليعمل في RTL وLTR معاً */
+.rich-content ul,
+.rich-content ol,
+.rte-content ul,
+.rte-content ol {
+  margin: 0 0 0.9em;
+  padding-inline-start: 1.6em;
+}
+.rich-content li,
+.rte-content li {
+  margin-bottom: 0.35em;
+  line-height: 1.85;
+}
+.rich-content ul,
+.rte-content ul {
+  list-style: disc;
+}
+.rich-content ol,
+.rte-content ol {
+  list-style: decimal;
+}
+
+.rich-content blockquote,
+.rte-content blockquote {
+  margin: 0 0 0.9em;
+  padding: 0.6em 1em;
+  border-inline-start: 4px solid var(--primary);
+  background: var(--primary-soft);
+  border-radius: 0 8px 8px 0;
+  color: var(--text-muted);
+}
+
+.rich-content hr,
+.rte-content hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 1.4em 0;
+}
+
+.rich-content code,
+.rte-content code {
+  background: var(--primary-soft);
+  padding: 0.15em 0.4em;
+  border-radius: 6px;
+  font-size: 0.92em;
+}
+
+.rich-content a,
+.rte-content a {
+  color: var(--primary-dark);
+  text-decoration: underline;
+}
+
+/* الصور بين النصوص */
+.rich-content img,
+.rte-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1em auto;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+/* الصورة المحدّدة داخل المحرّر */
+.rte-content img.ProseMirror-selectednode {
+  outline: 3px solid var(--primary);
+}
+
+/* الجداول — تمرير أفقي على الجوال بدل كسر التخطيط */
+.rich-content table,
+.rte-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  overflow: hidden;
+  table-layout: fixed;
+}
+.rich-content th,
+.rich-content td,
+.rte-content th,
+.rte-content td {
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  text-align: start;
+  vertical-align: top;
+}
+.rich-content th,
+.rte-content th {
+  background: var(--primary-soft);
+  font-weight: 700;
+}
+.rte-content .selectedCell {
+  background: var(--primary-soft);
+}
+
+@media (max-width: 720px) {
+  .rte-toolbar {
+    gap: 4px;
+  }
+  .rte-group {
+    padding-inline-end: 4px;
+  }
+  .rte-btn {
+    padding: 5px 7px;
+    font-size: 0.8rem;
+  }
+  /* الجداول الواسعة تُمرَّر أفقياً داخل حاويتها فقط */
+  .rich-content table,
+  .rte-content table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}

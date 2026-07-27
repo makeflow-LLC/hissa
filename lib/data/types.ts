@@ -4,7 +4,10 @@ export type Stage = "ابتدائي" | "إعدادي" | "ثانوي";
 
 export interface ContentSection {
   heading: string;
-  paragraphs: string[];
+  /** محتوى منسّق من محرّر المعلّم — يُعقَّم قبل العرض */
+  html?: string;
+  /** الصيغة القديمة (فقرات نصية) — لا تزال تُعرض لدروس أُنشئت قبل المحرّر */
+  paragraphs?: string[];
 }
 
 export interface GalleryItem {

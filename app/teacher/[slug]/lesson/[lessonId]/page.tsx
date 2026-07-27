@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser, getLessonPage } from "@/lib/data/queries";
+import { sanitizeLessonHtml } from "@/lib/sanitize";
 import VideoPlayer from "@/components/VideoPlayer";
 import LessonCompleteButton from "@/components/LessonCompleteButton";
 import QuizSection from "@/components/QuizSection";
@@ -132,14 +133,27 @@ export default async function LessonPage({
 
           {content && content.sections.length > 0 && (
             <article className="lesson-content">
-              {content.sections.map((section) => (
-                <section key={section.heading}>
-                  <h2 className="content-heading">{section.heading}</h2>
-                  {section.paragraphs.map((p, i) => (
-                    <p key={i} className="content-paragraph">
-                      {p}
-                    </p>
-                  ))}
+              {content.sections.map((section, si) => (
+                <section key={si}>
+                  {section.heading && (
+                    <h2 className="content-heading">{section.heading}</h2>
+                  )}
+                  {section.html ? (
+                    // محتوى المعلّم مُعقَّم هنا أيضاً وليس عند الحفظ فقط:
+                    // لا نثق بما هو مخزّن مسبقاً في قاعدة البيانات.
+                    <div
+                      className="rich-content"
+                      dangerouslySetInnerHTML={{
+                        __html: sanitizeLessonHtml(section.html),
+                      }}
+                    />
+                  ) : (
+                    (section.paragraphs ?? []).map((p, i) => (
+                      <p key={i} className="content-paragraph">
+                        {p}
+                      </p>
+                    ))
+                  )}
                 </section>
               ))}
             </article>

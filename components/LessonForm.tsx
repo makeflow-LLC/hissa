@@ -6,6 +6,7 @@ import {
   saveLesson,
   type ContentFormState,
 } from "@/app/actions/teacher-content";
+import RichTextEditor from "@/components/RichTextEditor";
 
 const EMOJIS = ["📚", "✏️", "🧮", "🔬", "🧪", "🌍", "📖", "💡", "🎯", "🧠", "📝", "🔤"];
 
@@ -19,13 +20,33 @@ export interface LessonFormInitial {
   video_url: string | null;
   status: string;
   is_free_preview: boolean;
-  sections: { heading: string; paragraphs: string[] }[];
+  sections: { heading: string; html?: string; paragraphs?: string[] }[];
   quiz: { prompt: string; options: string[]; correct_index: number }[];
 }
 
 interface SectionUI {
   heading: string;
-  body: string;
+  /** محتوى منسّق (HTML) — يُعقَّم على الخادم قبل الحفظ */
+  html: string;
+}
+
+/**
+ * هل في القسم شيء يستحق الحفظ؟ المحرّر الفارغ ينتج «<p></p>»، لكن القسم
+ * قد يحمل صورة أو جدولاً أو خطاً فاصلاً بلا أي نص — وهذه محتوى أيضاً.
+ */
+function hasContent(html: string): boolean {
+  if (/<(img|table|hr|iframe)\b/i.test(html)) return true;
+  return html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0;
+}
+
+/** الأقسام القديمة كانت فقرات نصية؛ نحوّلها إلى HTML لتُفتح في المحرّر */
+function toHtml(section: { html?: string; paragraphs?: string[] }): string {
+  if (section.html) return section.html;
+  return (section.paragraphs ?? [])
+    .map((p) => `<p>${p.replace(/[<>&]/g, (c) =>
+      c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&amp;"
+    )}</p>`)
+    .join("");
 }
 interface QuizUI {
   prompt: string;
@@ -49,11 +70,8 @@ export default function LessonForm({
   const [emoji, setEmoji] = useState(initial?.emoji ?? "📚");
   const [sections, setSections] = useState<SectionUI[]>(
     initial?.sections?.length
-      ? initial.sections.map((s) => ({
-          heading: s.heading,
-          body: s.paragraphs.join("\n\n"),
-        }))
-      : [{ heading: "", body: "" }]
+      ? initial.sections.map((s) => ({ heading: s.heading, html: toHtml(s) }))
+      : [{ heading: "", html: "" }]
   );
   const [quiz, setQuiz] = useState<QuizUI[]>(
     initial?.quiz?.map((q) => ({
@@ -71,14 +89,8 @@ export default function LessonForm({
     () =>
       JSON.stringify(
         sections
-          .map((s) => ({
-            heading: s.heading.trim(),
-            paragraphs: s.body
-              .split(/\n{2,}/)
-              .map((p) => p.trim())
-              .filter(Boolean),
-          }))
-          .filter((s) => s.heading || s.paragraphs.length > 0)
+          .map((s) => ({ heading: s.heading.trim(), html: s.html }))
+          .filter((s) => s.heading || hasContent(s.html))
       ),
     [sections]
   );
@@ -221,16 +233,14 @@ export default function LessonForm({
                   </button>
                 )}
               </div>
-              <textarea
-                className="search-input form-textarea"
-                rows={3}
-                value={s.body}
-                onChange={(e) =>
+              <RichTextEditor
+                value={s.html}
+                onChange={(html) =>
                   setSections((prev) =>
-                    prev.map((x, j) => (j === i ? { ...x, body: e.target.value } : x))
+                    prev.map((x, j) => (j === i ? { ...x, html } : x))
                   )
                 }
-                placeholder="نص الشرح… افصل بين الفقرات بسطر فارغ."
+                placeholder="اكتب الشرح هنا…"
               />
             </div>
           ))}
@@ -239,7 +249,7 @@ export default function LessonForm({
           type="button"
           className="btn btn-outline btn-sm"
           onClick={() =>
-            setSections((prev) => [...prev, { heading: "", body: "" }])
+            setSections((prev) => [...prev, { heading: "", html: "" }])
           }
         >
           ➕ إضافة قسم
