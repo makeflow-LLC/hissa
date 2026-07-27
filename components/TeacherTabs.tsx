@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { TeacherProfile } from "@/lib/data/types";
-import { useLessonDrafts } from "@/lib/useLessonDrafts";
 import EnrollButton from "@/components/EnrollButton";
 
 export default function TeacherTabs({
@@ -15,10 +14,6 @@ export default function TeacherTabs({
 }) {
   const { teacher, units, liveSessions, completedLessonIds, enrolledSessionIds } = profile;
   const [tab, setTab] = useState<"recorded" | "live">("recorded");
-  // حصص صمّمها المعلم محلياً في متصفحه (ميزة تجريبية قائمة على localStorage)
-  const { drafts, loaded: draftsLoaded } = useLessonDrafts(teacher.slug);
-  const recordedDrafts = draftsLoaded ? drafts.filter((d) => d.kind === "recorded") : [];
-  const liveDrafts = draftsLoaded ? drafts.filter((d) => d.kind === "live") : [];
 
   const done = new Set(completedLessonIds);
   const totalLessons = units.reduce((n, u) => n + u.lessons.length, 0);
@@ -38,7 +33,7 @@ export default function TeacherTabs({
           onClick={() => setTab("recorded")}
         >
           🎬 الدروس المسجّلة
-          <span className="tab-count">{totalLessons + recordedDrafts.length}</span>
+          <span className="tab-count">{totalLessons}</span>
         </button>
         <button
           type="button"
@@ -48,7 +43,7 @@ export default function TeacherTabs({
           onClick={() => setTab("live")}
         >
           🔴 الحصص المباشرة
-          <span className="tab-count">{liveSessions.length + liveDrafts.length}</span>
+          <span className="tab-count">{liveSessions.length}</span>
         </button>
       </div>
 
@@ -73,51 +68,6 @@ export default function TeacherTabs({
                 <div className="progress-fill" style={{ width: `${progressPct}%` }} />
               </div>
             </div>
-          )}
-
-          {recordedDrafts.length > 0 && (
-            <section className="unit unit-new">
-              <header className="unit-header">
-                <div>
-                  <h3 className="unit-title">
-                    <span className="unit-number unit-number-new">جديد</span>
-                    دروس جديدة من المعلم
-                  </h3>
-                  <p className="unit-description">
-                    حصص صمّمها المعلم مؤخراً وستُضاف للمنهج.
-                  </p>
-                </div>
-              </header>
-              <ol className="unit-lessons">
-                {recordedDrafts.map((d) => (
-                  <li key={d.id}>
-                    <Link
-                      href={`/teacher/${teacher.slug}/lesson-draft/${d.id}`}
-                      className="lesson-row"
-                    >
-                      <span
-                        className="lesson-row-thumb lesson-row-thumb-draft"
-                        aria-hidden="true"
-                      >
-                        {d.emoji}
-                      </span>
-                      <span className="lesson-row-body">
-                        <span className="lesson-row-title">{d.title}</span>
-                        <span className="lesson-row-description">{d.description}</span>
-                      </span>
-                      <span className="lesson-row-meta">
-                        <span className="lesson-duration">⏱ {d.duration}</span>
-                        {d.quiz.length > 0 && (
-                          <span className="lesson-quiz-badge">
-                            ❓ {d.quiz.length} أسئلة
-                          </span>
-                        )}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ol>
-            </section>
           )}
 
           {units.map((unit, ui) => {
@@ -188,26 +138,6 @@ export default function TeacherTabs({
         </div>
       ) : (
         <div className="live-grid">
-          {liveDrafts.map((d) => (
-            <article key={d.id} className="live-card">
-              <div className="live-thumb lesson-row-thumb-draft" aria-hidden="true">
-                {d.emoji}
-              </div>
-              <div className="live-body">
-                <h3 className="live-title">
-                  {d.title}
-                  <span className="live-badge">مباشر</span>
-                  <span className="badge badge-new">جديد</span>
-                </h3>
-                <p className="live-description">{d.description}</p>
-                <div className="live-meta">
-                  <span className="live-schedule">📅 {d.detail}</span>
-                  <span className="lesson-duration">⏱ {d.duration}</span>
-                </div>
-              </div>
-            </article>
-          ))}
-
           {liveSessions.map((s) => (
             <article key={s.id} className="live-card">
               <div

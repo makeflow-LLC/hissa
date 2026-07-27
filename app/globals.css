@@ -1967,39 +1967,6 @@ body {
   font-size: 1.05rem;
 }
 
-/* ===== الحصص الجديدة (المصممة) ===== */
-
-.unit-new {
-  border: 1px solid #c7d2fe;
-  background: linear-gradient(180deg, #eef2ff 0%, #ffffff 55%);
-}
-
-.unit-number-new {
-  background: var(--primary);
-  color: #fff;
-}
-
-.lesson-row-thumb-draft {
-  background: linear-gradient(135deg, #6366f1, #a855f7);
-}
-
-.lesson-quiz-badge {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--primary-dark);
-  white-space: nowrap;
-}
-
-.badge-new {
-  background: var(--primary-soft);
-  color: var(--primary-dark);
-}
-
-.unit-chip-new {
-  background: linear-gradient(135deg, #6366f1, #a855f7);
-  color: #fff;
-  margin-inline-start: 0.4rem;
-}
 
 .video-poster-draft {
   background: linear-gradient(135deg, #475569, #1e293b);
@@ -2708,5 +2675,229 @@ body {
 
   .attachment-row .btn {
     width: 100%;
+  }
+}
+
+/* ============================================================
+   إدارة محتوى المعلّم (/teacher/me/content ونماذجه)
+   ============================================================ */
+
+.section-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.add-unit-form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.add-unit-form .search-input {
+  flex: 1 1 200px;
+}
+
+.unit-manage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.unit-manage-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+
+.unit-manage-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.unit-manage-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+.unit-manage-desc {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 4px 0 0;
+}
+
+.lesson-manage-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lesson-manage-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--primary-soft);
+}
+
+.lesson-manage-emoji {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.lesson-manage-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lesson-manage-title {
+  font-weight: 600;
+  color: var(--text);
+}
+.lesson-manage-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.lesson-manage-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.add-lesson-btn {
+  width: 100%;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.pill-live {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.pill-draft {
+  background: #fef3c7;
+  color: #b45309;
+}
+.pill-free {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+.pill-paid {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.btn-danger {
+  color: #dc2626;
+  border-color: #fecaca;
+}
+.btn-danger:hover {
+  background: #fef2f2;
+  border-color: #dc2626;
+}
+
+.content-foot-hint {
+  margin-top: 24px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* حقل تبديل (checkbox + شرح) */
+.toggle-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+.toggle-field input[type="checkbox"] {
+  margin-top: 4px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.toggle-field > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* مكرّرات الأقسام والأسئلة */
+.repeater {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.repeater-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.repeater-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.repeater-head .search-input {
+  flex: 1;
+}
+
+.quiz-option-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.quiz-option-edit input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.quiz-option-edit .search-input {
+  flex: 1;
+}
+
+@media (max-width: 720px) {
+  .lesson-manage-row {
+    flex-wrap: wrap;
+  }
+  .lesson-manage-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }
