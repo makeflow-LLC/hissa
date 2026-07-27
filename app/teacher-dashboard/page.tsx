@@ -9,6 +9,7 @@ import { getStudentsForTeacher } from "@/lib/students";
 import { useTeacherAuth } from "@/lib/useTeacherAuth";
 import { useLessonDrafts } from "@/lib/useLessonDrafts";
 import { mergeTeacherProfile, useTeacherProfile } from "@/lib/useTeacherProfile";
+import ShareProfile from "@/components/ShareProfile";
 
 export default function DashboardPage() {
   const { teacher, loaded } = useTeacherAuth();
@@ -68,6 +69,8 @@ function DashboardContent({ teacher }: { teacher: Teacher }) {
           </Link>
         </div>
       </section>
+
+      <ShareProfile slug={teacher.slug} teacherName={profile.name} />
 
       <section className="dashboard-stats">
         <div className="stat-box">
