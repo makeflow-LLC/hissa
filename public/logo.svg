@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="شعار منصة حصة">
+  <defs>
+    <linearGradient id="hissaCap" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7c3aed"/>
+      <stop offset="1" stop-color="#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="hissaBand" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8b5cf6"/>
+      <stop offset="1" stop-color="#6d28d9"/>
+    </linearGradient>
+  </defs>
+
+  <!-- الدائرة -->
+  <circle cx="60" cy="70" r="34" fill="none" stroke="url(#hissaCap)" stroke-width="9"/>
+
+  <!-- الشخصان داخل الدائرة (يكوّنان أيضاً طرف فقاعة الحوار للأسفل) -->
+  <g fill="url(#hissaCap)">
+    <!-- الشخص الخلفي الأطول -->
+    <circle cx="49" cy="52" r="9.5"/>
+    <path d="M36 98 C36 74 62 74 62 98 L49 110 Z"/>
+    <!-- الشخص الأمامي الأقصر -->
+    <circle cx="72" cy="60" r="8"/>
+    <path d="M61 99 C61 80 83 80 83 99 L72 108 Z"/>
+  </g>
+
+  <!-- قبعة التخرج -->
+  <path d="M60 14 L104 30 L60 46 L16 30 Z" fill="url(#hissaCap)"/>
+  <path d="M40 37 L40 46 C40 54 80 54 80 46 L80 37 L60 44 Z" fill="url(#hissaBand)"/>
+  <!-- الشرّابة -->
+  <path d="M16 30 L16 52" fill="none" stroke="url(#hissaCap)" stroke-width="2.4" stroke-linecap="round"/>
+  <circle cx="16" cy="55" r="3.4" fill="url(#hissaCap)"/>
+  <path d="M16 58 L14 66 M16 58 L18 66 M16 58 L16 67" stroke="url(#hissaCap)" stroke-width="1.8" stroke-linecap="round"/>
+</svg>

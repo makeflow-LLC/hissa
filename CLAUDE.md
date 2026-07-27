@@ -99,6 +99,9 @@ Security is verified with SQL that switches `role` and `request.jwt.claims` to i
 | `app/dashboard/page.tsx` | **student** dashboard: حصصي / معلّميّ / تقدّمي + "أكمل التعلّم" |
 | `app/teacher-login/page.tsx` | teacher demo sign-in (was `/login`) |
 | `app/teacher-dashboard/**` | teacher demo dashboard, new-lesson designer, profile editor (was `/dashboard/**`) |
+| `app/privacy/page.tsx` · `app/terms/page.tsx` | Arabic legal pages, linked from the footer |
+
+Brand: `public/logo.svg` is a hand-built SVG reconstruction of the platform logo (mortarboard + ring + two figures), used in the navbar, footer, and as favicon/OG icon. `metadataBase` is `https://hissa.sbs` (the live custom domain). Contact email placeholder in the legal pages is `support@hissa.sbs`.
 
 Auth providers: **email magic link works out of the box**; **Google OAuth must be enabled** in Supabase → Authentication → Providers with the callback URL added to redirect URLs. Phone/WhatsApp OTP is deliberately deferred until an SMS provider exists.
 
