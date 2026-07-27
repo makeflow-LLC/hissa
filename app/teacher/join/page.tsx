@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { getCurrentUser, getMyTeacher } from "@/lib/data/queries";
+import { getAccountRole, getCurrentUser } from "@/lib/data/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +13,40 @@ export const metadata: Metadata = {
 
 export default async function TeacherJoinPage() {
   const user = await getCurrentUser();
-  // معلّم مسجّل بالفعل ⇒ لوحته؛ مستخدم بلا بروفايل معلّم ⇒ إنشاء البروفايل
+
   if (user) {
-    const teacher = await getMyTeacher();
-    redirect(teacher ? "/teacher/me" : "/teacher/onboarding");
+    const role = await getAccountRole();
+    // معلّم مسجّل ⇒ لوحته مباشرة
+    if (role === "teacher") redirect("/teacher/me");
+    // حساب جديد لم يُستخدم كطالب ⇒ يكمل إنشاء بروفايل المعلّم
+    if (role === "new") redirect("/teacher/onboarding");
+
+    // حساب طالب نشِط: البريد الواحد لا يجمع الدورين
+    return (
+      <main className="container container-narrow">
+        <section className="join-hero">
+          <span className="join-emoji" aria-hidden="true">
+            ✋
+          </span>
+          <h1 className="join-title">هذا البريد مسجَّل كحساب طالب</h1>
+          <p className="join-subtitle">
+            أنت داخل الآن ببريد استُخدم كطالب على المنصة (تسجيل في حصص أو متابعة
+            معلّمين). حساب المعلّم وحساب الطالب منفصلان تماماً — لفتح حساب معلّم
+            سجّل الخروج ثم ادخل ببريد آخر.
+          </p>
+          <div className="join-actions">
+            <form action="/auth/signout" method="post">
+              <button type="submit" className="btn btn-primary btn-lg">
+                تسجيل الخروج والدخول ببريد آخر
+              </button>
+            </form>
+            <Link href="/dashboard" className="btn btn-outline">
+              العودة إلى لوحتي كطالب
+            </Link>
+          </div>
+        </section>
+      </main>
+    );
   }
 
   return (

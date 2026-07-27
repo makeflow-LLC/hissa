@@ -120,6 +120,16 @@ Security is verified with SQL that switches `role` and `request.jwt.claims` to i
 
 **Teacher accounts** (Supabase Auth, same Google/magic-link as students — there is no separate teacher login): a user is a teacher iff they own a `teachers` row (`owner_id = auth.uid()`). `saveTeacherProfile` (`app/actions/teacher.ts`) creates/updates that row — name, subject, stages, qualification, `experience_years`, bio, whatsapp, avatar (resized data URL in `avatar_url`), auto-generated unique slug (reserved words blocked). `teachers` columns `qualification`, `experience_years`, `is_published` (directory shows published only; RLS: public read = published-or-owner, plus owner INSERT). `getMyTeacher()` / `isCurrentUserTeacher()` drive the navbar and teacher pages.
 
+**One email = one role.** A teacher account and a student account are mutually exclusive, deliberately. `getAccountRole()` returns `visitor` | `new` | `student` | `teacher`:
+
+- `teacher` — owns a `teachers` row.
+- `student` — signed in with *activity* (an enrollment, follow, or saved progress).
+- `new` — signed in with no activity yet; **this state must stay convertible to teacher**, because it is the normal signup path (sign in → create profile). Do not tighten it to "any signed-in user is a student".
+
+Enforcement is server-side, not just hidden buttons: every action in `app/actions/student.ts` rejects callers who own a `teachers` row, and `saveTeacherProfile` refuses to create a profile for an account with student activity. `/dashboard` redirects teachers to `/teacher/me`; `/teacher/join` and `/teacher/onboarding` send active students to an explanatory page offering sign-out. A teacher viewing their own public profile sees a preview banner and edit links instead of follow/enroll controls.
+
+Both roles sign in through `/login`; `?role=teacher` only switches the copy and the post-login destination. The navbar shows two equally prominent entries (`🎓 دخول الطلاب`, `👩‍🏫 دخول المعلّمين`) — a text link reading "انضم كمعلّم" was confusing returning teachers, since sign-in and sign-up are the same action here.
+
 **Teacher content** lives in Supabase, written by `app/actions/teacher-content.ts`: `createUnit` / `renameUnit` / `deleteUnit`, `saveLesson` / `deleteLesson`, `saveLive` / `deleteLive`. Every action re-resolves the caller's own `teachers` row and scopes each write by `teacher_id`, so a signed-in user can only touch their own curriculum (owner-write RLS from `0002_rls.sql` is the second line of defence — no migration was needed for this feature). Notes:
 
 - `saveLesson` replaces `quiz_questions` wholesale (delete + insert), enforces **one** `is_free_preview` lesson per teacher by clearing the flag on the teacher's other lessons, and sanitizes every section's HTML (see "Rich lesson content").

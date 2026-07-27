@@ -8,9 +8,12 @@ import EnrollButton from "@/components/EnrollButton";
 export default function TeacherTabs({
   profile,
   isAuthed,
+  canEnroll,
 }: {
   profile: TeacherProfile;
   isAuthed: boolean;
+  /** حساب المعلّم لا يسجّل في الحصص كطالب — الدوران منفصلان */
+  canEnroll: boolean;
 }) {
   const { teacher, units, liveSessions, completedLessonIds, enrolledSessionIds } = profile;
   const [tab, setTab] = useState<"recorded" | "live">("recorded");
@@ -166,16 +169,22 @@ export default function TeacherTabs({
                   <span className="live-seats">🪑 متبقٍ {s.seats_left} مقعداً</span>
                 </div>
               </div>
-              <EnrollButton
-                sessionId={s.id}
-                teacherSlug={teacher.slug}
-                isPaid={s.is_paid}
-                price={Number(s.price)}
-                currency={s.currency}
-                enrolledStatus={enrolledSessionIds[s.id]}
-                isAuthed={isAuthed}
-                whatsapp={teacher.whatsapp}
-              />
+              {canEnroll || !isAuthed ? (
+                <EnrollButton
+                  sessionId={s.id}
+                  teacherSlug={teacher.slug}
+                  isPaid={s.is_paid}
+                  price={Number(s.price)}
+                  currency={s.currency}
+                  enrolledStatus={enrolledSessionIds[s.id]}
+                  isAuthed={isAuthed}
+                  whatsapp={teacher.whatsapp}
+                />
+              ) : (
+                <p className="live-teacher-note">
+                  التسجيل في الحصص متاح لحسابات الطلاب.
+                </p>
+              )}
             </article>
           ))}
         </div>

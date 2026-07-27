@@ -113,14 +113,41 @@ function LoginCard() {
     <main className="container container-narrow">
       <div className="login-card">
         <span className="login-emoji" aria-hidden="true">
-          🎓
+          {isTeacher ? "👩‍🏫" : "🎓"}
         </span>
-        <h1 className="login-title">{isTeacher ? "انضم كمعلّم" : "دخول الطلاب"}</h1>
+        <h1 className="login-title">
+          {isTeacher ? "دخول المعلّمين" : "دخول الطلاب"}
+        </h1>
         <p className="login-subtitle">
           {isTeacher
-            ? "أنشئ حسابك كمعلّم بضغطة، ثم افتح ملفك الشخصي وابدأ بنشر دروسك وحصصك للطلاب."
+            ? "بوابة واحدة للدخول والتسجيل: إن كان لك حساب ستفتح لوحتك مباشرة، وإن كنت جديداً سننشئ ملفك بعد الدخول."
             : "الوصول مجاني تماماً للطالب. سجّل الدخول لتشاهد كل الدروس، وتحمّل المرفقات، وتسجّل في الحصص، ويُحفظ تقدّمك."}
         </p>
+
+        {/* تبديل واضح بين البوابتين — لا يضيع أحد في البوابة الخطأ */}
+        <p className="login-switch">
+          {isTeacher ? (
+            <>
+              لست معلّماً؟{" "}
+              <Link href="/login" className="back-link">
+                🎓 دخول الطلاب
+              </Link>
+            </>
+          ) : (
+            <>
+              أنت معلّم؟{" "}
+              <Link href="/login?role=teacher" className="back-link">
+                👩‍🏫 دخول المعلّمين
+              </Link>
+            </>
+          )}
+        </p>
+
+        {isTeacher && (
+          <p className="login-note">
+            ⚠️ حساب المعلّم وحساب الطالب منفصلان — استخدم بريداً مختلفاً لكل دور.
+          </p>
+        )}
 
         {(error || urlError) && <p className="form-error">{error || urlError}</p>}
 

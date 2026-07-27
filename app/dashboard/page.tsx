@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { getCurrentUser, getStudentDashboard, getStudentName } from "@/lib/data/queries";
+import {
+  getCurrentUser,
+  getStudentDashboard,
+  getStudentName,
+  isCurrentUserTeacher,
+} from "@/lib/data/queries";
 import CancelEnrollmentButton from "@/components/CancelEnrollmentButton";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +16,8 @@ export const metadata: Metadata = { title: "لوحتي | منصة حصة" };
 export default async function StudentDashboard() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/dashboard");
+  // حساب المعلّم له لوحته الخاصة — لا لوحة طالب على البريد نفسه
+  if (await isCurrentUserTeacher()) redirect("/teacher/me");
 
   const [name, data] = await Promise.all([getStudentName(), getStudentDashboard()]);
   const { enrollments = [], following = [] } = data ?? {};
@@ -126,7 +133,7 @@ export default async function StudentDashboard() {
         <h2 className="section-title">👨‍🏫 معلّميّ وتقدّمي</h2>
         {following.length === 0 ? (
           <p className="drafts-empty">
-            لا تتابع أي معلم بعد — افتح بروفايل معلم واضغط «تابع هذا المعلم» ليظهر
+            لا تتابع أي معلم بعد — افتح صفحة معلّم واضغط «تابع هذا المعلم» ليظهر
             تقدّمك هنا.{" "}
             <Link href="/" className="back-link">
               ابدأ من الدليل

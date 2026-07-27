@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getCurrentUser, getLessonPage } from "@/lib/data/queries";
+import { getCurrentUser, getLessonPage, isCurrentUserTeacher } from "@/lib/data/queries";
 import { sanitizeLessonHtml } from "@/lib/sanitize";
 import VideoPlayer from "@/components/VideoPlayer";
 import LessonCompleteButton from "@/components/LessonCompleteButton";
@@ -31,6 +31,8 @@ export default async function LessonPage({
 }) {
   const { slug, lessonId } = await params;
   const user = await getCurrentUser();
+  // حساب المعلّم لا يحفظ تقدّماً كطالب — الدوران منفصلان
+  const isTeacherAccount = user ? await isCurrentUserTeacher() : false;
 
   let page: Awaited<ReturnType<typeof getLessonPage>> = null;
   let loadError: string | undefined;
@@ -239,7 +241,7 @@ export default async function LessonPage({
         ) : (
           <span className="lesson-nav-placeholder" />
         )}
-        {!locked && (
+        {!locked && !isTeacherAccount && (
           <LessonCompleteButton
             lessonId={lesson.id}
             teacherSlug={teacher.slug}

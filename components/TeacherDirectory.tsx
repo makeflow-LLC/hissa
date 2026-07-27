@@ -113,7 +113,7 @@ export default function TeacherDirectory({ teachers }: { teachers: TeacherCard[]
                 🎬 {t.lessonCount} درساً مسجّلاً · 🔴 {t.liveCount} حصص مباشرة
               </p>
               <Link href={`/teacher/${t.slug}`} className="btn btn-primary">
-                عرض البروفايل
+                📚 ادخل إلى الدروس والحصص
               </Link>
             </article>
           ))}

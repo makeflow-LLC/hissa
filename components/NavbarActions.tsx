@@ -4,6 +4,10 @@ import { getCurrentUser, getMyTeacher, getStudentName } from "@/lib/data/queries
 /**
  * أزرار الشريط العلوي — مكوّن خادم يقرأ جلسة Supabase مباشرة،
  * فلا وميض بين حالة الزائر والمسجّل عند التحميل.
+ *
+ * الزائر يرى مدخلين واضحين: دخول الطلاب ودخول المعلّمين. الرابط النصي
+ * «انضم كمعلّم» كان يربك المعلّم القديم لأنه يوحي بالتسجيل الجديد وحده،
+ * بينما الدخول والتسجيل هنا عملية واحدة (جوجل أو رابط البريد).
  */
 export default async function NavbarActions() {
   const user = await getCurrentUser();
@@ -12,10 +16,10 @@ export default async function NavbarActions() {
     return (
       <span className="navbar-actions">
         <Link href="/login" className="btn btn-primary btn-sm">
-          دخول الطلاب
+          🎓 دخول الطلاب
         </Link>
-        <Link href="/teacher/join" className="navbar-link">
-          انضم كمعلّم
+        <Link href="/login?role=teacher" className="btn btn-outline btn-sm">
+          👩‍🏫 دخول المعلّمين
         </Link>
       </span>
     );
@@ -30,8 +34,14 @@ export default async function NavbarActions() {
         <Link href="/teacher/me" className="btn btn-primary btn-sm">
           لوحة المعلّم
         </Link>
-        <span className="navbar-user" title={user.email ?? undefined}>
-          {teacher.name}
+        <Link href="/teacher/me/content" className="navbar-link">
+          إدارة المحتوى
+        </Link>
+        <span
+          className="navbar-user navbar-user-teacher"
+          title={user.email ?? undefined}
+        >
+          👩‍🏫 {teacher.name}
         </span>
         <form action="/auth/signout" method="post">
           <button type="submit" className="btn btn-outline btn-sm">
@@ -46,11 +56,14 @@ export default async function NavbarActions() {
 
   return (
     <span className="navbar-actions">
+      <Link href="/" className="navbar-link">
+        دليل المعلّمين
+      </Link>
       <Link href="/dashboard" className="btn btn-primary btn-sm">
         لوحتي
       </Link>
       <span className="navbar-user" title={user.email ?? undefined}>
-        {name}
+        🎓 {name}
       </span>
       <form action="/auth/signout" method="post">
         <button type="submit" className="btn btn-outline btn-sm">
