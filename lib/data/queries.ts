@@ -475,3 +475,199 @@ export async function isCurrentUserTeacher(): Promise<boolean> {
     return false;
   }
 }
+
+/* ============== محتوى المعلّم (لإدارته من حسابه) ============== */
+
+export interface TeacherUnit {
+  id: string;
+  title: string;
+  description: string;
+  position: number;
+  lessons: {
+    id: string;
+    title: string;
+    description: string;
+    duration: string;
+    emoji: string;
+    status: string;
+    is_free_preview: boolean;
+    position: number;
+  }[];
+}
+
+export interface TeacherLive {
+  id: string;
+  title: string;
+  description: string;
+  schedule: string;
+  duration: string;
+  seats_left: number;
+  emoji: string;
+  status: string;
+  is_paid: boolean;
+  price: number;
+  currency: string;
+}
+
+export interface TeacherContent {
+  teacherId: string;
+  slug: string;
+  units: TeacherUnit[];
+  live: TeacherLive[];
+}
+
+/** كل محتوى المعلّم الحالي (بما فيه المسودات) لإدارته */
+export async function getMyTeacherContent(): Promise<TeacherContent | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id, slug")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return null;
+
+  const [unitsRes, lessonsRes, liveRes] = await Promise.all([
+    supabase
+      .from("units")
+      .select("id, title, description, position")
+      .eq("teacher_id", teacher.id)
+      .order("position"),
+    supabase
+      .from("lessons")
+      .select("id, unit_id, title, description, duration, emoji, status, is_free_preview, position")
+      .eq("teacher_id", teacher.id)
+      .order("position"),
+    supabase
+      .from("live_sessions")
+      .select("id, title, description, schedule, duration, seats_left, emoji, status, is_paid, price, currency")
+      .eq("teacher_id", teacher.id)
+      .order("created_at"),
+  ]);
+
+  type L = TeacherUnit["lessons"][number] & { unit_id: string | null };
+  const lessons = (lessonsRes.data ?? []) as L[];
+  const units: TeacherUnit[] = (unitsRes.data ?? []).map((u) => ({
+    ...u,
+    lessons: lessons.filter((l) => l.unit_id === u.id),
+  }));
+
+  return {
+    teacherId: teacher.id,
+    slug: teacher.slug,
+    units,
+    live: (liveRes.data ?? []) as TeacherLive[],
+  };
+}
+
+/** درس واحد يملكه المعلّم الحالي (للتعديل) */
+export async function getMyLesson(lessonId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase
+    .from("lessons")
+    .select(
+      "id, unit_id, title, description, duration, emoji, video_url, sections, is_free_preview, status, teachers!inner(owner_id)"
+    )
+    .eq("id", lessonId)
+    .maybeSingle();
+  const row = data as
+    | (Record<string, unknown> & { teachers: { owner_id: string } | { owner_id: string }[] })
+    | null;
+  if (!row) return null;
+  const owner = Array.isArray(row.teachers) ? row.teachers[0] : row.teachers;
+  if (owner?.owner_id !== user.id) return null;
+  return row;
+}
+
+/** درس يملكه المعلّم بالشكل الجاهز لنموذج التعديل (مع الأقسام والأسئلة) */
+export async function getMyLessonForEdit(lessonId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data } = await supabase
+    .from("lessons")
+    .select(
+      "id, unit_id, title, description, duration, emoji, video_url, sections, is_free_preview, status, teachers!inner(owner_id)"
+    )
+    .eq("id", lessonId)
+    .maybeSingle();
+  const row = data as
+    | (Record<string, unknown> & {
+        teachers: { owner_id: string } | { owner_id: string }[];
+      })
+    | null;
+  if (!row) return null;
+  const owner = Array.isArray(row.teachers) ? row.teachers[0] : row.teachers;
+  if (owner?.owner_id !== user.id) return null;
+
+  const { data: quizRows } = await supabase
+    .from("quiz_questions")
+    .select("prompt, options, correct_index")
+    .eq("lesson_id", lessonId)
+    .order("position");
+
+  const rawSections = Array.isArray(row.sections) ? row.sections : [];
+  const sections = rawSections.map((s) => {
+    const o = s as Record<string, unknown>;
+    return {
+      heading: String(o.heading ?? ""),
+      paragraphs: Array.isArray(o.paragraphs)
+        ? (o.paragraphs as unknown[]).map((p) => String(p))
+        : [],
+    };
+  });
+
+  return {
+    id: String(row.id),
+    unit_id: (row.unit_id as string | null) ?? null,
+    title: String(row.title ?? ""),
+    description: String(row.description ?? ""),
+    duration: String(row.duration ?? ""),
+    emoji: String(row.emoji ?? "📚"),
+    video_url: (row.video_url as string | null) ?? null,
+    status: String(row.status ?? "published"),
+    is_free_preview: Boolean(row.is_free_preview),
+    sections,
+    quiz: (quizRows ?? []).map((q) => ({
+      prompt: String(q.prompt ?? ""),
+      options: Array.isArray(q.options)
+        ? (q.options as unknown[]).map((x) => String(x))
+        : [],
+      correct_index: Number(q.correct_index ?? 0),
+    })),
+  };
+}
+
+/** حصة مباشرة واحدة يملكها المعلّم الحالي (للتعديل) */
+export async function getMyLive(sessionId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase
+    .from("live_sessions")
+    .select(
+      "id, title, description, schedule, duration, seats_left, emoji, is_paid, price, currency, status, teachers!inner(owner_id)"
+    )
+    .eq("id", sessionId)
+    .maybeSingle();
+  const row = data as
+    | (Record<string, unknown> & { teachers: { owner_id: string } | { owner_id: string }[] })
+    | null;
+  if (!row) return null;
+  const owner = Array.isArray(row.teachers) ? row.teachers[0] : row.teachers;
+  if (owner?.owner_id !== user.id) return null;
+  return row;
+}

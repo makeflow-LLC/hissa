@@ -89,13 +89,18 @@ export default async function TeacherMePage() {
       <ShareProfile slug={teacher.slug} teacherName={teacher.name} />
 
       <section className="dashboard-section">
-        <h2 className="section-title">🎬 محتواك</h2>
-        <p className="drafts-empty">
-          إدارة الدروس والحصص من{" "}
-          <Link href="/teacher-dashboard" className="back-link">
-            لوحة تصميم المحتوى
+        <div className="section-head-row">
+          <h2 className="section-title">🎬 محتواك</h2>
+          <Link href="/teacher/me/content" className="btn btn-primary">
+            إدارة المحتوى
           </Link>
-          . قريباً سنربطها مباشرةً بحسابك.
+        </div>
+        <p className="drafts-empty">
+          أضِف الوحدات والدروس المسجّلة والحصص المباشرة، وتظهر مباشرةً في{" "}
+          <Link href={`/teacher/${teacher.slug}`} className="back-link">
+            بروفايلك العام
+          </Link>{" "}
+          للطلاب.
         </p>
       </section>
     </main>
