@@ -92,19 +92,25 @@ Security is verified with SQL that switches `role` and `request.jwt.claims` to i
 | `app/page.tsx` | home directory; passes teacher cards to `TeacherDirectory` |
 | `app/teacher/[slug]/page.tsx` | profile: header, follow button, WhatsApp, visitor banner, `TeacherTabs` |
 | `app/teacher/[slug]/lesson/[lessonId]/page.tsx` | lesson; renders locked panel when gated |
-| `app/teacher/[slug]/lesson-draft/[draftId]/page.tsx` | teacher-designed lesson (localStorage demo, client-rendered) |
-| `app/login/page.tsx` | **student** sign-in: Google OAuth + email magic link |
+| `app/login/page.tsx` | sign-in for **everyone** (students and teachers): Google OAuth + email magic link |
 | `app/auth/callback/route.ts` | exchanges the OAuth/magic-link code for a session |
 | `app/auth/signout/route.ts` | POST sign-out |
 | `app/dashboard/page.tsx` | **student** dashboard: حصصي / معلّميّ / تقدّمي + "أكمل التعلّم" |
-| `app/teacher/join/page.tsx` | **real** teacher signup landing → `/login?role=teacher` |
-| `app/teacher/onboarding/page.tsx` | create/edit real teacher profile (`TeacherProfileForm` → `saveTeacherProfile` action) |
-| `app/teacher/me/page.tsx` | teacher hub: profile summary, stats, share panel, edit |
-| `app/teacher-login/page.tsx` | teacher **demo** sign-in (legacy localStorage, was `/login`) |
-| `app/teacher-dashboard/**` | teacher **demo** content designer (localStorage, was `/dashboard/**`) |
-
-**Real teacher accounts** (Supabase Auth, same Google/magic-link as students): a user is a teacher iff they own a `teachers` row (`owner_id = auth.uid()`). `saveTeacherProfile` (`app/actions/teacher.ts`) creates/updates that row — name, subject, stages, qualification, `experience_years`, bio, whatsapp, avatar (resized data URL in `avatar_url`), auto-generated unique slug (reserved words blocked). New `teachers` columns: `qualification`, `experience_years`, `is_published` (directory shows published only; RLS: public read = published-or-owner, plus owner INSERT). `getMyTeacher()` / `isCurrentUserTeacher()` drive the navbar and teacher pages. The public profile (`/teacher/[slug]`) and directory read these fields. NOTE: the localStorage teacher demo (`/teacher-dashboard`, `/teacher-login`) still exists in parallel for the content designer; migrating content creation onto real accounts is the next step.
+| `app/teacher/join/page.tsx` | teacher signup landing → `/login?role=teacher` |
+| `app/teacher/onboarding/page.tsx` | create/edit teacher profile (`TeacherProfileForm` → `saveTeacherProfile` action) |
+| `app/teacher/me/page.tsx` | teacher hub: profile summary, stats, share panel, edit, link to content manager |
+| `app/teacher/me/content/page.tsx` | content manager: units + lessons + live sessions, with delete forms |
+| `app/teacher/me/lessons/new` · `lessons/[lessonId]` | create/edit a recorded lesson (`LessonForm`) |
+| `app/teacher/me/live/new` · `live/[sessionId]` | create/edit a live session with pricing (`LiveForm`) |
 | `app/privacy/page.tsx` · `app/terms/page.tsx` | Arabic legal pages, linked from the footer |
+
+**Teacher accounts** (Supabase Auth, same Google/magic-link as students — there is no separate teacher login): a user is a teacher iff they own a `teachers` row (`owner_id = auth.uid()`). `saveTeacherProfile` (`app/actions/teacher.ts`) creates/updates that row — name, subject, stages, qualification, `experience_years`, bio, whatsapp, avatar (resized data URL in `avatar_url`), auto-generated unique slug (reserved words blocked). `teachers` columns `qualification`, `experience_years`, `is_published` (directory shows published only; RLS: public read = published-or-owner, plus owner INSERT). `getMyTeacher()` / `isCurrentUserTeacher()` drive the navbar and teacher pages.
+
+**Teacher content** lives in Supabase, written by `app/actions/teacher-content.ts`: `createUnit` / `renameUnit` / `deleteUnit`, `saveLesson` / `deleteLesson`, `saveLive` / `deleteLive`. Every action re-resolves the caller's own `teachers` row and scopes each write by `teacher_id`, so a signed-in user can only touch their own curriculum (owner-write RLS from `0002_rls.sql` is the second line of defence — no migration was needed for this feature). Notes:
+
+- `saveLesson` replaces `quiz_questions` wholesale (delete + insert) and enforces **one** `is_free_preview` lesson per teacher by clearing the flag on the teacher's other lessons.
+- `status` is `draft` | `published`; public queries filter `status = 'published'`, so drafts never reach students.
+- `VideoPlayer` embeds YouTube links (`youtube-nocookie`, watch/youtu.be/embed/shorts forms) and falls back to a `<video>` element for direct MP4 URLs.
 
 Brand: `public/logo.svg` is a hand-built SVG reconstruction of the platform logo (mortarboard + ring + two figures), used in the navbar, footer, and as favicon/OG icon. `metadataBase` is `https://hissa.sbs` (the live custom domain). Contact email placeholder in the legal pages is `support@hissa.sbs`.
 
@@ -112,15 +118,17 @@ Auth providers: **email magic link works out of the box**; **Google OAuth must b
 
 ### Client vs server components
 
-Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`.
+Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`.
 
-### Still browser-local (teacher demo side)
+`ShareProfile` (`components/ShareProfile.tsx`) on `/teacher/me`: the teacher's public profile URL (`window.location.origin + /teacher/<slug>`, so it's correct on any domain), a scannable QR code generated client-side with the `qrcode` package (downloadable PNG), a copy button, and WhatsApp/Telegram share links.
 
-The teacher area was **not** migrated and remains a localStorage demo: `lib/useTeacherAuth.ts` (shared demo password `123456`), `lib/useLessonDrafts.ts` + `lib/mediaStore.ts` (IndexedDB media), `lib/useTeacherProfile.ts`, and `lib/students.ts` (deterministic mock students). `lib/teachers.ts` is kept as the seed source for `scripts/seed.ts`.
+### Removed: the localStorage teacher demo
 
-The teacher dashboard shows a **`ShareProfile`** panel (`components/ShareProfile.tsx`): the teacher's public profile URL (`window.location.origin + /teacher/<slug>`, so it's correct on any domain), a scannable QR code generated client-side with the `qrcode` package (downloadable PNG), a copy button, and WhatsApp/Telegram share links.
+The old browser-local teacher demo is **gone** — deleted, not deprecated. That covered `/teacher-login` (shared demo password `123456` + teacher picker), `/teacher-dashboard/**` (content designer), `/teacher/[slug]/lesson-draft/[draftId]`, and `lib/useTeacherAuth.ts`, `lib/useLessonDrafts.ts`, `lib/mediaStore.ts`, `lib/useTeacherProfile.ts`, `lib/students.ts`. Teachers now sign in through the normal `/login` and manage real Supabase content at `/teacher/me/content`. Do not reintroduce a separate teacher login.
 
-**Known consequence:** teacher profile edits in `/teacher-dashboard/profile` no longer appear on the public profile, because that page now reads `teachers` from Supabase. Fixing this needs real teacher auth (populating `teachers.owner_id`) — the owner-write RLS policies are already in place for it.
+`lib/teachers.ts` and `scripts/seed.ts` (`npm run seed`) are deliberately **kept** as a dev-only seed source — they are not imported by any page, so they cost nothing in the bundle, and they make the demo directory reproducible on a fresh database.
+
+The six seeded demo teachers were deleted from the live database (their units/lessons/attachments/live sessions cascaded). Real teacher rows are distinguished by `owner_id is not null` — the seed rows had `owner_id is null`, which is the safe discriminator if you ever need to purge seed data again.
 
 ## Conventions
 

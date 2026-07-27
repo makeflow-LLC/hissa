@@ -67,7 +67,21 @@ export default function TeacherDirectory({ teachers }: { teachers: TeacherCard[]
       </div>
 
       {filtered.length === 0 ? (
-        <p className="empty-state">لا توجد نتائج مطابقة — جرّب تعديل البحث أو الفلاتر.</p>
+        teachers.length === 0 ? (
+          // لا معلّمين بعد على المنصة إطلاقاً — ليست مشكلة بحث
+          <div className="empty-state">
+            <p>لا يوجد معلّمون منشورون بعد.</p>
+            <p>
+              كن أول معلّم على المنصة —{" "}
+              <Link href="/teacher/join" className="back-link">
+                انضم كمعلّم
+              </Link>
+              .
+            </p>
+          </div>
+        ) : (
+          <p className="empty-state">لا توجد نتائج مطابقة — جرّب تعديل البحث أو الفلاتر.</p>
+        )
       ) : (
         <div className="teachers-grid">
           {filtered.map((t) => (

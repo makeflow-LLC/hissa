@@ -1967,39 +1967,6 @@ body {
   font-size: 1.05rem;
 }
 
-/* ===== الحصص الجديدة (المصممة) ===== */
-
-.unit-new {
-  border: 1px solid #c7d2fe;
-  background: linear-gradient(180deg, #eef2ff 0%, #ffffff 55%);
-}
-
-.unit-number-new {
-  background: var(--primary);
-  color: #fff;
-}
-
-.lesson-row-thumb-draft {
-  background: linear-gradient(135deg, #6366f1, #a855f7);
-}
-
-.lesson-quiz-badge {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--primary-dark);
-  white-space: nowrap;
-}
-
-.badge-new {
-  background: var(--primary-soft);
-  color: var(--primary-dark);
-}
-
-.unit-chip-new {
-  background: linear-gradient(135deg, #6366f1, #a855f7);
-  color: #fff;
-  margin-inline-start: 0.4rem;
-}
 
 .video-poster-draft {
   background: linear-gradient(135deg, #475569, #1e293b);

@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { QuizQuestion } from "@/lib/useLessonDrafts";
+
+export interface QuizQuestion {
+  id: string;
+  prompt: string;
+  options: string[];
+  correctIndex: number;
+}
 
 /** اختبار تفاعلي قصير في نهاية الحصة: يختار الطالب ثم يتحقق من إجاباته */
 export default function QuizSection({ questions }: { questions: QuizQuestion[] }) {
