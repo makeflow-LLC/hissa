@@ -241,6 +241,64 @@ body {
   margin-top: 0.75rem;
   font-size: clamp(1rem, 2.5vw, 1.2rem);
   color: var(--text-muted);
+  max-width: 46rem;
+  margin-inline: auto;
+}
+
+.site-subtitle-en {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  max-width: 46rem;
+  margin-inline: auto;
+  opacity: 0.85;
+}
+
+/* ===== قسم «كيف تعمل المنصة» ===== */
+
+.about-section {
+  margin-bottom: 2.5rem;
+}
+
+.about-title {
+  font-size: clamp(1.3rem, 4vw, 1.7rem);
+  font-weight: 800;
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.about-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1.25rem;
+}
+
+.about-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.6rem 1.4rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.about-icon {
+  font-size: 2.2rem;
+}
+
+.about-card-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.about-card-text {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.8;
 }
 
 /* ===== البحث والفلترة ===== */
