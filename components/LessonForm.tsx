@@ -20,6 +20,7 @@ export interface LessonFormInitial {
   video_url: string | null;
   status: string;
   is_free_preview: boolean;
+  is_restricted: boolean;
   sections: { heading: string; html?: string; paragraphs?: string[] }[];
   quiz: { prompt: string; options: string[]; correct_index: number }[];
 }
@@ -365,6 +366,22 @@ export default function LessonForm({
             <span className="form-label">عيّنة مجانية للزوّار 🎁</span>
             <span className="form-hint">
               درس واحد فقط لكل معلّم يظهر كاملاً لغير المسجّلين.
+            </span>
+          </span>
+        </label>
+      </div>
+
+      <div className="form-grid">
+        <label className="form-field toggle-field">
+          <input
+            type="checkbox"
+            name="is_restricted"
+            defaultChecked={initial?.is_restricted ?? false}
+          />
+          <span>
+            <span className="form-label">درس خاص 🔒</span>
+            <span className="form-hint">
+              لا يظهر لأحد إلا لمن تمنحه الوصول من صفحة «طلابي».
             </span>
           </span>
         </label>

@@ -65,6 +65,7 @@ SUPABASE_SERVICE_ROLE_KEY=<secret key>   # npm run seed only — never NEXT_PUBL
 | `0005_lock_down_trigger_function.sql` | revoke API execute on the trigger function |
 | `0006_teacher_accounts.sql` | `qualification`, `experience_years`, `is_published` + owner INSERT policy |
 | `0007_lesson_media_storage.sql` | `lesson-media` storage bucket + owner-folder upload policies |
+| `0008_student_profiles_messages_grants.sql` | student profile columns, `teacher_messages`, `student_grants`, `is_restricted` + RLS |
 
 ### Rich lesson content (the `sections` column)
 
@@ -116,6 +117,8 @@ Security is verified with SQL that switches `role` and `request.jwt.claims` to i
 | `app/teacher/me/content/page.tsx` | content manager: units + lessons + live sessions, with delete forms |
 | `app/teacher/me/lessons/new` · `lessons/[lessonId]` | create/edit a recorded lesson (`LessonForm`) |
 | `app/teacher/me/live/new` · `live/[sessionId]` | create/edit a live session with pricing (`LiveForm`) |
+| `app/dashboard/profile/page.tsx` | student fills their own data (`StudentProfileForm`) |
+| `app/teacher/me/students/page.tsx` | teacher's followers: profiles, progress, messages, access grants |
 | `app/privacy/page.tsx` · `app/terms/page.tsx` | Arabic legal pages, linked from the footer |
 
 **Teacher accounts** (Supabase Auth, same Google/magic-link as students — there is no separate teacher login): a user is a teacher iff they own a `teachers` row (`owner_id = auth.uid()`). `saveTeacherProfile` (`app/actions/teacher.ts`) creates/updates that row — name, subject, stages, qualification, `experience_years`, bio, whatsapp, avatar (resized data URL in `avatar_url`), auto-generated unique slug (reserved words blocked). `teachers` columns `qualification`, `experience_years`, `is_published` (directory shows published only; RLS: public read = published-or-owner, plus owner INSERT). `getMyTeacher()` / `isCurrentUserTeacher()` drive the navbar and teacher pages.
@@ -154,9 +157,20 @@ The old browser-local teacher demo is **gone** — deleted, not deprecated. That
 
 The six seeded demo teachers were deleted from the live database (their units/lessons/attachments/live sessions cascaded). Real teacher rows are distinguished by `owner_id is not null` — the seed rows had `owner_id is null`, which is the safe discriminator if you ever need to purge seed data again.
 
+### Student profiles, teacher messages, and access grants (`0008`)
+
+**Student data** lives on `profiles` (`grade`, `school`, `city`, `age`, `avatar_url`, `phone`, `whatsapp`, `guardian_phone`, `profile_done`). Only name and grade are required — **the phone numbers are deliberately optional** and the form says so. `saveStudentProfile` (`app/actions/student-profile.ts`) rejects teacher accounts, since the roles are exclusive. A teacher can read a follower's profile only through the `profiles_teacher_reads_followers` policy, which is keyed on `follows` (the older policy keyed on the dead `subscriptions` table and never matched).
+
+**Teacher messages** (`teacher_messages`): `student_id` set = a private note to one student; `student_id null` = broadcast to every follower. Students read them on `/dashboard`; RLS lets a student see only messages addressed to them or broadcasts from teachers they actually follow. Bodies are `stripTags`-ed — they render as plain text, never HTML.
+
+**Access grants** (`student_grants` + `lessons.is_restricted` / `live_sessions.is_restricted`): a teacher marks a lesson or session "خاص", then grants specific followers access from `/teacher/me/students`. A grant row with both `lesson_id` and `session_id` null means "all of this teacher's restricted content".
+
+Enforcement is in the `lessons` / `live_sessions` SELECT policies via the `security definer` helper `has_grant()`: a restricted row is **hidden entirely** from anyone without a grant — title included. RLS filters rows, not columns, so full-row hiding is the only real guarantee here; there is no "locked but visible" state for restricted content (unlike the visitor gate, which hides columns). Consequence: lesson counts legitimately differ per student.
+
 ## Conventions
 
 - Path alias `@/*` maps to the repository root (see `tsconfig.json`).
 - Arabic-Indic numerals (٩٠ دقيقة) appear inside data strings; UI-computed numbers render as Latin digits.
+- **PWA**: `public/manifest.webmanifest`, generated icons (`icon-*.png`, `apple-touch-icon.png`), and `public/sw.js`, registered by `components/ServiceWorker.tsx`. `components/InstallApp.tsx` shows an install button on Android/Chrome via `beforeinstallprompt`, and an "add to home screen" hint on iOS Safari (which has no such event); it hides itself when already installed or dismissed. **The service worker never caches HTML** — pages depend on auth state, so a cached page could show one account's data to another on a shared device. Only `/_next/static/` and other user-data-free assets are cached, plus `offline.html`.
 - Styling lives entirely in `app/globals.css` (plain CSS + custom properties, no Tailwind/CSS modules). Mobile breakpoint is 720px.
 - Placeholder media is CSS-only (gradients + initials/emoji). Lesson videos are Google's public sample MP4s; attachments point at three real PDFs in `public/files/`.

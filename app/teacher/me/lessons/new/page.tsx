@@ -33,6 +33,7 @@ export default async function NewLessonPage({
         video_url: null,
         status: "published",
         is_free_preview: false,
+        is_restricted: false,
         sections: [],
         quiz: [],
       }

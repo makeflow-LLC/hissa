@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import {
   getCurrentUser,
+  getMyMessages,
+  getMyStudentProfile,
   getStudentDashboard,
   getStudentName,
   isCurrentUserTeacher,
@@ -19,7 +21,12 @@ export default async function StudentDashboard() {
   // حساب المعلّم له لوحته الخاصة — لا لوحة طالب على البريد نفسه
   if (await isCurrentUserTeacher()) redirect("/teacher/me");
 
-  const [name, data] = await Promise.all([getStudentName(), getStudentDashboard()]);
+  const [name, data, profile, messages] = await Promise.all([
+    getStudentName(),
+    getStudentDashboard(),
+    getMyStudentProfile(),
+    getMyMessages(),
+  ]);
   const { enrollments = [], following = [] } = data ?? {};
 
   const totalLessons = following.reduce((n, f) => n + f.total, 0);
@@ -40,10 +47,52 @@ export default async function StudentDashboard() {
             </p>
           </div>
         </div>
-        <Link href="/" className="btn btn-outline">
-          ＋ استكشف معلّمين جدداً
-        </Link>
+        <div className="dashboard-header-actions">
+          <Link href="/dashboard/profile" className="btn btn-primary">
+            ✏️ بياناتي
+          </Link>
+          <Link href="/" className="btn btn-outline">
+            ＋ استكشف معلّمين جدداً
+          </Link>
+        </div>
       </section>
+
+      {!profile?.profile_done && (
+        <div className="visitor-banner">
+          <strong>أكمل بياناتك.</strong> اسمك وصفّك يساعدان معلّميك على متابعتك
+          ومعرفة مستواك.
+          <Link href="/dashboard/profile" className="btn btn-primary btn-sm">
+            أكمل الآن
+          </Link>
+        </div>
+      )}
+
+      {messages.length > 0 && (
+        <section className="dashboard-section">
+          <h2 className="section-title">✉️ رسائل من معلّميك</h2>
+          <ul className="messages-list">
+            {messages.map((m) => (
+              <li key={m.id} className="message-row">
+                <div className="message-head">
+                  <Link href={`/teacher/${m.teacherSlug}`} className="message-from">
+                    {m.teacherName}
+                  </Link>
+                  <span className="message-date">
+                    {new Date(m.created_at).toLocaleDateString("ar-EG", {
+                      day: "numeric",
+                      month: "long",
+                    })}
+                  </span>
+                  {m.student_id === null && (
+                    <span className="pill pill-free">📢 لكل الطلاب</span>
+                  )}
+                </div>
+                <p className="message-body">{m.body}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="dashboard-stats">
         <div className="stat-box">

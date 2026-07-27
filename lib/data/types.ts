@@ -130,3 +130,38 @@ export interface LessonPage {
   isCompleted: boolean;
   locked: boolean;
 }
+
+/** بيانات الطالب في profiles (يملؤها الطالب بنفسه) */
+export interface StudentProfile {
+  id: string;
+  full_name: string;
+  avatar_url: string | null;
+  grade: string;
+  school: string;
+  city: string;
+  age: number | null;
+  phone: string | null;
+  whatsapp: string | null;
+  guardian_phone: string | null;
+  profile_done: boolean;
+}
+
+/** صف واحد في قائمة طلاب المعلّم مع تقدّمه في منهج هذا المعلّم */
+export interface TeacherStudent {
+  profile: StudentProfile;
+  followedAt: string;
+  completedLessons: number;
+  totalLessons: number;
+  progressPct: number;
+  /** منح الوصول التي أعطاها هذا المعلّم لهذا الطالب */
+  grants: { id: string; lesson_id: string | null; session_id: string | null }[];
+}
+
+/** رسالة من معلّم إلى طالب بعينه أو إلى كل متابعيه */
+export interface TeacherMessage {
+  id: string;
+  teacher_id: string;
+  student_id: string | null;
+  body: string;
+  created_at: string;
+}

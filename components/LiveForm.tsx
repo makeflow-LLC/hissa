@@ -18,6 +18,7 @@ export interface LiveFormInitial {
   is_paid: boolean;
   price: number;
   currency: string;
+  is_restricted: boolean;
 }
 
 const initialState: ContentFormState = { ok: false };
@@ -168,6 +169,22 @@ export default function LiveForm({
           </label>
         </div>
       )}
+
+      <div className="form-field">
+        <label className="toggle-field">
+          <input
+            type="checkbox"
+            name="is_restricted"
+            defaultChecked={initial?.is_restricted ?? false}
+          />
+          <span>
+            <span className="form-label">حصة خاصة 🔒</span>
+            <span className="form-hint">
+              لا تظهر لأحد إلا لمن تمنحه الوصول من صفحة «طلابي».
+            </span>
+          </span>
+        </label>
+      </div>
 
       <label className="form-field">
         <span className="form-label">الحالة</span>

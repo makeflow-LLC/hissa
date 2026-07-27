@@ -39,7 +39,10 @@ export default async function TeacherMePage() {
           </div>
         </div>
         <div className="dashboard-header-actions">
-          <Link href="/teacher/onboarding" className="btn btn-primary">
+          <Link href="/teacher/me/students" className="btn btn-primary">
+            👥 طلابي
+          </Link>
+          <Link href="/teacher/onboarding" className="btn btn-outline">
             ✏️ تعديل بياناتي
           </Link>
           <Link href={`/teacher/${teacher.slug}`} className="btn btn-outline">

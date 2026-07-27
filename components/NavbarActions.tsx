@@ -35,7 +35,10 @@ export default async function NavbarActions() {
           لوحة المعلّم
         </Link>
         <Link href="/teacher/me/content" className="navbar-link">
-          إدارة المحتوى
+          المحتوى
+        </Link>
+        <Link href="/teacher/me/students" className="navbar-link">
+          طلابي
         </Link>
         <span
           className="navbar-user navbar-user-teacher"
