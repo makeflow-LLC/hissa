@@ -457,6 +457,57 @@ export async function getMyTeacher(): Promise<MyTeacher | null> {
   return (data as MyTeacher) ?? null;
 }
 
+/**
+ * دور الحساب الحالي — مصدر واحد للحقيقة يمنع ازدواج الهوية.
+ *
+ * القاعدة: البريد الواحد إمّا معلّم وإمّا طالب، لا الاثنين معاً.
+ * - «معلّم» = يملك صفاً في teachers.
+ * - «طالب نشِط» = له تسجيل أو متابعة أو تقدّم محفوظ؛ لا يجوز أن يفتح
+ *   حساب معلّم على البريد نفسه.
+ * - «حساب جديد» = سجّل دخوله ولم يفعل شيئاً بعد؛ يجوز أن يصبح معلّماً
+ *   (هذا هو مسار تسجيل المعلّم الطبيعي: دخول ثم إنشاء بروفايل).
+ *
+ * يفشل «مغلقاً» لأنه يُستدعى من الشريط العلوي في التخطيط الجذري.
+ */
+export type AccountRole = "visitor" | "new" | "student" | "teacher";
+
+export async function getAccountRole(): Promise<AccountRole> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return "visitor";
+
+    const { data: teacher } = await supabase
+      .from("teachers")
+      .select("id")
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    if (teacher) return "teacher";
+
+    const [enr, fol, prog] = await Promise.all([
+      supabase
+        .from("enrollments")
+        .select("session_id", { count: "exact", head: true })
+        .eq("student_id", user.id),
+      supabase
+        .from("follows")
+        .select("teacher_id", { count: "exact", head: true })
+        .eq("student_id", user.id),
+      supabase
+        .from("lesson_progress")
+        .select("lesson_id", { count: "exact", head: true })
+        .eq("student_id", user.id),
+    ]);
+
+    const active = (enr.count ?? 0) + (fol.count ?? 0) + (prog.count ?? 0);
+    return active > 0 ? "student" : "new";
+  } catch {
+    return "visitor";
+  }
+}
+
 /** هل المستخدم الحالي معلّم مسجّل؟ (لعناصر التنقل) */
 export async function isCurrentUserTeacher(): Promise<boolean> {
   try {

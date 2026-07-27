@@ -43,7 +43,7 @@ export default async function TeacherMePage() {
             ✏️ تعديل بياناتي
           </Link>
           <Link href={`/teacher/${teacher.slug}`} className="btn btn-outline">
-            👁 بروفايلي العام
+            👁 معاينة صفحتي كما يراها الطالب
           </Link>
         </div>
       </section>

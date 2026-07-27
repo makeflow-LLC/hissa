@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { getCurrentUser, getMyTeacher } from "@/lib/data/queries";
+import { getAccountRole, getCurrentUser, getMyTeacher } from "@/lib/data/queries";
 import TeacherProfileForm from "@/components/TeacherProfileForm";
 
 export const dynamic = "force-dynamic";
@@ -12,13 +12,16 @@ export default async function TeacherOnboardingPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?role=teacher&next=/teacher/onboarding");
 
+  // حساب طالب نشِط لا يفتح بروفايل معلّم على البريد نفسه — نفس قاعدة /teacher/join
+  if ((await getAccountRole()) === "student") redirect("/teacher/join");
+
   const existing = await getMyTeacher();
 
   return (
     <main className="container container-narrow">
       <nav className="breadcrumb">
-        <Link href="/" className="back-link">
-          → الصفحة الرئيسية
+        <Link href={existing ? "/teacher/me" : "/"} className="back-link">
+          → {existing ? "لوحة المعلّم" : "الصفحة الرئيسية"}
         </Link>
       </nav>
 

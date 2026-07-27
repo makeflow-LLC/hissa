@@ -117,6 +117,30 @@ export async function saveTeacherProfile(
     return { ok: true, slug: existing.slug };
   }
 
+  // البريد الواحد إمّا معلّم وإمّا طالب: حساب استُخدم فعلاً كطالب
+  // (تسجيل في حصة أو متابعة معلّم أو تقدّم محفوظ) لا يُحوَّل إلى معلّم.
+  const [enr, fol, prog] = await Promise.all([
+    supabase
+      .from("enrollments")
+      .select("session_id", { count: "exact", head: true })
+      .eq("student_id", user.id),
+    supabase
+      .from("follows")
+      .select("teacher_id", { count: "exact", head: true })
+      .eq("student_id", user.id),
+    supabase
+      .from("lesson_progress")
+      .select("lesson_id", { count: "exact", head: true })
+      .eq("student_id", user.id),
+  ]);
+  if ((enr.count ?? 0) + (fol.count ?? 0) + (prog.count ?? 0) > 0) {
+    return {
+      ok: false,
+      message:
+        "هذا البريد مستخدَم كحساب طالب على المنصة. لفتح حساب معلّم سجّل الخروج واستخدم بريداً آخر.",
+    };
+  }
+
   // إنشاء: نولّد slug فريداً (نعيد المحاولة عند التعارض)
   const gradient = GRADIENTS[Math.floor(Math.random() * GRADIENTS.length)];
   let slug = normalizeSlug(wantedSlug || name);

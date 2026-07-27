@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getCurrentUser, getTeacherProfile } from "@/lib/data/queries";
+import { getCurrentUser, getMyTeacher, getTeacherProfile } from "@/lib/data/queries";
 import TeacherTabs from "@/components/TeacherTabs";
 import FollowButton from "@/components/FollowButton";
 import ConnectionNotice from "@/components/ConnectionNotice";
@@ -25,6 +25,9 @@ export default async function TeacherProfilePage({
 }) {
   const { slug } = await params;
   const user = await getCurrentUser();
+  const myTeacher = user ? await getMyTeacher() : null;
+  const isTeacherAccount = Boolean(myTeacher);
+  const isOwner = myTeacher?.slug === slug;
 
   let profile: Awaited<ReturnType<typeof getTeacherProfile>> = null;
   let loadError: string | undefined;
@@ -93,12 +96,26 @@ export default async function TeacherProfilePage({
         <p className="profile-bio">{teacher.bio}</p>
 
         <div className="profile-actions">
-          <FollowButton
-            teacherId={teacher.id}
-            teacherSlug={teacher.slug}
-            isFollowing={profile.isFollowing}
-            isAuthed={Boolean(user)}
-          />
+          {isOwner ? (
+            // المعلّم يعاين صفحته كما يراها الطالب — لا يتابع نفسه
+            <>
+              <Link href="/teacher/me/content" className="btn btn-primary">
+                ✏️ تعديل المحتوى
+              </Link>
+              <Link href="/teacher/me" className="btn btn-outline">
+                لوحة المعلّم
+              </Link>
+            </>
+          ) : (
+            !isTeacherAccount && (
+              <FollowButton
+                teacherId={teacher.id}
+                teacherSlug={teacher.slug}
+                isFollowing={profile.isFollowing}
+                isAuthed={Boolean(user)}
+              />
+            )
+          )}
           {waDigits && (
             <a
               href={`https://wa.me/${waDigits}`}
@@ -130,7 +147,7 @@ export default async function TeacherProfilePage({
         </div>
       </section>
 
-      {!user && (
+      {!user && !isOwner && (
         <div className="visitor-banner">
           <strong>أنت تتصفّح كزائر.</strong> ترى عناوين الدروس ووصفها، ودرساً واحداً
           كعيّنة مجانية. سجّل الدخول مجاناً لمشاهدة كل الدروس وتحميل المرفقات
@@ -144,7 +161,21 @@ export default async function TeacherProfilePage({
         </div>
       )}
 
-      <TeacherTabs profile={profile} isAuthed={Boolean(user)} />
+      {isOwner && (
+        <div className="owner-preview-banner">
+          👁 هذه صفحتك كما يراها الطالب. لتعديل الدروس والحصص افتح{" "}
+          <Link href="/teacher/me/content" className="back-link">
+            إدارة المحتوى
+          </Link>
+          .
+        </div>
+      )}
+
+      <TeacherTabs
+        profile={profile}
+        isAuthed={Boolean(user)}
+        canEnroll={Boolean(user) && !isTeacherAccount}
+      />
     </main>
   );
 }

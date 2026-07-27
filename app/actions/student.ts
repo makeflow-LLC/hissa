@@ -15,6 +15,29 @@ const NEED_LOGIN: ActionResult = {
   message: "سجّل الدخول أولاً للمتابعة.",
 };
 
+const TEACHER_ACCOUNT: ActionResult = {
+  ok: false,
+  message:
+    "هذا الحساب حساب معلّم. للتسجيل في الحصص كطالب استخدم بريداً آخر.",
+};
+
+/**
+ * الحساب الواحد إمّا معلّم وإمّا طالب — لا يجمع الدورين.
+ * كل إجراء طالب يتحقّق خادمياً من أن صاحب الجلسة لا يملك بروفايل معلّم،
+ * فلا يكفي إخفاء الأزرار في الواجهة.
+ */
+async function isTeacherAccount(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", userId)
+    .maybeSingle();
+  return Boolean(data);
+}
+
 /**
  * التسجيل في حصة مباشرة.
  * الحصة المجانية → مسجّل فوراً. المدفوعة → بانتظار تأكيد المعلم للدفع.
@@ -29,6 +52,7 @@ export async function enrollInSession(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NEED_LOGIN;
+  if (await isTeacherAccount(supabase, user.id)) return TEACHER_ACCOUNT;
 
   const { data: session } = await supabase
     .from("live_sessions")
@@ -69,6 +93,7 @@ export async function cancelEnrollment(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NEED_LOGIN;
+  if (await isTeacherAccount(supabase, user.id)) return TEACHER_ACCOUNT;
 
   const { error } = await supabase
     .from("enrollments")
@@ -93,6 +118,7 @@ export async function toggleFollow(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NEED_LOGIN;
+  if (await isTeacherAccount(supabase, user.id)) return TEACHER_ACCOUNT;
 
   const { error } = following
     ? await supabase
@@ -125,6 +151,7 @@ export async function toggleLessonComplete(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NEED_LOGIN;
+  if (await isTeacherAccount(supabase, user.id)) return TEACHER_ACCOUNT;
 
   const { error } = completed
     ? await supabase
