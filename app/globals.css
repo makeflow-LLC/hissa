@@ -2433,6 +2433,120 @@ body {
   flex-wrap: wrap;
 }
 
+/* ===== المؤهلات في البروفايل ===== */
+
+.profile-credentials {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.credential {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.9rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ===== دعوة الانضمام كمعلّم ===== */
+
+.teacher-cta {
+  margin-top: 2.5rem;
+}
+
+.teacher-cta-inner {
+  background: linear-gradient(135deg, var(--primary), #8b5cf6);
+  border-radius: var(--radius);
+  padding: 2rem;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  box-shadow: var(--shadow-hover);
+}
+
+.teacher-cta-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.teacher-cta-text {
+  margin-top: 0.4rem;
+  max-width: 34rem;
+  opacity: 0.95;
+}
+
+.teacher-cta .btn-primary {
+  background: #fff;
+  color: var(--primary-dark);
+  flex-shrink: 0;
+}
+
+.teacher-cta .btn-primary:hover {
+  background: #f1f5f9;
+}
+
+/* ===== صفحة انضمام المعلّم ===== */
+
+.join-hero {
+  text-align: center;
+  padding: 2rem 0 2.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.join-emoji {
+  font-size: 3.2rem;
+}
+
+.join-title {
+  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--primary), #8b5cf6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.join-subtitle {
+  color: var(--text-muted);
+  font-size: clamp(1rem, 2.5vw, 1.15rem);
+  max-width: 40rem;
+}
+
+.join-login-note {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.join-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+/* ===== لوحة المعلّم ===== */
+
+.me-qualification,
+.me-bio {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.1rem 1.3rem;
+  color: #334155;
+  line-height: 1.9;
+}
+
 /* ===== التجاوب مع الموبايل ===== */
 
 @media (max-width: 720px) {
@@ -2531,6 +2645,15 @@ body {
 
   .share-actions .btn {
     flex: 1;
+  }
+
+  .teacher-cta-inner {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .teacher-cta .btn-primary {
+    width: 100%;
   }
 
   .live-card {

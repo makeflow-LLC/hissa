@@ -89,6 +89,22 @@ export default async function Home() {
           <ConnectionNotice detail={error} />
         )}
       </section>
+
+      {/* دعوة المعلّمين للانضمام */}
+      <section className="teacher-cta">
+        <div className="teacher-cta-inner">
+          <div>
+            <h2 className="teacher-cta-title">هل أنت معلّم؟</h2>
+            <p className="teacher-cta-text">
+              أنشئ حسابك مجاناً، افتح ملفك الشخصي، وابدأ بالوصول إلى طلابك بدروسك
+              وحصصك — أنت من يحدّد أسعار حصصك.
+            </p>
+          </div>
+          <Link href="/teacher/join" className="btn btn-primary btn-lg">
+            انضم كمعلّم
+          </Link>
+        </div>
+      </section>
     </main>
   );
 }

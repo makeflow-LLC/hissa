@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type {
+  MyTeacher,
   AttachmentRow,
   LessonContent,
   LessonMeta,
@@ -17,7 +18,7 @@ const LESSON_META_COLS =
   "id, unit_id, title, description, duration, emoji, gradient, position, is_free_preview";
 
 const TEACHER_COLS =
-  "id, slug, name, subject, stages, bio, initials, gradient, avatar_url, whatsapp, rating, rating_count";
+  "id, slug, name, subject, stages, bio, initials, gradient, avatar_url, whatsapp, rating, rating_count, qualification, experience_years";
 
 /**
  * المستخدم الحالي (null للزائر).
@@ -67,7 +68,11 @@ export async function getTeacherCards(): Promise<TeacherCard[]> {
   const supabase = await createClient();
 
   const [teachersRes, lessonsRes, liveRes] = await Promise.all([
-    supabase.from("teachers").select(TEACHER_COLS).order("created_at"),
+    supabase
+      .from("teachers")
+      .select(TEACHER_COLS)
+      .eq("is_published", true)
+      .order("created_at"),
     supabase.from("lessons").select("id, teacher_id").eq("status", "published"),
     supabase.from("live_sessions").select("id, teacher_id").eq("status", "published"),
   ]);
@@ -431,4 +436,42 @@ export async function getStudentDashboard(): Promise<StudentDashboard | null> {
   }
 
   return { enrollments, following };
+}
+
+/* ===================== حساب المعلّم ===================== */
+
+/** ملف المعلّم المملوك للمستخدم الحالي (null إن لم يكن معلّماً بعد) */
+export async function getMyTeacher(): Promise<MyTeacher | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data } = await supabase
+    .from("teachers")
+    .select(`${TEACHER_COLS}, is_published`)
+    .eq("owner_id", user.id)
+    .maybeSingle();
+
+  return (data as MyTeacher) ?? null;
+}
+
+/** هل المستخدم الحالي معلّم مسجّل؟ (لعناصر التنقل) */
+export async function isCurrentUserTeacher(): Promise<boolean> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return false;
+    const { data } = await supabase
+      .from("teachers")
+      .select("slug")
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    return Boolean(data);
+  } catch {
+    return false;
+  }
 }
