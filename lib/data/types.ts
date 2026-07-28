@@ -178,4 +178,6 @@ export interface TeacherMessage {
   student_id: string | null;
   body: string;
   created_at: string;
+  /** من كتبها — الخيط الواحد يحمل رسائل الطرفين */
+  sender: "teacher" | "student";
 }

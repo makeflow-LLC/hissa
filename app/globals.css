@@ -3434,3 +3434,70 @@ body {
 }
 .quiz-stat-name { font-weight: 600; }
 .pill-low { background: #fee2e2; color: #b91c1c; }
+
+/* ===== إعادة الترتيب والمحادثات ===== */
+
+.reorder-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.reorder-group .btn[disabled] { opacity: 0.35; cursor: not-allowed; }
+
+.ask-box { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.ask-actions { display: flex; gap: 8px; }
+
+.message-row-mine {
+  border-inline-start-color: var(--text-muted);
+  background: var(--primary-soft);
+}
+
+.threads-list { display: flex; flex-direction: column; gap: 14px; }
+.thread-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--surface);
+}
+.thread-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.thread-messages {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.thread-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 11px;
+  border-radius: 12px;
+  max-width: 85%;
+}
+/* سؤال الطالب على جهة البداية، وردّ المعلّم على جهة النهاية */
+.thread-msg-student {
+  background: var(--primary-soft);
+  align-self: flex-start;
+}
+.thread-msg-teacher {
+  background: var(--success-soft);
+  align-self: flex-end;
+}
+.thread-msg-who { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); }
+.thread-msg-body { line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.thread-msg-date { font-size: 0.72rem; color: var(--text-muted); }
+
+.thread-reply { display: flex; flex-direction: column; gap: 8px; }
+.thread-reply .btn { align-self: flex-start; }
+
+@media (max-width: 720px) {
+  .thread-msg { max-width: 95%; }
+  .thread-reply .btn { align-self: stretch; }
+  .reorder-group { width: 100%; justify-content: flex-end; }
+}

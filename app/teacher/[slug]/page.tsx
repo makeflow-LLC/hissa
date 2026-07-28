@@ -15,8 +15,37 @@ export async function generateMetadata({
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const profile = await getTeacherProfile((await params).slug);
-  return { title: profile ? `${profile.teacher.name} | منصة حصة` : "منصة حصة" };
+  const { slug } = await params;
+  let profile: Awaited<ReturnType<typeof getTeacherProfile>> = null;
+  try {
+    profile = await getTeacherProfile(slug);
+  } catch {
+    /* فشل الاتصال لا يمنع تصيير الصفحة — نكتفي بعنوان عام */
+  }
+  if (!profile) return { title: "منصة حصة" };
+
+  const { teacher, units } = profile;
+  const lessonCount = units.reduce((n, u) => n + u.lessons.length, 0);
+  const title = `${teacher.name} — ${teacher.subject} | منصة حصة`;
+  const description =
+    (teacher.bio?.trim() ||
+      `${teacher.name} معلّم ${teacher.subject} على منصة حصة`) +
+    ` · ${lessonCount} درساً مسجّلاً لمراحل ${teacher.stages.join(" و")}.`;
+
+  return {
+    title,
+    description: description.slice(0, 300),
+    alternates: { canonical: `/teacher/${slug}` },
+    openGraph: {
+      title,
+      description: description.slice(0, 300),
+      url: `/teacher/${slug}`,
+      type: "profile",
+      images: teacher.avatar_url?.startsWith("http")
+        ? [teacher.avatar_url]
+        : undefined,
+    },
+  };
 }
 
 export default async function TeacherProfilePage({
@@ -55,8 +84,35 @@ export default async function TeacherProfilePage({
   const canReview = Boolean(user) && !isTeacherAccount && completedCount > 0;
   const waDigits = teacher.whatsapp?.replace(/[^0-9]/g, "") ?? "";
 
+  // بيانات منظّمة تساعد جوجل على فهم الصفحة كمعلّم له منهج
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: teacher.name,
+    jobTitle: `معلّم ${teacher.subject}`,
+    description: teacher.bio || undefined,
+    url: `https://hissa.sbs/teacher/${teacher.slug}`,
+    image: teacher.avatar_url?.startsWith("http") ? teacher.avatar_url : undefined,
+    knowsAbout: teacher.subject,
+    ...(teacher.rating_count > 0 && {
+      aggregateRating: {
+        "@type": "AggregateRating",
+        ratingValue: Number(teacher.rating),
+        reviewCount: teacher.rating_count,
+        bestRating: 5,
+        worstRating: 1,
+      },
+    }),
+    worksFor: { "@type": "Organization", name: "منصة حصة", url: "https://hissa.sbs" },
+  };
+
   return (
     <main className="container">
+      <script
+        type="application/ld+json"
+        // بيانات مبنيّة من صفوفنا لا من مُدخَل حرّ
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <nav className="breadcrumb">
         <Link href="/" className="back-link">
           → دليل المعلّمين
