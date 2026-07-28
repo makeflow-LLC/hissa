@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser, getMyTeacherContent } from "@/lib/data/queries";
 import LessonForm from "@/components/LessonForm";
+import { isAiConfigured } from "@/lib/ai/openrouter";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,7 @@ export default async function NewLessonPage({
         </Link>
       </nav>
       <h1 className="dashboard-title">➕ درس جديد</h1>
-      <LessonForm units={units} initial={initial} />
+      <LessonForm units={units} initial={initial} aiEnabled={isAiConfigured()} />
     </main>
   );
 }

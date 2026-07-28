@@ -8,6 +8,10 @@ import {
 } from "@/app/actions/teacher-content";
 import RichTextEditor from "@/components/RichTextEditor";
 import AttachmentManager from "@/components/AttachmentManager";
+import AiAssistPanel, {
+  AiFormatButton,
+  type AiQuizQuestion,
+} from "@/components/AiAssistPanel";
 import type { AttachmentRow } from "@/lib/data/types";
 
 const EMOJIS = ["📚", "✏️", "🧮", "🔬", "🧪", "🌍", "📖", "💡", "🎯", "🧠", "📝", "🔤"];
@@ -63,9 +67,12 @@ const initialState: ContentFormState = { ok: false };
 export default function LessonForm({
   units,
   initial,
+  aiEnabled,
 }: {
   units: { id: string; title: string }[];
   initial: LessonFormInitial | null;
+  /** مفتاح النموذج مضبوط على الخادم؟ */
+  aiEnabled: boolean;
 }) {
   const router = useRouter();
   const isEdit = Boolean(initial);
@@ -204,6 +211,24 @@ export default function LessonForm({
         </span>
       </label>
 
+      <AiAssistPanel
+        lessonId={initial?.id ?? ""}
+        enabled={aiEnabled && isEdit}
+        onSummary={(html) =>
+          setSections((prev) => [...prev, { heading: "ملخّص الدرس", html }])
+        }
+        onQuiz={(questions: AiQuizQuestion[]) =>
+          setQuiz((prev) => [
+            ...prev,
+            ...questions.map((q) => ({
+              prompt: q.prompt,
+              options: [...q.options, "", "", "", ""].slice(0, 4),
+              correct_index: q.correct_index,
+            })),
+          ])
+        }
+      />
+
       {/* أقسام الشرح */}
       <div className="form-field">
         <span className="form-label">الشرح المكتوب</span>
@@ -245,6 +270,16 @@ export default function LessonForm({
                   )
                 }
                 placeholder="اكتب الشرح هنا…"
+              />
+              <AiFormatButton
+                lessonId={initial?.id ?? ""}
+                html={s.html}
+                enabled={aiEnabled && isEdit}
+                onResult={(html) =>
+                  setSections((prev) =>
+                    prev.map((x, j) => (j === i ? { ...x, html } : x))
+                  )
+                }
               />
             </div>
           ))}
