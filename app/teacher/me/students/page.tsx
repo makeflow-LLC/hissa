@@ -5,6 +5,7 @@ import {
   getCurrentUser,
   getMyStudents,
   getMyTeacher,
+  getMyQuizStats,
   getMyTeacherContent,
 } from "@/lib/data/queries";
 import { revokeAccess } from "@/app/actions/teacher-students";
@@ -27,9 +28,14 @@ export default async function TeacherStudentsPage() {
 
   let students: Awaited<ReturnType<typeof getMyStudents>> = [];
   let content: Awaited<ReturnType<typeof getMyTeacherContent>> = null;
+  let quizStats: Awaited<ReturnType<typeof getMyQuizStats>> = [];
   let loadError: string | undefined;
   try {
-    [students, content] = await Promise.all([getMyStudents(), getMyTeacherContent()]);
+    [students, content, quizStats] = await Promise.all([
+      getMyStudents(),
+      getMyTeacherContent(),
+      getMyQuizStats(),
+    ]);
   } catch (e) {
     loadError = e instanceof Error ? e.message : String(e);
   }
@@ -100,6 +106,47 @@ export default async function TeacherStudentsPage() {
             <h2 className="section-title">📢 رسالة لكل المتابعين</h2>
             <BroadcastForm />
           </section>
+
+          {quizStats.length > 0 && (
+            <section className="dashboard-section">
+              <h2 className="section-title">📝 نتائج الاختبارات</h2>
+              <div className="quiz-stats">
+                {quizStats.map((q) => (
+                  <article key={q.lessonId} className="quiz-stat-card">
+                    <header className="quiz-stat-head">
+                      <strong>{q.lessonTitle}</strong>
+                      <span className="quiz-stat-meta">
+                        {q.attempts} محاولة · متوسّط {q.avgPct}%
+                      </span>
+                    </header>
+                    <ul className="quiz-stat-rows">
+                      {q.rows.map((r, i) => {
+                        const pct = r.total
+                          ? Math.round((r.score / r.total) * 100)
+                          : 0;
+                        return (
+                          <li key={i} className="quiz-stat-row">
+                            <span className="quiz-stat-name">{r.studentName}</span>
+                            <span
+                              className={`pill ${
+                                pct >= 70
+                                  ? "pill-live"
+                                  : pct >= 40
+                                    ? "pill-draft"
+                                    : "pill-low"
+                              }`}
+                            >
+                              {r.score} / {r.total} ({pct}%)
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="dashboard-section">
             <h2 className="section-title">قائمة الطلاب</h2>

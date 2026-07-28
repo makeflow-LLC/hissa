@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { submitQuiz } from "@/app/actions/quiz";
 
 export interface QuizQuestion {
   id: string;
@@ -9,19 +10,58 @@ export interface QuizQuestion {
   correctIndex: number;
 }
 
-/** اختبار تفاعلي قصير في نهاية الحصة: يختار الطالب ثم يتحقق من إجاباته */
-export default function QuizSection({ questions }: { questions: QuizQuestion[] }) {
+/**
+ * اختبار قصير في نهاية الدرس.
+ * النتيجة تُحفظ في قاعدة البيانات ليراها المعلّم؛ والتصحيح النهائي يتم
+ * على الخادم لا هنا، فلا يستطيع أحد إرسال درجة كاملة من المتصفح.
+ */
+export default function QuizSection({
+  questions,
+  lessonId,
+  teacherSlug,
+  previous,
+}: {
+  questions: QuizQuestion[];
+  lessonId: string;
+  teacherSlug: string;
+  /** محاولة سابقة إن وُجدت */
+  previous: { score: number; total: number } | null;
+}) {
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [checked, setChecked] = useState(false);
+  const [saving, startSaving] = useTransition();
+  const [saved, setSaved] = useState<{ score: number; total: number } | null>(
+    previous
+  );
+  const [saveErr, setSaveErr] = useState("");
 
   if (questions.length === 0) return null;
 
   const answeredAll = questions.every((q) => answers[q.id] !== undefined);
   const score = questions.filter((q) => answers[q.id] === q.correctIndex).length;
 
+  function submit() {
+    setChecked(true);
+    setSaveErr("");
+    startSaving(async () => {
+      const res = await submitQuiz(lessonId, teacherSlug, answers);
+      if (res.ok && res.score !== undefined && res.total !== undefined) {
+        setSaved({ score: res.score, total: res.total });
+      } else {
+        setSaveErr(res.message ?? "تعذّر حفظ النتيجة.");
+      }
+    });
+  }
+
   return (
     <section className="lesson-block">
       <h2 className="content-heading">❓ اختبر فهمك</h2>
+      {saved && !checked && (
+        <p className="quiz-previous">
+          📊 نتيجتك السابقة: {saved.score} من {saved.total} — يمكنك إعادة الحل
+          وستُحدَّث نتيجتك.
+        </p>
+      )}
       <div className="quiz">
         {questions.map((q, qi) => (
           <div key={q.id} className="quiz-question">
@@ -59,6 +99,13 @@ export default function QuizSection({ questions }: { questions: QuizQuestion[] }
               نتيجتك: {score} من {questions.length}{" "}
               {score === questions.length ? "🎉 ممتاز!" : score >= questions.length / 2 ? "👏 جيد جداً" : "💪 راجع الدرس وحاول مجدداً"}
             </p>
+            <p className="quiz-saved-note">
+              {saving
+                ? "⏳ جارٍ حفظ نتيجتك…"
+                : saveErr
+                  ? `⚠️ ${saveErr}`
+                  : "✅ حُفظت نتيجتك — يراها معلّمك."}
+            </p>
             <button
               type="button"
               className="btn btn-outline"
@@ -74,10 +121,10 @@ export default function QuizSection({ questions }: { questions: QuizQuestion[] }
           <button
             type="button"
             className="btn btn-primary"
-            disabled={!answeredAll}
-            onClick={() => setChecked(true)}
+            disabled={!answeredAll || saving}
+            onClick={submit}
           >
-            تحقق من إجاباتك
+            {saving ? "جارٍ الحفظ…" : "تحقق من إجاباتك"}
           </button>
         )}
       </div>

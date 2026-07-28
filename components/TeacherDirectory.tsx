@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import Stars from "@/components/Stars";
 import type { TeacherCard } from "@/lib/data/types";
+import { matchesQuery } from "@/lib/arabic";
 
 const STAGES = ["ابتدائي", "إعدادي", "ثانوي"] as const;
 
@@ -21,7 +22,9 @@ export default function TeacherDirectory({ teachers }: { teachers: TeacherCard[]
     const q = query.trim();
     return teachers.filter(
       (t) =>
-        (!q || t.name.includes(q)) &&
+        // بحث عربي متسامح: يتجاهل الهمزات والتشكيل والتاء المربوطة،
+        // ويشمل المادة والنبذة والمؤهل وعناوين الدروس لا الاسم وحده
+        (!q || matchesQuery(t.searchText, q)) &&
         (!stage || t.stages.includes(stage)) &&
         (!subject || t.subject === subject)
     );
@@ -33,10 +36,10 @@ export default function TeacherDirectory({ teachers }: { teachers: TeacherCard[]
         <input
           type="search"
           className="search-input"
-          placeholder="ابحث عن معلّم بالاسم…"
+          placeholder="ابحث باسم المعلّم أو المادة أو عنوان درس…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          aria-label="البحث بالاسم"
+          aria-label="البحث في دليل المعلّمين"
         />
         <select
           className="filter-select"

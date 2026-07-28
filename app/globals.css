@@ -3367,3 +3367,70 @@ body {
   .review-form .btn { align-self: stretch; }
   .parent-report-actions > * { width: 100%; }
 }
+
+/* ===== المرفقات (إدارة) ونتائج الاختبارات ===== */
+
+.attach-manage-list { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.attach-manage-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.attach-manage-name { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.attach-manage-size { color: var(--text-muted); font-size: 0.8rem; white-space: nowrap; }
+
+.attach-pending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px;
+  border: 1px dashed var(--primary);
+  border-radius: 10px;
+  background: var(--primary-soft);
+}
+.attach-pending .search-input { flex: 1; min-width: 160px; }
+.attach-upload { display: inline-flex; }
+
+.quiz-previous {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  margin: 0 0 12px;
+}
+.quiz-saved-note { margin: 6px 0; color: var(--text-muted); font-size: 0.85rem; }
+
+.quiz-stats { display: flex; flex-direction: column; gap: 12px; }
+.quiz-stat-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--surface);
+}
+.quiz-stat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.quiz-stat-meta { color: var(--text-muted); font-size: 0.85rem; }
+.quiz-stat-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.quiz-stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--primary-soft);
+}
+.quiz-stat-name { font-weight: 600; }
+.pill-low { background: #fee2e2; color: #b91c1c; }

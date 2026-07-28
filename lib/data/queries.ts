@@ -76,7 +76,7 @@ export async function getTeacherCards(): Promise<TeacherCard[]> {
       .select(TEACHER_COLS)
       .eq("is_published", true)
       .order("created_at"),
-    supabase.from("lessons").select("id, teacher_id").eq("status", "published"),
+    supabase.from("lessons").select("id, teacher_id, title").eq("status", "published"),
     supabase.from("follows").select("teacher_id"),
     supabase.from("units").select("id, teacher_id"),
   ]);
@@ -84,8 +84,13 @@ export async function getTeacherCards(): Promise<TeacherCard[]> {
   if (teachersRes.error) throw teachersRes.error;
 
   const lessonCounts = new Map<string, number>();
+  // عناوين الدروس تدخل نص البحث ليجد الطالب المعلّم بموضوع درسه
+  const lessonTitles = new Map<string, string[]>();
   for (const l of lessonsRes.data ?? []) {
     lessonCounts.set(l.teacher_id, (lessonCounts.get(l.teacher_id) ?? 0) + 1);
+    const list = lessonTitles.get(l.teacher_id) ?? [];
+    list.push(String(l.title ?? ""));
+    lessonTitles.set(l.teacher_id, list);
   }
   const studentCounts = new Map<string, number>();
   for (const f of followsRes.data ?? []) {
@@ -101,6 +106,16 @@ export async function getTeacherCards(): Promise<TeacherCard[]> {
     lessonCount: lessonCounts.get(t.id) ?? 0,
     studentCount: studentCounts.get(t.id) ?? 0,
     unitCount: unitCounts.get(t.id) ?? 0,
+    searchText: [
+      t.name,
+      t.subject,
+      t.bio,
+      t.qualification,
+      ...t.stages,
+      ...(lessonTitles.get(t.id) ?? []),
+    ]
+      .filter(Boolean)
+      .join(" "),
   }));
 }
 
@@ -265,11 +280,12 @@ export async function getLessonPage(
   let attachments: AttachmentRow[] = [];
   let quiz: QuizQuestionRow[] = [];
   let isCompleted = false;
+  let quizAttempt: { score: number; total: number } | null = null;
 
   if (!locked) {
     if (user) {
       // المسجّل يقرأ الأعمدة الكاملة مباشرة (صلاحيات authenticated)
-      const [contentRes, attRes, quizRes, progressRes] = await Promise.all([
+      const [contentRes, attRes, quizRes, progressRes, attemptRes] = await Promise.all([
         supabase
           .from("lessons")
           .select("sections, gallery, video_url")
@@ -291,11 +307,19 @@ export async function getLessonPage(
           .eq("student_id", user.id)
           .eq("lesson_id", lesson.id)
           .maybeSingle(),
+        supabase
+          .from("quiz_attempts")
+          .select("score, total")
+          .eq("student_id", user.id)
+          .eq("lesson_id", lesson.id)
+          .maybeSingle(),
       ]);
       content = (contentRes.data as LessonContent) ?? null;
       attachments = (attRes.data ?? []) as AttachmentRow[];
       quiz = (quizRes.data ?? []) as QuizQuestionRow[];
       isCompleted = Boolean(progressRes.data);
+      quizAttempt =
+        (attemptRes.data as { score: number; total: number } | null) ?? null;
     } else {
       // الزائر في العيّنة المجانية: الدالة الآمنة هي طريقه الوحيد للمحتوى
       const { data } = await supabase.rpc("get_free_preview_content", {
@@ -323,6 +347,7 @@ export async function getLessonPage(
         : null,
     isCompleted,
     locked,
+    quizAttempt,
   };
 }
 
@@ -618,11 +643,18 @@ export async function getMyLessonForEdit(lessonId: string) {
   const owner = Array.isArray(row.teachers) ? row.teachers[0] : row.teachers;
   if (owner?.owner_id !== user.id) return null;
 
-  const { data: quizRows } = await supabase
-    .from("quiz_questions")
-    .select("prompt, options, correct_index")
-    .eq("lesson_id", lessonId)
-    .order("position");
+  const [{ data: quizRows }, { data: attachRows }] = await Promise.all([
+    supabase
+      .from("quiz_questions")
+      .select("prompt, options, correct_index")
+      .eq("lesson_id", lessonId)
+      .order("position"),
+    supabase
+      .from("lesson_attachments")
+      .select("id, name, kind, size, file_path")
+      .eq("lesson_id", lessonId)
+      .order("position"),
+  ]);
 
   const rawSections = Array.isArray(row.sections) ? row.sections : [];
   const sections = rawSections.map((s) => {
@@ -654,6 +686,7 @@ export async function getMyLessonForEdit(lessonId: string) {
         : [],
       correct_index: Number(q.correct_index ?? 0),
     })),
+    attachments: (attachRows ?? []) as AttachmentRow[],
   };
 }
 
@@ -851,4 +884,83 @@ export async function getMyParentReports(): Promise<
   } catch {
     return [];
   }
+}
+
+/** نتائج اختبارات دروس المعلّم الحالي، مجمّعة لكل درس */
+export interface LessonQuizStats {
+  lessonId: string;
+  lessonTitle: string;
+  attempts: number;
+  avgPct: number;
+  rows: { studentName: string; score: number; total: number; created_at: string }[];
+}
+
+export async function getMyQuizStats(): Promise<LessonQuizStats[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return [];
+
+  const { data: lessons } = await supabase
+    .from("lessons")
+    .select("id, title")
+    .eq("teacher_id", teacher.id);
+  const lessonRows = (lessons ?? []) as { id: string; title: string }[];
+  if (lessonRows.length === 0) return [];
+
+  const { data: attempts } = await supabase
+    .from("quiz_attempts")
+    .select("lesson_id, student_id, score, total, created_at")
+    .in(
+      "lesson_id",
+      lessonRows.map((l) => l.id)
+    )
+    .order("created_at", { ascending: false });
+  const attemptRows = (attempts ?? []) as {
+    lesson_id: string;
+    student_id: string;
+    score: number;
+    total: number;
+    created_at: string;
+  }[];
+  if (attemptRows.length === 0) return [];
+
+  const { data: names } = await supabase
+    .from("profiles")
+    .select("id, full_name")
+    .in("id", [...new Set(attemptRows.map((a) => a.student_id))]);
+  const nameById = new Map((names ?? []).map((n) => [n.id, n.full_name as string]));
+
+  return lessonRows
+    .map((l) => {
+      const rows = attemptRows.filter((a) => a.lesson_id === l.id);
+      const avgPct = rows.length
+        ? Math.round(
+            (rows.reduce((n, a) => n + (a.total ? a.score / a.total : 0), 0) /
+              rows.length) *
+              100
+          )
+        : 0;
+      return {
+        lessonId: l.id,
+        lessonTitle: l.title,
+        attempts: rows.length,
+        avgPct,
+        rows: rows.map((a) => ({
+          studentName: nameById.get(a.student_id) ?? "طالب",
+          score: a.score,
+          total: a.total,
+          created_at: a.created_at,
+        })),
+      };
+    })
+    .filter((s) => s.attempts > 0);
 }
