@@ -206,6 +206,34 @@ export async function saveLesson(
     if (!u) return { ok: false, message: "الوحدة المختارة غير صالحة." };
   }
 
+  /**
+   * حماية من المسح الصامت.
+   *
+   * لو وصلت الأقسام فارغة لأي سبب (خلل في الواجهة، طلب مقطوع، حقل لم
+   * يُرسَل) لكتبنا [] فوق شرح الدرس وأعدنا «تم الحفظ» — فيفقد المعلّم
+   * عمله ويظنّه محفوظاً. لذلك: الفراغ لا يُكتب فوق محتوى قائم إلا إذا
+   * أكّدت الواجهة أن المعلّم أفرغ الأقسام بنفسه.
+   */
+  if (lessonId && sections.length === 0) {
+    const clearedOnPurpose = formData.get("sectionsCleared") === "1";
+    const { data: current } = await supabase
+      .from("lessons")
+      .select("sections")
+      .eq("id", lessonId)
+      .eq("teacher_id", teacher.id)
+      .maybeSingle();
+    const hadContent =
+      Array.isArray(current?.sections) && current.sections.length > 0;
+
+    if (hadContent && !clearedOnPurpose) {
+      return {
+        ok: false,
+        message:
+          "لم يصل شرح الدرس إلى الخادم، فلم نحفظ شيئاً حفاظاً على المحتوى القديم. أعد المحاولة، وإن تكرّر الأمر انسخ شرحك احتياطاً قبل الحفظ.",
+      };
+    }
+  }
+
   const base = {
     title,
     description,

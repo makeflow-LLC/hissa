@@ -33,9 +33,21 @@ export interface LessonFormInitial {
 }
 
 interface SectionUI {
+  /**
+   * مفتاح ثابت لكل قسم.
+   * استخدام الفهرس مفتاحاً كان يخلط المحتوى: عند حذف قسم أو إدراج آخر
+   * تُعاد استخدام نسخة المحرّر نفسها لقسم مختلف، فيعرض نصّ جاره.
+   */
+  id: string;
   heading: string;
   /** محتوى منسّق (HTML) — يُعقَّم على الخادم قبل الحفظ */
   html: string;
+}
+
+let sectionSeq = 0;
+function newSectionId(): string {
+  sectionSeq += 1;
+  return `s${sectionSeq}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 /**
@@ -81,8 +93,12 @@ export default function LessonForm({
   const [emoji, setEmoji] = useState(initial?.emoji ?? "📚");
   const [sections, setSections] = useState<SectionUI[]>(
     initial?.sections?.length
-      ? initial.sections.map((s) => ({ heading: s.heading, html: toHtml(s) }))
-      : [{ heading: "", html: "" }]
+      ? initial.sections.map((s) => ({
+          id: newSectionId(),
+          heading: s.heading,
+          html: toHtml(s),
+        }))
+      : [{ id: newSectionId(), heading: "", html: "" }]
   );
   const [quiz, setQuiz] = useState<QuizUI[]>(
     initial?.quiz?.map((q) => ({
@@ -125,6 +141,12 @@ export default function LessonForm({
       {isEdit && <input type="hidden" name="lessonId" value={initial!.id} />}
       <input type="hidden" name="emoji" value={emoji} />
       <input type="hidden" name="sections" value={sectionsJson} />
+      {/* إقرار صريح بأن الإفراغ مقصود — يميّزه الخادم عن ضياع الحقل */}
+      <input
+        type="hidden"
+        name="sectionsCleared"
+        value={sectionsJson === "[]" ? "1" : "0"}
+      />
       <input type="hidden" name="quiz" value={quizJson} />
 
       <label className="form-field">
@@ -215,7 +237,10 @@ export default function LessonForm({
         lessonId={initial?.id ?? ""}
         enabled={aiEnabled && isEdit}
         onSummary={(html) =>
-          setSections((prev) => [...prev, { heading: "ملخّص الدرس", html }])
+          setSections((prev) => [
+            ...prev,
+            { id: newSectionId(), heading: "ملخّص الدرس", html },
+          ])
         }
         onQuiz={(questions: AiQuizQuestion[]) =>
           setQuiz((prev) => [
@@ -234,7 +259,7 @@ export default function LessonForm({
         <span className="form-label">الشرح المكتوب</span>
         <div className="repeater">
           {sections.map((s, i) => (
-            <div key={i} className="repeater-item">
+            <div key={s.id} className="repeater-item">
               <div className="repeater-head">
                 <input
                   type="text"
@@ -288,7 +313,10 @@ export default function LessonForm({
           type="button"
           className="btn btn-outline btn-sm"
           onClick={() =>
-            setSections((prev) => [...prev, { heading: "", html: "" }])
+            setSections((prev) => [
+              ...prev,
+              { id: newSectionId(), heading: "", html: "" },
+            ])
           }
         >
           ➕ إضافة قسم

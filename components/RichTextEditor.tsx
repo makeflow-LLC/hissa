@@ -324,6 +324,8 @@ export default function RichTextEditor({
   onChange: (html: string) => void;
   placeholder?: string;
 }) {
+  const lastEmitted = useRef<string | null>(null);
+
   const editor = useEditor({
     // نمنع التصيير على الخادم: TipTap يحتاج DOM
     immediatelyRender: false,
@@ -342,17 +344,29 @@ export default function RichTextEditor({
         ...(placeholder ? { "data-placeholder": placeholder } : {}),
       },
     },
-    onUpdate: ({ editor }) => onChange(editor.getHTML()),
+    onUpdate: ({ editor }) => {
+      const html = editor.getHTML();
+      // نتذكّر ما أرسلناه للأب حتى لا نعيد كتابته على المحرّر ونقفز بالمؤشّر
+      lastEmitted.current = html;
+      onChange(html);
+    },
   });
 
-  // مزامنة المحتوى الأولي عند وصوله متأخراً (تحميل درس للتعديل)
-  const seeded = useRef(false);
+  /**
+   * مزامنة المحتوى القادم من الأب.
+   *
+   * كان هنا حارس «يُزامن مرّة واحدة فقط»، وهو خطأ: عند حذف قسم أو
+   * إعادة ترتيبه تُعاد استخدام نسخة المحرّر نفسها بمحتوى قسم آخر، فيظلّ
+   * عارضاً النصّ القديم بينما الحالة تحمل نصّاً مختلفاً — ثم يُحفظ الخطأ.
+   * والآن نزامن كلّما اختلفت القيمة عمّا يعرضه المحرّر، ونتجاهل ما صدر
+   * عنه هو للتوّ حتى لا نقاطع الكتابة.
+   */
   useEffect(() => {
-    if (!editor || seeded.current) return;
-    if (value && editor.getHTML() !== value) {
-      editor.commands.setContent(value);
-    }
-    seeded.current = true;
+    if (!editor) return;
+    if (value === lastEmitted.current) return;
+    if (value === editor.getHTML()) return;
+    editor.commands.setContent(value || "", { emitUpdate: false });
+    lastEmitted.current = value;
   }, [editor, value]);
 
   if (!editor) return <div className="rte-loading">…جارٍ تحميل المحرّر</div>;
