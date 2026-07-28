@@ -6,6 +6,7 @@ import {
   sendMessage,
   type StudentsActionState,
 } from "@/app/actions/teacher-students";
+import ParentReportForm from "@/components/ParentReportForm";
 
 const initialState: StudentsActionState = { ok: false };
 
@@ -22,12 +23,19 @@ export default function StudentActionsPanel({
   studentId,
   studentName,
   targets,
+  guardianPhone,
+  teacherName,
+  progress,
 }: {
   studentId: string;
   studentName: string;
   targets: GrantTarget[];
+  guardianPhone: string | null;
+  teacherName: string;
+  progress: { done: number; total: number; pct: number };
 }) {
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<"message" | "parent">("message");
   const [msgState, msgAction, msgPending] = useActionState(
     sendMessage,
     initialState
@@ -44,7 +52,7 @@ export default function StudentActionsPanel({
         className="btn btn-outline btn-sm"
         onClick={() => setOpen(true)}
       >
-        ✉️ رسالة / صلاحية
+        ✉️ رسالة / تقرير / صلاحية
       </button>
     );
   }
@@ -63,6 +71,37 @@ export default function StudentActionsPanel({
         </button>
       </div>
 
+      <div className="tabs tabs-sm" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "message"}
+          className={`tab ${tab === "message" ? "tab-active" : ""}`}
+          onClick={() => setTab("message")}
+        >
+          ✉️ رسالة وصلاحية
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "parent"}
+          className={`tab ${tab === "parent" ? "tab-active" : ""}`}
+          onClick={() => setTab("parent")}
+        >
+          👨‍👩‍👦 تقرير لوليّ الأمر
+        </button>
+      </div>
+
+      {tab === "parent" ? (
+        <ParentReportForm
+          studentId={studentId}
+          studentName={studentName}
+          guardianPhone={guardianPhone}
+          teacherName={teacherName}
+          progress={progress}
+        />
+      ) : (
+        <>
       <form action={msgAction} className="student-action-form">
         <input type="hidden" name="studentId" value={studentId} />
         <label className="form-field">
@@ -115,6 +154,8 @@ export default function StudentActionsPanel({
           </p>
         )}
       </form>
+        </>
+      )}
     </div>
   );
 }

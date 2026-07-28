@@ -42,7 +42,8 @@ export interface MyTeacher extends TeacherRow {
 /** بطاقة المعلم في الدليل: بيانات المعلم + عدّادات محتواه */
 export interface TeacherCard extends TeacherRow {
   lessonCount: number;
-  liveCount: number;
+  studentCount: number;
+  unitCount: number;
 }
 
 /** بيانات الدرس الوصفية — متاحة للزائر والطالب على حد سواء */
@@ -73,19 +74,6 @@ export interface UnitWithLessons {
   lessons: LessonMeta[];
 }
 
-export interface LiveSessionRow {
-  id: string;
-  title: string;
-  description: string;
-  schedule: string;
-  duration: string;
-  seats_left: number;
-  emoji: string;
-  gradient: string;
-  is_paid: boolean;
-  price: number;
-  currency: string;
-}
 
 export interface AttachmentRow {
   id: string;
@@ -106,11 +94,12 @@ export interface QuizQuestionRow {
 export interface TeacherProfile {
   teacher: TeacherRow;
   units: UnitWithLessons[];
-  liveSessions: LiveSessionRow[];
   /** حالة الطالب الحالي تجاه هذا المعلم (فارغة للزائر) */
   isFollowing: boolean;
   completedLessonIds: string[];
-  enrolledSessionIds: Record<string, string>;
+  /** تقييم الطالب الحالي لهذا المعلّم إن كتبه */
+  myReview: { rating: number; comment: string } | null;
+  reviews: PublicReview[];
 }
 
 /** صفحة درس واحد بسياقه في المنهج */
@@ -129,6 +118,27 @@ export interface LessonPage {
   next: { id: string; title: string } | null;
   isCompleted: boolean;
   locked: boolean;
+}
+
+/** تقييم منشور على صفحة المعلّم */
+export interface PublicReview {
+  id: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+  studentName: string;
+}
+
+/** تقرير المعلّم لوليّ أمر الطالب */
+export interface ParentReport {
+  id: string;
+  student_id: string;
+  period: string;
+  performance: string;
+  strengths: string;
+  improvements: string;
+  note: string;
+  created_at: string;
 }
 
 /** بيانات الطالب في profiles (يملؤها الطالب بنفسه) */

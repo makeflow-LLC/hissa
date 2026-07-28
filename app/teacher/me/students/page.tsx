@@ -42,17 +42,12 @@ export default async function TeacherStudentsPage() {
     );
   }
 
-  // أهداف المنح: الدروس والحصص المُعلَّمة «خاصة» فقط
-  const targets: GrantTarget[] = [
-    ...(content?.units ?? []).flatMap((u) =>
-      u.lessons
-        .filter((l) => l.is_restricted)
-        .map((l) => ({ value: `lesson:${l.id}`, label: `🔒 درس: ${l.title}` }))
-    ),
-    ...(content?.live ?? [])
-      .filter((s) => s.is_restricted)
-      .map((s) => ({ value: `session:${s.id}`, label: `🔒 حصة: ${s.title}` })),
-  ];
+  // أهداف المنح: الدروس المُعلَّمة «خاصة» فقط
+  const targets: GrantTarget[] = (content?.units ?? []).flatMap((u) =>
+    u.lessons
+      .filter((l) => l.is_restricted)
+      .map((l) => ({ value: `lesson:${l.id}`, label: `🔒 ${l.title}` }))
+  );
 
   const avgProgress = students.length
     ? Math.round(students.reduce((n, s) => n + s.progressPct, 0) / students.length)
@@ -70,7 +65,8 @@ export default async function TeacherStudentsPage() {
         <div>
           <h1 className="dashboard-title">👥 طلابي</h1>
           <p className="dashboard-subtitle">
-            الطلاب الذين يتابعونك، وتقدّمهم في منهجك، ورسائلك وصلاحياتهم.
+            الطلاب الذين يتابعونك وتقدّمهم في منهجك — راسلهم، وأرسل تقريراً
+            لوليّ الأمر، وامنحهم وصولاً لدروسك الخاصة.
           </p>
         </div>
       </section>
@@ -86,7 +82,7 @@ export default async function TeacherStudentsPage() {
         </div>
         <div className="stat-box">
           <span className="stat-value">{targets.length}</span>
-          <span className="stat-label">عنصر خاص</span>
+          <span className="stat-label">درساً خاصاً</span>
         </div>
       </section>
 
@@ -197,11 +193,7 @@ export default async function TeacherStudentsPage() {
                         <li key={g.id} className="grant-row">
                           <span className="pill pill-free">
                             🔓{" "}
-                            {g.lesson_id
-                              ? "درس خاص"
-                              : g.session_id
-                                ? "حصة خاصة"
-                                : "كل المحتوى الخاص"}
+                            {g.lesson_id ? "درس خاص" : "كل المحتوى الخاص"}
                           </span>
                           <form action={revokeAccess}>
                             <input type="hidden" name="grantId" value={g.id} />
@@ -221,6 +213,13 @@ export default async function TeacherStudentsPage() {
                     studentId={s.profile.id}
                     studentName={s.profile.full_name}
                     targets={targets}
+                    guardianPhone={s.profile.guardian_phone}
+                    teacherName={teacher.name}
+                    progress={{
+                      done: s.completedLessons,
+                      total: s.totalLessons,
+                      pct: s.progressPct,
+                    }}
                   />
                 </article>
               ))}

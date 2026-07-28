@@ -4,12 +4,12 @@ import type { Metadata } from "next";
 import {
   getCurrentUser,
   getMyMessages,
+  getMyParentReports,
   getMyStudentProfile,
   getStudentDashboard,
   getStudentName,
   isCurrentUserTeacher,
 } from "@/lib/data/queries";
-import CancelEnrollmentButton from "@/components/CancelEnrollmentButton";
 
 export const dynamic = "force-dynamic";
 
@@ -21,17 +21,17 @@ export default async function StudentDashboard() {
   // حساب المعلّم له لوحته الخاصة — لا لوحة طالب على البريد نفسه
   if (await isCurrentUserTeacher()) redirect("/teacher/me");
 
-  const [name, data, profile, messages] = await Promise.all([
+  const [name, data, profile, messages, reports] = await Promise.all([
     getStudentName(),
     getStudentDashboard(),
     getMyStudentProfile(),
     getMyMessages(),
+    getMyParentReports(),
   ]);
-  const { enrollments = [], following = [] } = data ?? {};
+  const { following = [] } = data ?? {};
 
   const totalLessons = following.reduce((n, f) => n + f.total, 0);
   const totalDone = following.reduce((n, f) => n + f.done, 0);
-  const pending = enrollments.filter((e) => e.status === "pending_payment").length;
 
   return (
     <main className="container">
@@ -43,7 +43,7 @@ export default async function StudentDashboard() {
           <div>
             <h1 className="dashboard-title">مرحباً، {name} 👋</h1>
             <p className="dashboard-subtitle">
-              هذه لوحتك: حصصك ومعلّموك وتقدّمك في المناهج
+              هذه لوحتك: معلّموك وتقدّمك في المناهج
             </p>
           </div>
         </div>
@@ -94,11 +94,37 @@ export default async function StudentDashboard() {
         </section>
       )}
 
+      {reports.length > 0 && (
+        <section className="dashboard-section">
+          <h2 className="section-title">📋 تقارير معلّميك</h2>
+          <ul className="messages-list">
+            {reports.map((r) => (
+              <li key={r.id} className="message-row report-row">
+                <div className="message-head">
+                  <strong className="message-from">{r.teacherName}</strong>
+                  {r.period && <span className="pill pill-free">{r.period}</span>}
+                  <span className="pill pill-live">{r.performance}</span>
+                  <span className="message-date">
+                    {new Date(r.created_at).toLocaleDateString("ar-EG", {
+                      day: "numeric",
+                      month: "long",
+                    })}
+                  </span>
+                </div>
+                {r.strengths && (
+                  <p className="message-body">✅ نقاط القوة: {r.strengths}</p>
+                )}
+                {r.improvements && (
+                  <p className="message-body">📌 للتحسين: {r.improvements}</p>
+                )}
+                {r.note && <p className="message-body">📝 {r.note}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="dashboard-stats">
-        <div className="stat-box">
-          <span className="stat-value">{enrollments.length}</span>
-          <span className="stat-label">حصة مسجّل فيها</span>
-        </div>
         <div className="stat-box">
           <span className="stat-value">{following.length}</span>
           <span className="stat-label">معلّم تتابعه</span>
@@ -107,74 +133,10 @@ export default async function StudentDashboard() {
           <span className="stat-value">{totalDone}</span>
           <span className="stat-label">درساً أنجزته</span>
         </div>
-        {pending > 0 && (
-          <div className="stat-box stat-box-warn">
-            <span className="stat-value">{pending}</span>
-            <span className="stat-label">بانتظار تأكيد الدفع</span>
-          </div>
-        )}
-      </section>
-
-      {/* ===== حصصي ===== */}
-      <section className="dashboard-section">
-        <h2 className="section-title">🔴 حصصي</h2>
-        {enrollments.length === 0 ? (
-          <p className="drafts-empty">
-            لم تسجّل في أي حصة بعد —{" "}
-            <Link href="/" className="back-link">
-              تصفّح المعلّمين واختر حصة
-            </Link>
-            .
-          </p>
-        ) : (
-          <div className="live-grid">
-            {enrollments.map((e) => (
-              <article key={e.id} className="live-card">
-                <div
-                  className="live-thumb"
-                  style={{ background: e.session.gradient }}
-                  aria-hidden="true"
-                >
-                  {e.session.emoji}
-                </div>
-                <div className="live-body">
-                  <h3 className="live-title">
-                    {e.session.title}
-                    {e.status === "pending_payment" ? (
-                      <span className="badge badge-warn">بانتظار تأكيد الدفع</span>
-                    ) : (
-                      <span className="badge badge-success">مسجّل</span>
-                    )}
-                  </h3>
-                  <p className="live-description">{e.session.description}</p>
-                  <div className="live-meta">
-                    <span className="live-schedule">📅 {e.session.schedule}</span>
-                    <span className="lesson-duration">⏱ {e.session.duration}</span>
-                    <Link
-                      href={`/teacher/${e.session.teacherSlug}`}
-                      className="back-link"
-                    >
-                      {e.session.teacherName}
-                    </Link>
-                  </div>
-                  {e.status === "pending_payment" && (
-                    <p className="pending-note">
-                      💬 سيتواصل معك المعلم عبر واتساب لتأكيد الدفع وفتح الوصول
-                      {e.session.price > 0 && (
-                        <> — السعر {e.session.price} {e.session.currency}</>
-                      )}
-                      .
-                    </p>
-                  )}
-                </div>
-                <CancelEnrollmentButton
-                  sessionId={e.session.id}
-                  teacherSlug={e.session.teacherSlug}
-                />
-              </article>
-            ))}
-          </div>
-        )}
+        <div className="stat-box">
+          <span className="stat-value">{totalLessons}</span>
+          <span className="stat-label">درساً متاحاً لك</span>
+        </div>
       </section>
 
       {/* ===== معلّميّ + تقدّمي ===== */}

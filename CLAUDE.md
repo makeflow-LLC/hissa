@@ -4,9 +4,9 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-"منصة حصة" (Hissa Platform) is an Arabic-language, RTL digital-school platform built with Next.js and Supabase. Students browse a searchable teacher directory; each teacher profile offers a curriculum of recorded lessons organized into units plus enrollable live sessions.
+"منصة حصة" (Hissa Platform) is an Arabic-language, RTL digital-school platform built with Next.js and Supabase. Students browse a searchable teacher directory; each teacher profile offers a curriculum of recorded lessons organized into units, with rich formatted explanations, quizzes and attachments.
 
-**Business model:** the platform is **free for students** — no payments ever flow through it. Teachers set their own pricing per live session; a paid session creates an enrollment with status `pending_payment` and the teacher settles it directly with the student over WhatsApp.
+**Business model:** the platform is **free for everyone today** — free for students, free for teachers, and **no payments flow through it at all**. Any money that changes hands is arranged directly between student and teacher outside the platform; the app records nothing about it. Paid subscriptions are a deliberate "later", not an oversight.
 
 **Access tiers:**
 
@@ -16,7 +16,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 | Lesson titles + descriptions | ✅ | ✅ |
 | Full lesson content (video, explanation, gallery) | ❌ — except the one lesson flagged `is_free_preview` per teacher | ✅ all lessons |
 | Attachments, quizzes | ❌ | ✅ |
-| Enroll in sessions, follow teachers, save progress | ❌ | ✅ |
+| Follow teachers, save progress, review a teacher | ❌ | ✅ |
 
 Locked rows show a "سجّل الدخول للمشاهدة" badge; locked lesson pages show a full sign-in panel.
 
@@ -34,7 +34,7 @@ There is no test suite; `npm run build` is the verification gate (compile + Type
 
 ## Supabase
 
-Live project ref `mexpmtuqhvnphgeqqjuf`, region `eu-central-1`, URL `https://mexpmtuqhvnphgeqqjuf.supabase.co`. Schema, RLS and the six seeded teachers (12 units / 30 lessons / 90 attachments / 18 live sessions) are all applied.
+Live project ref `mexpmtuqhvnphgeqqjuf`, region `eu-central-1`, URL `https://mexpmtuqhvnphgeqqjuf.supabase.co`. Schema and RLS are applied; the demo teachers were deleted, so the directory starts empty.
 
 **`.env.local` is optional for running the app**: the project URL and publishable (anon) key are baked into `lib/supabase/config.ts` as defaults — they are public by design (sent to every browser); RLS is the security boundary. Env vars, when present, override the defaults. The one secret that must live only in `.env.local` (never commit — `.gitignore` covers `.env*`; template in `.env.example`):
 
@@ -46,13 +46,14 @@ SUPABASE_SERVICE_ROLE_KEY=<secret key>   # npm run seed only — never NEXT_PUBL
 
 ### Tables
 
-`teachers`, `units`, `lessons`, `lesson_attachments`, `quiz_questions`, `live_sessions`, `profiles`, `subscriptions`, `enrollments`, `follows`, `lesson_progress`.
+In use: `teachers`, `units`, `lessons`, `lesson_attachments`, `quiz_questions`, `profiles`, `follows`, `lesson_progress`, `teacher_messages`, `student_grants`, `reviews`, `parent_reports`.
 
-- `lessons.is_free_preview` — the one visitor-visible lesson per teacher (seeded as unit 0 / position 0).
-- `live_sessions.is_paid` / `price` / `currency` — teacher-set pricing, default free.
-- `enrollments.status` — `enrolled` | `pending_payment` | `cancelled`.
-- `lesson_progress` — one row per completed lesson (`completed`, `completed_at`).
-- `subscriptions` is legacy and unused by the app; `follows` is what "تابع هذا المعلم" writes.
+- `lessons.is_free_preview` — the one visitor-visible lesson per teacher.
+- `lessons.is_restricted` — hidden entirely unless the student holds a `student_grants` row.
+- `lesson_progress` — one row per completed lesson.
+- `follows` is what "تابع هذا المعلم" writes, and is the basis for "my students".
+
+Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `follows`), and `live_sessions` / `enrollments` (see "Removed: live sessions").
 
 ### Migrations (`supabase/migrations/`)
 
@@ -66,6 +67,23 @@ SUPABASE_SERVICE_ROLE_KEY=<secret key>   # npm run seed only — never NEXT_PUBL
 | `0006_teacher_accounts.sql` | `qualification`, `experience_years`, `is_published` + owner INSERT policy |
 | `0007_lesson_media_storage.sql` | `lesson-media` storage bucket + owner-folder upload policies |
 | `0008_student_profiles_messages_grants.sql` | student profile columns, `teacher_messages`, `student_grants`, `is_restricted` + RLS |
+| `0009_reviews_and_parent_reports.sql` | real `reviews` (+ rating trigger) and `parent_reports` |
+
+### Removed: live sessions
+
+Live sessions and paid enrollment were **removed from the product** — there is no way to create, browse, or enroll in one, and no pricing anywhere. Payment, when it happens, is arranged directly between student and teacher outside the platform; the app deliberately holds no record of it and offers no "confirm payment" step.
+
+The `live_sessions` and `enrollments` tables are **left in place, unused and unreferenced** (both were empty at removal). Nothing reads or writes them. Delete them only if you are sure the feature will not return.
+
+### Ratings are real, never seeded
+
+`teachers.rating` / `rating_count` are **derived columns** maintained by the `reviews_recalc` trigger — never write them by hand. A teacher with no reviews shows `0/0`, and every surface renders "معلّم جديد" / "لا تقييمات بعد" instead of stars. The earlier code wrote a hardcoded `5.0` at profile creation, which made every teacher look identically perfect; do not reintroduce that.
+
+Eligibility to review is enforced **in RLS, not just the UI**: `reviews_student_write` requires an existing `lesson_progress` row joined to a lesson owned by that teacher. So a student must actually complete one of the teacher's lessons before rating, and cannot post under another student's id. One review per (teacher, student), editable.
+
+### Parent reports
+
+`parent_reports` lets a teacher send a periodic report about a student to that student's **guardian**, who has no account on the platform. The report is stored (the student sees it on `/dashboard`) and `ParentReportForm` builds a prefilled WhatsApp message to `profiles.guardian_phone` — a one-tap send, no messaging infrastructure required. If the student left the guardian number blank the form says so instead of offering a dead button.
 
 ### Rich lesson content (the `sections` column)
 
@@ -98,7 +116,7 @@ Security is verified with SQL that switches `role` and `request.jwt.claims` to i
 - **`middleware.ts` + `lib/supabase/middleware.ts`** — refreshes the Supabase session cookie on every request. Without it a student's token expires without renewal and the server sees an anonymous visitor.
 - **`lib/supabase/client.ts` / `server.ts`** — browser and server clients (`@supabase/ssr`).
 - **`lib/data/types.ts` / `queries.ts`** — the only place that reads Supabase. `getCurrentUser()` and `getStudentName()` **fail closed** (any error ⇒ treated as visitor) because they run inside the root layout; a throw there would take down every page including the error boundary. Page-level queries throw and each page catches into `ConnectionNotice`.
-- **`app/actions/student.ts`** — server actions: `enrollInSession` (free ⇒ `enrolled`, paid ⇒ `pending_payment`), `cancelEnrollment`, `toggleFollow`, `toggleLessonComplete`. Each re-validates auth server-side and calls `revalidatePath`.
+- **`app/actions/student.ts`** — student server actions: `toggleFollow`, `toggleLessonComplete`. Each re-validates auth server-side, rejects teacher accounts, and calls `revalidatePath`. Reviews live in `app/actions/review.ts`.
 
 ### Routes
 
@@ -114,9 +132,8 @@ Security is verified with SQL that switches `role` and `request.jwt.claims` to i
 | `app/teacher/join/page.tsx` | teacher signup landing → `/login?role=teacher` |
 | `app/teacher/onboarding/page.tsx` | create/edit teacher profile (`TeacherProfileForm` → `saveTeacherProfile` action) |
 | `app/teacher/me/page.tsx` | teacher hub: profile summary, stats, share panel, edit, link to content manager |
-| `app/teacher/me/content/page.tsx` | content manager: units + lessons + live sessions, with delete forms |
+| `app/teacher/me/content/page.tsx` | content manager: units + lessons, with delete forms |
 | `app/teacher/me/lessons/new` · `lessons/[lessonId]` | create/edit a recorded lesson (`LessonForm`) |
-| `app/teacher/me/live/new` · `live/[sessionId]` | create/edit a live session with pricing (`LiveForm`) |
 | `app/dashboard/profile/page.tsx` | student fills their own data (`StudentProfileForm`) |
 | `app/teacher/me/students/page.tsx` | teacher's followers: profiles, progress, messages, access grants |
 | `app/privacy/page.tsx` · `app/terms/page.tsx` | Arabic legal pages, linked from the footer |
@@ -136,6 +153,7 @@ Both roles sign in through `/login`; `?role=teacher` only switches the copy and 
 **Teacher content** lives in Supabase, written by `app/actions/teacher-content.ts`: `createUnit` / `renameUnit` / `deleteUnit`, `saveLesson` / `deleteLesson`, `saveLive` / `deleteLive`. Every action re-resolves the caller's own `teachers` row and scopes each write by `teacher_id`, so a signed-in user can only touch their own curriculum (owner-write RLS from `0002_rls.sql` is the second line of defence — no migration was needed for this feature). Notes:
 
 - `saveLesson` replaces `quiz_questions` wholesale (delete + insert), enforces **one** `is_free_preview` lesson per teacher by clearing the flag on the teacher's other lessons, and sanitizes every section's HTML (see "Rich lesson content").
+- `app/actions/teacher-students.ts` covers the teacher↔student side: `sendMessage` (one student or broadcast), `grantAccess` / `revokeAccess`, `saveParentReport` / `deleteParentReport`. Every one re-checks that the target actually follows this teacher.
 - `status` is `draft` | `published`; public queries filter `status = 'published'`, so drafts never reach students.
 - `VideoPlayer` embeds YouTube links (`youtube-nocookie`, watch/youtu.be/embed/shorts forms) and falls back to a `<video>` element for direct MP4 URLs.
 
@@ -159,7 +177,7 @@ The old browser-local teacher demo is **gone** — deleted, not deprecated. That
 
 `lib/teachers.ts` and `scripts/seed.ts` (`npm run seed`) are deliberately **kept** as a dev-only seed source — they are not imported by any page, so they cost nothing in the bundle, and they make the demo directory reproducible on a fresh database.
 
-The six seeded demo teachers were deleted from the live database (their units/lessons/attachments/live sessions cascaded). Real teacher rows are distinguished by `owner_id is not null` — the seed rows had `owner_id is null`, which is the safe discriminator if you ever need to purge seed data again.
+The six seeded demo teachers were deleted from the live database (their units, lessons and attachments cascaded). Real teacher rows are distinguished by `owner_id is not null` — the seed rows had `owner_id is null`, which is the safe discriminator if you ever need to purge seed data again.
 
 ### Student profiles, teacher messages, and access grants (`0008`)
 

@@ -24,18 +24,18 @@ export default async function Home() {
         <h1 className="site-title">منصة حصة</h1>
         <p className="site-subtitle">
           منصة حصة منصة تعليمية عربية تربط الطلاب بالمعلّمين: تصفّح دليل
-          المعلّمين، شاهد الدروس المسجّلة، وسجّل في الحصص المباشرة — والوصول
+          المعلّمين، وشاهد دروسهم المسجّلة، وتابع تقدّمك — والوصول
           مجاني تماماً للطالب.
         </p>
         <p className="site-subtitle-en" lang="en" dir="ltr">
           Hissa (منصة حصة) is an Arabic online learning platform that connects
-          students with teachers to browse lessons and enroll in live classes.
+          students with teachers to browse recorded lessons and track their progress.
         </p>
         {!user && teachers && (
           <div className="hero-cta">
             <p className="hero-cta-text">
               🎁 الوصول مجاني تماماً للطالب — سجّل الدخول لتشاهد كل الدروس وتحمّل
-              المرفقات وتسجّل في الحصص.
+              المرفقات وتحفظ تقدّمك.
             </p>
             <Link href="/login" className="btn btn-primary btn-lg">
               سجّل الدخول مجاناً
@@ -74,8 +74,8 @@ export default async function Home() {
             </span>
             <h3 className="about-card-title">تعلّم وتابع تقدّمك</h3>
             <p className="about-card-text">
-              شاهد كل الدروس المسجّلة، حمّل المرفقات، وسجّل في الحصص المباشرة،
-              ويُحفظ تقدّمك في منهج كل معلّم.
+              شاهد كل الدروس المسجّلة، حمّل المرفقات، ويُحفظ تقدّمك في منهج كل
+              معلّم.
             </p>
           </article>
         </div>
@@ -97,7 +97,7 @@ export default async function Home() {
             <h2 className="teacher-cta-title">هل أنت معلّم؟</h2>
             <p className="teacher-cta-text">
               أنشئ حسابك مجاناً، افتح ملفك الشخصي، وابدأ بالوصول إلى طلابك بدروسك
-              وحصصك — أنت من يحدّد أسعار حصصك.
+              ومنهجك المنظّم في وحدات.
             </p>
           </div>
           <Link href="/teacher/join" className="btn btn-primary btn-lg">

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "انضم كمعلّم",
   description:
-    "أنشئ حسابك كمعلّم على منصة حصة وافتح ملفك الشخصي: صورتك، مؤهلك، الصفوف التي تدرّسها، وسنوات خبرتك — وابدأ بنشر دروسك وحصصك.",
+    "أنشئ حسابك كمعلّم على منصة حصة وافتح ملفك الشخصي: صورتك، مؤهلك، الصفوف التي تدرّسها، وسنوات خبرتك — وابدأ بنشر دروسك لطلابك.",
 };
 
 export default async function TeacherJoinPage() {
@@ -30,8 +30,8 @@ export default async function TeacherJoinPage() {
           </span>
           <h1 className="join-title">هذا البريد مسجَّل كحساب طالب</h1>
           <p className="join-subtitle">
-            أنت داخل الآن ببريد استُخدم كطالب على المنصة (تسجيل في حصص أو متابعة
-            معلّمين). حساب المعلّم وحساب الطالب منفصلان تماماً — لفتح حساب معلّم
+            أنت داخل الآن ببريد استُخدم كطالب على المنصة (متابعة معلّمين أو تقدّم
+            محفوظ). حساب المعلّم وحساب الطالب منفصلان تماماً — لفتح حساب معلّم
             سجّل الخروج ثم ادخل ببريد آخر.
           </p>
           <div className="join-actions">
@@ -58,7 +58,7 @@ export default async function TeacherJoinPage() {
         <h1 className="join-title">علّم على منصة حصة</h1>
         <p className="join-subtitle">
           أنشئ حسابك كمعلّم مجاناً، وافتح ملفك الشخصي، وابدأ بالوصول إلى طلابك
-          بدروس مسجّلة وحصص مباشرة — أنت من يحدّد أسعار حصصك.
+          بدروس مسجّلة منظّمة في وحدات، وتابع تقدّمهم أولاً بأول.
         </p>
         <Link href="/login?role=teacher" className="btn btn-primary btn-lg">
           أنشئ حساب معلّم مجاناً
@@ -86,9 +86,9 @@ export default async function TeacherJoinPage() {
           <span className="about-icon" aria-hidden="true">
             🎬
           </span>
-          <h3 className="about-card-title">دروس وحصص</h3>
+          <h3 className="about-card-title">منهج منظّم</h3>
           <p className="about-card-text">
-            انشر دروساً مسجّلة منظّمة في وحدات، وأنشئ حصصاً مباشرة يحجزها طلابك.
+            انشر دروساً مسجّلة منظّمة في وحدات، بشرح منسّق وصور وجداول واختبارات.
           </p>
         </article>
         <article className="about-card">

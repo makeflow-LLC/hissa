@@ -851,103 +851,6 @@ body {
   color: var(--primary);
 }
 
-/* ===== الحصص المباشرة ===== */
-
-.live-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.live-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 1.25rem;
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  transition: box-shadow 0.2s;
-}
-
-.live-card:hover {
-  box-shadow: var(--shadow-hover);
-}
-
-.live-thumb {
-  width: 84px;
-  height: 84px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  font-size: 2.2rem;
-  flex-shrink: 0;
-  color: #fff;
-}
-
-.live-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.live-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-}
-
-.live-badge {
-  background: #fef2f2;
-  color: #dc2626;
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 0.15rem 0.6rem;
-  border-radius: 999px;
-  animation: live-pulse 2s ease-in-out infinite;
-}
-
-@keyframes live-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.55;
-  }
-}
-
-.live-description {
-  color: var(--text-muted);
-  font-size: 0.92rem;
-  margin: 0.3rem 0 0.55rem;
-}
-
-.live-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-}
-
-.live-schedule {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.live-seats {
-  font-size: 0.82rem;
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.btn-book {
-  flex-shrink: 0;
-}
-
 /* ===== صفحة الدرس ===== */
 
 .lesson-header {
@@ -3405,4 +3308,62 @@ body {
 @media (max-width: 720px) {
   .broadcast-form .btn { align-self: stretch; }
   .student-main { align-items: flex-start; }
+}
+
+/* ===== التقييمات وتقارير وليّ الأمر ===== */
+
+.teacher-rating-none {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.stat-value-muted { color: var(--text-muted); }
+
+.star-picker { display: flex; gap: 4px; }
+.star-btn {
+  background: none;
+  border: 0;
+  font-size: 1.7rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+.star-on { color: #f59e0b; }
+.star-off { color: #d4d4d8; }
+
+.review-stars { font-size: 1rem; letter-spacing: 1px; }
+
+.review-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 16px;
+  background: var(--surface);
+}
+.review-form .btn { align-self: flex-start; }
+.review-eligibility { margin-bottom: 14px; }
+
+.reviews-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.review-row {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+}
+.review-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 5px; }
+.review-author { color: var(--text); }
+.review-comment { margin: 0; line-height: 1.85; }
+
+.parent-report { padding-top: 4px; }
+.parent-report-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+.report-row { border-inline-start-color: var(--success); }
+
+.tabs-sm .tab { font-size: 0.85rem; padding: 7px 12px; }
+
+@media (max-width: 720px) {
+  .review-form .btn { align-self: stretch; }
+  .parent-report-actions > * { width: 100%; }
 }

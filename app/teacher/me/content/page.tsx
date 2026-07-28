@@ -6,11 +6,7 @@ import {
   getMyTeacher,
   getMyTeacherContent,
 } from "@/lib/data/queries";
-import {
-  deleteUnit,
-  deleteLesson,
-  deleteLive,
-} from "@/app/actions/teacher-content";
+import { deleteUnit, deleteLesson } from "@/app/actions/teacher-content";
 import AddUnitForm from "@/components/AddUnitForm";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +22,6 @@ export default async function TeacherContentPage() {
 
   const content = await getMyTeacherContent();
   const units = content?.units ?? [];
-  const live = content?.live ?? [];
 
   return (
     <main className="container">
@@ -40,16 +35,12 @@ export default async function TeacherContentPage() {
         <div>
           <h1 className="dashboard-title">🎬 إدارة المحتوى</h1>
           <p className="dashboard-subtitle">
-            أضِف الوحدات والدروس والحصص المباشرة — تظهر مباشرةً في بروفايلك العام
-            للطلاب.
+            أضِف الوحدات والدروس — تظهر مباشرةً في صفحتك العامة للطلاب.
           </p>
         </div>
         <div className="dashboard-header-actions">
           <Link href="/teacher/me/lessons/new" className="btn btn-primary">
             ➕ درس جديد
-          </Link>
-          <Link href="/teacher/me/live/new" className="btn btn-outline">
-            🔴 حصة مباشرة
           </Link>
         </div>
       </section>
@@ -141,64 +132,6 @@ export default async function TeacherContentPage() {
               </article>
             ))}
           </div>
-        )}
-      </section>
-
-      {/* الحصص المباشرة */}
-      <section className="dashboard-section">
-        <div className="section-head-row">
-          <h2 className="section-title">🔴 الحصص المباشرة</h2>
-          <Link href="/teacher/me/live/new" className="btn btn-outline btn-sm">
-            ➕ حصة جديدة
-          </Link>
-        </div>
-
-        {live.length === 0 ? (
-          <p className="drafts-empty">لا توجد حصص مباشرة بعد.</p>
-        ) : (
-          <ul className="lesson-manage-list">
-            {live.map((s) => (
-              <li key={s.id} className="lesson-manage-row">
-                <span className="lesson-manage-emoji" aria-hidden="true">
-                  {s.emoji}
-                </span>
-                <span className="lesson-manage-body">
-                  <span className="lesson-manage-title">{s.title}</span>
-                  <span className="lesson-manage-meta">
-                    {s.schedule && <>🗓️ {s.schedule} · </>}
-                    {s.is_paid ? (
-                      <span className="pill pill-paid">
-                        💳 {s.price} {s.currency}
-                      </span>
-                    ) : (
-                      <span className="pill pill-free">مجانية</span>
-                    )}
-                    {s.status === "draft" && (
-                      <span className="pill pill-draft">مسودّة</span>
-                    )}
-                  </span>
-                </span>
-                <span className="lesson-manage-actions">
-                  <Link
-                    href={`/teacher/me/live/${s.id}`}
-                    className="btn btn-outline btn-sm"
-                  >
-                    ✏️ تعديل
-                  </Link>
-                  <form action={deleteLive}>
-                    <input type="hidden" name="sessionId" value={s.id} />
-                    <button
-                      type="submit"
-                      className="btn btn-outline btn-sm btn-danger"
-                      aria-label="حذف الحصة"
-                    >
-                      🗑
-                    </button>
-                  </form>
-                </span>
-              </li>
-            ))}
-          </ul>
         )}
       </section>
 
