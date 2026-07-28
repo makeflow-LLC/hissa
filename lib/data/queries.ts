@@ -661,6 +661,12 @@ export async function getMyLessonForEdit(lessonId: string) {
     const o = s as Record<string, unknown>;
     return {
       heading: String(o.heading ?? ""),
+      /**
+       * الشرح المنسّق يُخزَّن في `html`. إغفاله هنا كان يفتح المحرّر فارغاً
+       * دائماً مهما كان المحفوظ، فيظنّ المعلّم أن شيئاً لم يُحفَظ — وإن حفظ
+       * مرّة أخرى كتب الفراغ فوق شرحه. `paragraphs` هو الشكل القديم فقط.
+       */
+      html: typeof o.html === "string" ? o.html : undefined,
       paragraphs: Array.isArray(o.paragraphs)
         ? (o.paragraphs as unknown[]).map((p) => String(p))
         : [],

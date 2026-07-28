@@ -214,7 +214,7 @@ export async function saveLesson(
    * عمله ويظنّه محفوظاً. لذلك: الفراغ لا يُكتب فوق محتوى قائم إلا إذا
    * أكّدت الواجهة أن المعلّم أفرغ الأقسام بنفسه.
    */
-  if (lessonId && sections.length === 0) {
+  if (lessonId && !sections.some((s) => htmlHasContent(s.html))) {
     const clearedOnPurpose = formData.get("sectionsCleared") === "1";
     const { data: current } = await supabase
       .from("lessons")
@@ -222,14 +222,24 @@ export async function saveLesson(
       .eq("id", lessonId)
       .eq("teacher_id", teacher.id)
       .maybeSingle();
+    /**
+     * نقيس «هل كان هناك شرح» بالمحتوى نفسه لا بعدد الأقسام: قسم بعنوان
+     * وشرح فارغ كان يمرّ من الحارس ويمحو الشرح المحفوظ تحته.
+     */
     const hadContent =
-      Array.isArray(current?.sections) && current.sections.length > 0;
+      Array.isArray(current?.sections) &&
+      (current.sections as unknown[]).some((s) => {
+        const o = s as Record<string, unknown>;
+        const html = typeof o.html === "string" ? o.html : "";
+        const paras = Array.isArray(o.paragraphs) ? o.paragraphs : [];
+        return htmlHasContent(html) || paras.length > 0;
+      });
 
     if (hadContent && !clearedOnPurpose) {
       return {
         ok: false,
         message:
-          "لم يصل شرح الدرس إلى الخادم، فلم نحفظ شيئاً حفاظاً على المحتوى القديم. أعد المحاولة، وإن تكرّر الأمر انسخ شرحك احتياطاً قبل الحفظ.",
+          "الشرح المكتوب وصل فارغاً بينما الدرس يحتوي شرحاً محفوظاً، فلم نحفظ شيئاً حفاظاً عليه. إن كنت تقصد حذف الشرح فاحذف القسم نفسه بزر 🗑 ثم احفظ.",
       };
     }
   }
