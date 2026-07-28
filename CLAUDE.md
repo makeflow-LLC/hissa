@@ -69,6 +69,7 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0008_student_profiles_messages_grants.sql` | student profile columns, `teacher_messages`, `student_grants`, `is_restricted` + RLS |
 | `0009_reviews_and_parent_reports.sql` | real `reviews` (+ rating trigger) and `parent_reports` |
 | `0010_attachments_and_quiz_attempts.sql` | widen attachment kinds + bucket MIME types, `quiz_attempts` |
+| `0011_two_way_messaging.sql` | `teacher_messages.sender` + student insert/delete policies |
 
 ### Removed: live sessions
 
@@ -99,6 +100,12 @@ Both were dead UI until `0010`. The lesson page had always rendered a "📎 ال
 `lib/arabic.ts` normalizes before comparing: strips diacritics and tatweel, folds all alef forms to `ا`, `ى`→`ي`, `ة`→`ه`, hamza carriers to `ي`, Arabic-Indic digits to Latin, and punctuation to spaces. Without it "احمد" never matched "أحمد" — an everyday failure in Arabic, not an edge case. `matchesQuery` requires every query word to appear, so "احمد رياضيات" matches even when the words are far apart.
 
 Each `TeacherCard` carries a prebuilt `searchText` (name + subject + bio + qualification + stages + **lesson titles**), so a student can find a teacher by the topic of a lesson, not just by name.
+
+### Ordering and SEO
+
+Units and lessons carry a `position`, but it is a counter set at creation, so gaps and ties appear after deletes. `moveUnit` / `moveLesson` therefore sort the current siblings, swap two entries, then **rewrite the whole list as 0..n** — the order self-normalizes on every move instead of drifting. Lessons only reorder within their own unit; moving a lesson between units is the unit dropdown in the lesson form.
+
+`app/sitemap.ts` and `app/robots.ts` expose the public surface: the directory, every published teacher, and every published non-restricted lesson. Personal pages (`/dashboard`, `/teacher/me`, `/login`, `/auth/`) are disallowed — a crawler only ever sees a redirect there. The sitemap fails closed: on a connection error it returns the static pages rather than throwing, so one outage cannot empty the whole sitemap. Teacher and lesson pages carry real descriptions, canonical URLs, OpenGraph tags, and JSON-LD (`Person` with `aggregateRating` when reviews exist; `LearningResource` for lessons). Routes stay `force-dynamic` — that is fine for indexing, since titles and descriptions are public and only the gated content is withheld.
 
 ### Rich lesson content (the `sections` column)
 
@@ -198,7 +205,7 @@ The six seeded demo teachers were deleted from the live database (their units, l
 
 **Student data** lives on `profiles` (`grade`, `school`, `city`, `age`, `avatar_url`, `phone`, `whatsapp`, `guardian_phone`, `profile_done`). Only name and grade are required — **the phone numbers are deliberately optional** and the form says so. `saveStudentProfile` (`app/actions/student-profile.ts`) rejects teacher accounts, since the roles are exclusive. A teacher can read a follower's profile only through the `profiles_teacher_reads_followers` policy, which is keyed on `follows` (the older policy keyed on the dead `subscriptions` table and never matched).
 
-**Teacher messages** (`teacher_messages`): `student_id` set = a private note to one student; `student_id null` = broadcast to every follower. Students read them on `/dashboard`; RLS lets a student see only messages addressed to them or broadcasts from teachers they actually follow. Bodies are `stripTags`-ed — they render as plain text, never HTML.
+**Teacher messages** (`teacher_messages`) are a **two-way thread** since `0011`. `sender` is `teacher` or `student`; `student_id` set = a private thread with one student; `student_id null` = broadcast to every follower (teacher-only). A student may insert only rows where `sender = 'student'`, `student_id = auth.uid()`, they already follow that teacher, and they do not own a `teachers` row — so nobody can impersonate a teacher, message a stranger, or fake a broadcast. Teachers answer inline from `/teacher/me/students`, where threads awaiting a reply sort first. Students read them on `/dashboard`; RLS lets a student see only messages addressed to them or broadcasts from teachers they actually follow. Bodies are `stripTags`-ed — they render as plain text, never HTML.
 
 **Access grants** (`student_grants` + `lessons.is_restricted` / `live_sessions.is_restricted`): a teacher marks a lesson or session "خاص", then grants specific followers access from `/teacher/me/students`. A grant row with both `lesson_id` and `session_id` null means "all of this teacher's restricted content".
 

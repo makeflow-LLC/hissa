@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { stripTags } from "@/lib/sanitize";
 
 export interface ActionResult {
   ok: boolean;
@@ -98,4 +99,45 @@ export async function toggleLessonComplete(
   revalidatePath(`/teacher/${teacherSlug}/lesson/${lessonId}`);
   revalidatePath("/dashboard");
   return { ok: true };
+}
+
+/**
+ * سؤال الطالب لمعلّم يتابعه.
+ * الرسالة نص صِرف تُعرض في خيط المحادثة، وسياسة RLS من 0011 تفرض
+ * أن يكون المرسِل طالباً متابعاً يكتب باسمه هو.
+ */
+export async function askTeacher(
+  teacherId: string,
+  teacherSlug: string,
+  body: string
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NEED_LOGIN;
+  if (await isTeacherAccount(supabase, user.id)) return TEACHER_ACCOUNT;
+
+  const text = stripTags(body).slice(0, 1000);
+  if (!text) return { ok: false, message: "اكتب سؤالك أولاً." };
+
+  const { error } = await supabase.from("teacher_messages").insert({
+    teacher_id: teacherId,
+    student_id: user.id,
+    sender: "student",
+    body: text,
+  });
+  if (error) {
+    return {
+      ok: false,
+      message:
+        error.code === "42501"
+          ? "تابع هذا المعلّم أولاً لتتمكّن من مراسلته."
+          : "تعذّر إرسال سؤالك — حاول مجدداً.",
+    };
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath(`/teacher/${teacherSlug}`);
+  return { ok: true, message: "أُرسل سؤالك — سيصل معلّمك." };
 }

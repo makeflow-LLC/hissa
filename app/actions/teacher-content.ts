@@ -395,3 +395,85 @@ export async function deleteAttachment(formData: FormData): Promise<void> {
   revalidatePath(`/teacher/me/lessons/${lessonId}`);
   revalidatePath(`/teacher/${teacher.slug}/lesson/${lessonId}`);
 }
+
+/* --------------------------- إعادة الترتيب --------------------------- */
+
+/**
+ * تحريك عنصر خطوةً واحدة بتبديل موضعه مع جاره.
+ *
+ * المواضع تُنشأ بعدّاد عند الإضافة، فقد تتكرّر أو تتباعد بعد الحذف.
+ * لذلك نرتّب القائمة الحالية ونعمل على فهارسها، ثم نكتب مواضع متتابعة
+ * (0..n) لكل العناصر — فيتطبّع الترتيب من تلقائه مع كل تحريك.
+ */
+async function reorder(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  table: "units" | "lessons",
+  rows: { id: string; position: number }[],
+  itemId: string,
+  direction: "up" | "down"
+): Promise<void> {
+  const ordered = [...rows].sort((a, b) => a.position - b.position);
+  const i = ordered.findIndex((r) => r.id === itemId);
+  if (i === -1) return;
+  const j = direction === "up" ? i - 1 : i + 1;
+  if (j < 0 || j >= ordered.length) return;
+
+  [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
+
+  await Promise.all(
+    ordered.map((r, idx) =>
+      r.position === idx
+        ? Promise.resolve()
+        : supabase.from(table).update({ position: idx }).eq("id", r.id)
+    )
+  );
+}
+
+/** تحريك وحدة لأعلى أو لأسفل */
+export async function moveUnit(formData: FormData): Promise<void> {
+  const { supabase, teacher } = await requireMyTeacher();
+  if (!teacher) return;
+  const unitId = String(formData.get("unitId") ?? "");
+  const direction = String(formData.get("direction") ?? "") === "up" ? "up" : "down";
+  if (!unitId) return;
+
+  const { data } = await supabase
+    .from("units")
+    .select("id, position")
+    .eq("teacher_id", teacher.id);
+  await reorder(supabase, "units", data ?? [], unitId, direction);
+
+  revalidatePath("/teacher/me/content");
+  revalidatePath(`/teacher/${teacher.slug}`);
+}
+
+/** تحريك درس داخل وحدته */
+export async function moveLesson(formData: FormData): Promise<void> {
+  const { supabase, teacher } = await requireMyTeacher();
+  if (!teacher) return;
+  const lessonId = String(formData.get("lessonId") ?? "");
+  const direction = String(formData.get("direction") ?? "") === "up" ? "up" : "down";
+  if (!lessonId) return;
+
+  // الترتيب داخل الوحدة نفسها فقط — نقل الدرس بين الوحدات من نموذج التعديل
+  const { data: lesson } = await supabase
+    .from("lessons")
+    .select("id, unit_id")
+    .eq("id", lessonId)
+    .eq("teacher_id", teacher.id)
+    .maybeSingle();
+  if (!lesson) return;
+
+  const query = supabase
+    .from("lessons")
+    .select("id, position")
+    .eq("teacher_id", teacher.id);
+  const { data } = lesson.unit_id
+    ? await query.eq("unit_id", lesson.unit_id)
+    : await query.is("unit_id", null);
+
+  await reorder(supabase, "lessons", data ?? [], lessonId, direction);
+
+  revalidatePath("/teacher/me/content");
+  revalidatePath(`/teacher/${teacher.slug}`);
+}

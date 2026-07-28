@@ -726,7 +726,7 @@ export async function getMyMessages(): Promise<
     if (!user) return [];
     const { data } = await supabase
       .from("teacher_messages")
-      .select("id, teacher_id, student_id, body, created_at, teachers(name, slug)")
+      .select("id, teacher_id, student_id, body, created_at, sender, teachers(name, slug)")
       .order("created_at", { ascending: false })
       .limit(30);
 
@@ -741,6 +741,7 @@ export async function getMyMessages(): Promise<
         student_id: (row.student_id as string | null) ?? null,
         body: String(row.body ?? ""),
         created_at: String(row.created_at),
+        sender: row.sender === "student" ? ("student" as const) : ("teacher" as const),
         teacherName: t?.name ?? "معلّم",
         teacherSlug: t?.slug ?? "",
       };
@@ -963,4 +964,69 @@ export async function getMyQuizStats(): Promise<LessonQuizStats[]> {
       };
     })
     .filter((s) => s.attempts > 0);
+}
+
+/** خيوط محادثة المعلّم مع كل طالب (أسئلة الطلاب وردوده) */
+export interface StudentThread {
+  studentId: string;
+  studentName: string;
+  messages: { id: string; body: string; created_at: string; sender: string }[];
+  unansweredCount: number;
+}
+
+export async function getMyThreads(): Promise<StudentThread[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return [];
+
+  const { data } = await supabase
+    .from("teacher_messages")
+    .select("id, student_id, body, created_at, sender")
+    .eq("teacher_id", teacher.id)
+    .not("student_id", "is", null)
+    .order("created_at");
+
+  const rows = (data ?? []) as {
+    id: string;
+    student_id: string;
+    body: string;
+    created_at: string;
+    sender: string;
+  }[];
+  if (rows.length === 0) return [];
+
+  const ids = [...new Set(rows.map((r) => r.student_id))];
+  const { data: names } = await supabase
+    .from("profiles")
+    .select("id, full_name")
+    .in("id", ids);
+  const nameById = new Map((names ?? []).map((n) => [n.id, n.full_name as string]));
+
+  return ids
+    .map((sid) => {
+      const messages = rows.filter((r) => r.student_id === sid);
+      const last = messages[messages.length - 1];
+      return {
+        studentId: sid,
+        studentName: nameById.get(sid) ?? "طالب",
+        messages: messages.map((m) => ({
+          id: m.id,
+          body: m.body,
+          created_at: m.created_at,
+          sender: m.sender,
+        })),
+        // آخر رسالة من الطالب ⇒ بانتظار ردّ المعلّم
+        unansweredCount: last?.sender === "student" ? 1 : 0,
+      };
+    })
+    .sort((a, b) => b.unansweredCount - a.unansweredCount);
 }

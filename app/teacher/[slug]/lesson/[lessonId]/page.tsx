@@ -33,11 +33,32 @@ export async function generateMetadata({
   params: Promise<{ slug: string; lessonId: string }>;
 }): Promise<Metadata> {
   const { slug, lessonId } = await params;
-  const page = await getLessonPage(slug, lessonId);
+  let page: Awaited<ReturnType<typeof getLessonPage>> = null;
+  try {
+    page = await getLessonPage(slug, lessonId);
+  } catch {
+    /* فشل الاتصال لا يمنع التصيير */
+  }
+  if (!page) return { title: "منصة حصة" };
+
+  const { lesson, teacher, unit } = page;
+  const title = `${lesson.title} | ${teacher.name} | منصة حصة`;
+  const description =
+    lesson.description?.trim() ||
+    `درس «${lesson.title}» في ${teacher.subject} مع ${teacher.name}${
+      unit ? ` — ${unit.title}` : ""
+    } على منصة حصة.`;
+
   return {
-    title: page
-      ? `${page.lesson.title} | ${page.teacher.name} | منصة حصة`
-      : "منصة حصة",
+    title,
+    description: description.slice(0, 300),
+    alternates: { canonical: `/teacher/${slug}/lesson/${lessonId}` },
+    openGraph: {
+      title,
+      description: description.slice(0, 300),
+      url: `/teacher/${slug}/lesson/${lessonId}`,
+      type: "article",
+    },
   };
 }
 
@@ -89,8 +110,32 @@ export default async function LessonPage({
     `/teacher/${slug}/lesson/${lessonId}`
   )}`;
 
+  // بيانات منظّمة: الدرس جزء من منهج معلّم
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "LearningResource",
+    name: lesson.title,
+    description: lesson.description || undefined,
+    url: `https://hissa.sbs/teacher/${teacher.slug}/lesson/${lesson.id}`,
+    inLanguage: "ar",
+    learningResourceType: "درس مسجّل",
+    educationalLevel: teacher.stages.join(", "),
+    about: teacher.subject,
+    isPartOf: unit ? { "@type": "Course", name: unit.title } : undefined,
+    author: {
+      "@type": "Person",
+      name: teacher.name,
+      url: `https://hissa.sbs/teacher/${teacher.slug}`,
+    },
+    isAccessibleForFree: lesson.is_free_preview,
+  };
+
   return (
     <main className="container container-narrow">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <nav className="breadcrumb">
         <Link href="/" className="back-link">
           دليل المعلّمين

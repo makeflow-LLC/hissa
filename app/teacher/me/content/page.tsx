@@ -6,7 +6,12 @@ import {
   getMyTeacher,
   getMyTeacherContent,
 } from "@/lib/data/queries";
-import { deleteUnit, deleteLesson } from "@/app/actions/teacher-content";
+import {
+  deleteUnit,
+  deleteLesson,
+  moveUnit,
+  moveLesson,
+} from "@/app/actions/teacher-content";
 import AddUnitForm from "@/components/AddUnitForm";
 
 export const dynamic = "force-dynamic";
@@ -57,7 +62,7 @@ export default async function TeacherContentPage() {
           </p>
         ) : (
           <div className="unit-manage-list">
-            {units.map((u) => (
+            {units.map((u, ui) => (
               <article key={u.id} className="unit-manage-card">
                 <header className="unit-manage-head">
                   <div>
@@ -66,22 +71,50 @@ export default async function TeacherContentPage() {
                       <p className="unit-manage-desc">{u.description}</p>
                     )}
                   </div>
-                  <form action={deleteUnit}>
-                    <input type="hidden" name="unitId" value={u.id} />
-                    <button
-                      type="submit"
-                      className="btn btn-outline btn-sm btn-danger"
-                    >
-                      🗑 حذف الوحدة
-                    </button>
-                  </form>
+                  <div className="reorder-group">
+                    <form action={moveUnit}>
+                      <input type="hidden" name="unitId" value={u.id} />
+                      <input type="hidden" name="direction" value="up" />
+                      <button
+                        type="submit"
+                        className="btn btn-outline btn-sm"
+                        disabled={ui === 0}
+                        aria-label={`تحريك ${u.title} لأعلى`}
+                        title="لأعلى"
+                      >
+                        ▲
+                      </button>
+                    </form>
+                    <form action={moveUnit}>
+                      <input type="hidden" name="unitId" value={u.id} />
+                      <input type="hidden" name="direction" value="down" />
+                      <button
+                        type="submit"
+                        className="btn btn-outline btn-sm"
+                        disabled={ui === units.length - 1}
+                        aria-label={`تحريك ${u.title} لأسفل`}
+                        title="لأسفل"
+                      >
+                        ▼
+                      </button>
+                    </form>
+                    <form action={deleteUnit}>
+                      <input type="hidden" name="unitId" value={u.id} />
+                      <button
+                        type="submit"
+                        className="btn btn-outline btn-sm btn-danger"
+                      >
+                        🗑 حذف الوحدة
+                      </button>
+                    </form>
+                  </div>
                 </header>
 
                 {u.lessons.length === 0 ? (
                   <p className="drafts-empty">لا دروس في هذه الوحدة بعد.</p>
                 ) : (
                   <ul className="lesson-manage-list">
-                    {u.lessons.map((l) => (
+                    {u.lessons.map((l, li) => (
                       <li key={l.id} className="lesson-manage-row">
                         <span className="lesson-manage-emoji" aria-hidden="true">
                           {l.emoji}
@@ -101,6 +134,32 @@ export default async function TeacherContentPage() {
                           </span>
                         </span>
                         <span className="lesson-manage-actions">
+                          <form action={moveLesson}>
+                            <input type="hidden" name="lessonId" value={l.id} />
+                            <input type="hidden" name="direction" value="up" />
+                            <button
+                              type="submit"
+                              className="btn btn-outline btn-sm"
+                              disabled={li === 0}
+                              aria-label={`تحريك ${l.title} لأعلى`}
+                              title="لأعلى"
+                            >
+                              ▲
+                            </button>
+                          </form>
+                          <form action={moveLesson}>
+                            <input type="hidden" name="lessonId" value={l.id} />
+                            <input type="hidden" name="direction" value="down" />
+                            <button
+                              type="submit"
+                              className="btn btn-outline btn-sm"
+                              disabled={li === u.lessons.length - 1}
+                              aria-label={`تحريك ${l.title} لأسفل`}
+                              title="لأسفل"
+                            >
+                              ▼
+                            </button>
+                          </form>
                           <Link
                             href={`/teacher/me/lessons/${l.id}`}
                             className="btn btn-outline btn-sm"

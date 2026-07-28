@@ -7,12 +7,14 @@ import {
   getMyTeacher,
   getMyQuizStats,
   getMyTeacherContent,
+  getMyThreads,
 } from "@/lib/data/queries";
 import { revokeAccess } from "@/app/actions/teacher-students";
 import StudentActionsPanel, {
   type GrantTarget,
 } from "@/components/StudentActionsPanel";
 import BroadcastForm from "@/components/BroadcastForm";
+import ReplyForm from "@/components/ReplyForm";
 import ConnectionNotice from "@/components/ConnectionNotice";
 
 export const dynamic = "force-dynamic";
@@ -29,12 +31,14 @@ export default async function TeacherStudentsPage() {
   let students: Awaited<ReturnType<typeof getMyStudents>> = [];
   let content: Awaited<ReturnType<typeof getMyTeacherContent>> = null;
   let quizStats: Awaited<ReturnType<typeof getMyQuizStats>> = [];
+  let threads: Awaited<ReturnType<typeof getMyThreads>> = [];
   let loadError: string | undefined;
   try {
-    [students, content, quizStats] = await Promise.all([
+    [students, content, quizStats, threads] = await Promise.all([
       getMyStudents(),
       getMyTeacherContent(),
       getMyQuizStats(),
+      getMyThreads(),
     ]);
   } catch (e) {
     loadError = e instanceof Error ? e.message : String(e);
@@ -54,6 +58,8 @@ export default async function TeacherStudentsPage() {
       .filter((l) => l.is_restricted)
       .map((l) => ({ value: `lesson:${l.id}`, label: `🔒 ${l.title}` }))
   );
+
+  const waiting = threads.filter((t) => t.unansweredCount > 0).length;
 
   const avgProgress = students.length
     ? Math.round(students.reduce((n, s) => n + s.progressPct, 0) / students.length)
@@ -106,6 +112,56 @@ export default async function TeacherStudentsPage() {
             <h2 className="section-title">📢 رسالة لكل المتابعين</h2>
             <BroadcastForm />
           </section>
+
+          {threads.length > 0 && (
+            <section className="dashboard-section">
+              <h2 className="section-title">
+                💬 محادثات الطلاب
+                {waiting > 0 && (
+                  <span className="pill pill-low"> {waiting} بانتظار ردّك</span>
+                )}
+              </h2>
+              <div className="threads-list">
+                {threads.map((t) => (
+                  <article key={t.studentId} className="thread-card">
+                    <header className="thread-head">
+                      <strong>{t.studentName}</strong>
+                      {t.unansweredCount > 0 && (
+                        <span className="pill pill-low">بانتظار ردّك</span>
+                      )}
+                    </header>
+                    <ul className="thread-messages">
+                      {t.messages.map((m) => (
+                        <li
+                          key={m.id}
+                          className={`thread-msg ${
+                            m.sender === "student"
+                              ? "thread-msg-student"
+                              : "thread-msg-teacher"
+                          }`}
+                        >
+                          <span className="thread-msg-who">
+                            {m.sender === "student" ? t.studentName : "أنت"}
+                          </span>
+                          <span className="thread-msg-body">{m.body}</span>
+                          <span className="thread-msg-date">
+                            {new Date(m.created_at).toLocaleDateString("ar-EG", {
+                              day: "numeric",
+                              month: "long",
+                            })}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    <ReplyForm
+                      studentId={t.studentId}
+                      studentName={t.studentName}
+                    />
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
 
           {quizStats.length > 0 && (
             <section className="dashboard-section">

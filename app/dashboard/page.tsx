@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import AskTeacherForm from "@/components/AskTeacherForm";
 import {
   getCurrentUser,
   getMyMessages,
@@ -69,14 +70,23 @@ export default async function StudentDashboard() {
 
       {messages.length > 0 && (
         <section className="dashboard-section">
-          <h2 className="section-title">✉️ رسائل من معلّميك</h2>
+          <h2 className="section-title">✉️ مراسلاتك مع معلّميك</h2>
           <ul className="messages-list">
             {messages.map((m) => (
-              <li key={m.id} className="message-row">
+              <li
+                key={m.id}
+                className={`message-row ${
+                  m.sender === "student" ? "message-row-mine" : ""
+                }`}
+              >
                 <div className="message-head">
-                  <Link href={`/teacher/${m.teacherSlug}`} className="message-from">
-                    {m.teacherName}
-                  </Link>
+                  {m.sender === "student" ? (
+                    <strong className="message-from">أنت ← {m.teacherName}</strong>
+                  ) : (
+                    <Link href={`/teacher/${m.teacherSlug}`} className="message-from">
+                      {m.teacherName}
+                    </Link>
+                  )}
                   <span className="message-date">
                     {new Date(m.created_at).toLocaleDateString("ar-EG", {
                       day: "numeric",
@@ -221,6 +231,12 @@ export default async function StudentDashboard() {
                   ) : (
                     <p className="finished-note">🎉 أنجزت منهج هذا المعلم بالكامل!</p>
                   )}
+
+                  <AskTeacherForm
+                    teacherId={f.teacher.id}
+                    teacherSlug={f.teacher.slug}
+                    teacherName={f.teacher.name}
+                  />
                 </article>
               );
             })}
