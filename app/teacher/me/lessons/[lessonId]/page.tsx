@@ -7,6 +7,7 @@ import {
   getMyTeacherContent,
 } from "@/lib/data/queries";
 import LessonForm from "@/components/LessonForm";
+import { isAiConfigured } from "@/lib/ai/openrouter";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,7 @@ export default async function EditLessonPage({
         </Link>
       </nav>
       <h1 className="dashboard-title">✏️ تعديل الدرس</h1>
-      <LessonForm units={units} initial={initial} />
+      <LessonForm units={units} initial={initial} aiEnabled={isAiConfigured()} />
     </main>
   );
 }

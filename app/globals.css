@@ -3501,3 +3501,65 @@ body {
   .thread-reply .btn { align-self: stretch; }
   .reorder-group { width: 100%; justify-content: flex-end; }
 }
+
+/* ===== مساعد الذكاء الاصطناعي ===== */
+
+.ai-panel {
+  border: 1px solid #c7d2fe;
+  border-radius: 14px;
+  padding: 14px;
+  background: linear-gradient(135deg, #f5f3ff 0%, #eff6ff 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ai-panel-off { opacity: 0.75; }
+
+.ai-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ai-badge {
+  font-weight: 800;
+  color: #6d28d9;
+  font-size: 0.95rem;
+}
+
+.ai-remaining {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: var(--surface);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.ai-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.btn-active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.ai-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.ai-form .btn { align-self: flex-start; }
+
+.ai-format-btn { align-self: flex-start; margin-top: 6px; }
+
+@media (max-width: 720px) {
+  .ai-form .btn,
+  .ai-format-btn { align-self: stretch; width: 100%; }
+  .ai-actions .btn { flex: 1; }
+}

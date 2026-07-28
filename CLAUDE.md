@@ -70,6 +70,7 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0009_reviews_and_parent_reports.sql` | real `reviews` (+ rating trigger) and `parent_reports` |
 | `0010_attachments_and_quiz_attempts.sql` | widen attachment kinds + bucket MIME types, `quiz_attempts` |
 | `0011_two_way_messaging.sql` | `teacher_messages.sender` + student insert/delete policies |
+| `0012_ai_usage_quota.sql` | `ai_usage` ledger enforcing a monthly per-teacher cap |
 
 ### Removed: live sessions
 
@@ -106,6 +107,23 @@ Each `TeacherCard` carries a prebuilt `searchText` (name + subject + bio + quali
 Units and lessons carry a `position`, but it is a counter set at creation, so gaps and ties appear after deletes. `moveUnit` / `moveLesson` therefore sort the current siblings, swap two entries, then **rewrite the whole list as 0..n** — the order self-normalizes on every move instead of drifting. Lessons only reorder within their own unit; moving a lesson between units is the unit dropdown in the lesson form.
 
 `app/sitemap.ts` and `app/robots.ts` expose the public surface: the directory, every published teacher, and every published non-restricted lesson. Personal pages (`/dashboard`, `/teacher/me`, `/login`, `/auth/`) are disallowed — a crawler only ever sees a redirect there. The sitemap fails closed: on a connection error it returns the static pages rather than throwing, so one outage cannot empty the whole sitemap. Teacher and lesson pages carry real descriptions, canonical URLs, OpenGraph tags, and JSON-LD (`Person` with `aggregateRating` when reviews exist; `LearningResource` for lessons). Routes stay `force-dynamic` — that is fine for indexing, since titles and descriptions are public and only the gated content is withheld.
+
+### AI assistance (teacher-only)
+
+`lib/ai/openrouter.ts` + `lib/ai/prompts.ts` + `app/actions/ai.ts` power three teacher tools inside the lesson form: **summarize the lesson**, **suggest quiz questions**, and **improve a section's formatting**. Model is OpenRouter's `google/gemini-3.1-pro-preview` (override with `OPENROUTER_MODEL`).
+
+Non-negotiables baked into the design:
+
+- **The key is server-only.** `OPENROUTER_API_KEY` never gets a `NEXT_PUBLIC_` prefix, and both AI modules import `server-only` so a client-component import fails the build rather than shipping the key.
+- **The model suggests, never publishes.** Every result lands in the editor for the teacher to review and edit before saving. A wrong fact published under a teacher's name damages them.
+- **Output is untrusted input.** Generated HTML goes through `sanitizeLessonHtml` exactly like teacher-typed HTML; quiz JSON is re-validated field by field (`correct_index` must be in range) before it reaches the form.
+- **There is a hard monthly cap** (`MONTHLY_LIMIT` in `app/actions/ai.ts`, 40). Teacher signup is open to anyone and the platform has no revenue, so an uncapped endpoint is an open invitation to drain the balance.
+
+Prompts inject the teacher's own `subject` and `stages`, so wording targets the right level (a primary pupil and a secondary student get different registers). The allowed-tag list in `prompts.ts` deliberately mirrors the sanitizer's allowlist — asking for tags that would be stripped produces silently truncated output. Teachers can add free-text توصيات that are appended to the request.
+
+Gemini 3.1 Pro is a reasoning model: reasoning tokens count against `max_tokens`, hence the generous 8000 default. Measured cost is roughly $0.04 per summary and $0.036 per quiz, so the 40-call cap bounds a single teacher at well under $2/month.
+
+The whole feature is optional: with no `OPENROUTER_API_KEY` set, `isAiConfigured()` returns false and the buttons simply do not render.
 
 ### Rich lesson content (the `sections` column)
 
