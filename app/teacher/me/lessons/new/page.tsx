@@ -36,6 +36,7 @@ export default async function NewLessonPage({
         is_restricted: false,
         sections: [],
         quiz: [],
+        attachments: [],
       }
     : null;
 

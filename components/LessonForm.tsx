@@ -7,6 +7,8 @@ import {
   type ContentFormState,
 } from "@/app/actions/teacher-content";
 import RichTextEditor from "@/components/RichTextEditor";
+import AttachmentManager from "@/components/AttachmentManager";
+import type { AttachmentRow } from "@/lib/data/types";
 
 const EMOJIS = ["📚", "✏️", "🧮", "🔬", "🧪", "🌍", "📖", "💡", "🎯", "🧠", "📝", "🔤"];
 
@@ -23,6 +25,7 @@ export interface LessonFormInitial {
   is_restricted: boolean;
   sections: { heading: string; html?: string; paragraphs?: string[] }[];
   quiz: { prompt: string; options: string[]; correct_index: number }[];
+  attachments: AttachmentRow[];
 }
 
 interface SectionUI {
@@ -256,6 +259,21 @@ export default function LessonForm({
           ➕ إضافة قسم
         </button>
       </div>
+
+      {/* المرفقات — تحتاج درساً محفوظاً ليُربط بها الملف */}
+      {isEdit ? (
+        <AttachmentManager
+          lessonId={initial!.id}
+          initial={initial!.attachments}
+        />
+      ) : (
+        <div className="form-field">
+          <span className="form-label">📎 مرفقات الدرس</span>
+          <span className="form-hint">
+            احفظ الدرس أولاً، ثم افتحه للتعديل لإضافة أوراق العمل والملفات.
+          </span>
+        </div>
+      )}
 
       {/* أسئلة الاختبار */}
       <div className="form-field">

@@ -10,6 +10,23 @@ import ConnectionNotice from "@/components/ConnectionNotice";
 
 export const dynamic = "force-dynamic";
 
+const ATTACH_ICON: Record<string, string> = {
+  pdf: "📕",
+  worksheet: "📄",
+  doc: "📝",
+  slides: "📊",
+  sheet: "📈",
+  image: "🖼️",
+};
+const ATTACH_LABEL: Record<string, string> = {
+  pdf: "PDF",
+  worksheet: "ورقة عمل",
+  doc: "مستند",
+  slides: "عرض تقديمي",
+  sheet: "جدول",
+  image: "صورة",
+};
+
 export async function generateMetadata({
   params,
 }: {
@@ -65,6 +82,7 @@ export default async function LessonPage({
     next,
     isCompleted,
     locked,
+    quizAttempt,
   } = page;
   const isAuthed = Boolean(user);
   const loginHref = `/login?next=${encodeURIComponent(
@@ -189,12 +207,13 @@ export default async function LessonPage({
                   {attachments.map((att) => (
                     <li key={att.id} className="attachment-row">
                       <span className="attachment-icon" aria-hidden="true">
-                        {att.kind === "worksheet" ? "📄" : "📕"}
+                        {ATTACH_ICON[att.kind] ?? "📎"}
                       </span>
                       <span className="attachment-body">
                         <span className="attachment-name">{att.name}</span>
                         <span className="attachment-size">
-                          {att.kind === "worksheet" ? "ورقة عمل" : "PDF"} · {att.size}
+                          {ATTACH_LABEL[att.kind] ?? "ملف"}
+                          {att.size && <> · {att.size}</>}
                         </span>
                       </span>
                       <a href={att.file_path} download className="btn btn-outline">
@@ -216,8 +235,11 @@ export default async function LessonPage({
             )}
           </section>
 
-          {isAuthed && quiz.length > 0 && (
+          {isAuthed && !isTeacherAccount && quiz.length > 0 && (
             <QuizSection
+              lessonId={lesson.id}
+              teacherSlug={teacher.slug}
+              previous={quizAttempt}
               questions={quiz.map((q) => ({
                 id: q.id,
                 prompt: q.prompt,

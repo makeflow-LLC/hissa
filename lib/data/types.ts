@@ -44,6 +44,8 @@ export interface TeacherCard extends TeacherRow {
   lessonCount: number;
   studentCount: number;
   unitCount: number;
+  /** نص مجمّع للبحث: الاسم والمادة والنبذة والمؤهل وعناوين الدروس */
+  searchText: string;
 }
 
 /** بيانات الدرس الوصفية — متاحة للزائر والطالب على حد سواء */
@@ -78,7 +80,7 @@ export interface UnitWithLessons {
 export interface AttachmentRow {
   id: string;
   name: string;
-  kind: "pdf" | "worksheet";
+  kind: string;
   size: string;
   file_path: string;
 }
@@ -118,6 +120,8 @@ export interface LessonPage {
   next: { id: string; title: string } | null;
   isCompleted: boolean;
   locked: boolean;
+  /** محاولة الطالب السابقة في اختبار هذا الدرس */
+  quizAttempt: { score: number; total: number } | null;
 }
 
 /** تقييم منشور على صفحة المعلّم */

@@ -307,3 +307,91 @@ export async function deleteLesson(formData: FormData): Promise<void> {
 export async function goToContent(): Promise<never> {
   redirect("/teacher/me/content");
 }
+
+/* ----------------------------- المرفقات ----------------------------- */
+
+const ATTACHMENT_KINDS = [
+  "pdf",
+  "worksheet",
+  "image",
+  "doc",
+  "slides",
+  "sheet",
+  "other",
+] as const;
+
+/**
+ * تسجيل مرفق رُفع إلى التخزين.
+ * الملف نفسه يرفعه المتصفح مباشرةً إلى حاوية lesson-media داخل مجلد
+ * المستخدم، وهذا الإجراء يسجّل بياناته ويتحقّق أن الدرس يخصّ المعلّم.
+ */
+export async function addAttachment(
+  _prev: ContentFormState,
+  formData: FormData
+): Promise<ContentFormState> {
+  const { supabase, teacher } = await requireMyTeacher();
+  if (!teacher) return { ok: false, message: "سجّل الدخول كمعلّم أولاً." };
+
+  const lessonId = String(formData.get("lessonId") ?? "").trim();
+  const name = stripTags(String(formData.get("name") ?? "")).slice(0, 120);
+  const filePath = String(formData.get("file_path") ?? "").trim();
+  const size = stripTags(String(formData.get("size") ?? "")).slice(0, 20);
+  const kindRaw = String(formData.get("kind") ?? "pdf");
+  const kind = (ATTACHMENT_KINDS as readonly string[]).includes(kindRaw)
+    ? kindRaw
+    : "other";
+
+  if (!lessonId || !name || !filePath) {
+    return { ok: false, message: "بيانات المرفق ناقصة." };
+  }
+
+  // الدرس يجب أن يكون ملك هذا المعلّم
+  const { data: lesson } = await supabase
+    .from("lessons")
+    .select("id")
+    .eq("id", lessonId)
+    .eq("teacher_id", teacher.id)
+    .maybeSingle();
+  if (!lesson) return { ok: false, message: "الدرس غير صالح." };
+
+  const { count } = await supabase
+    .from("lesson_attachments")
+    .select("id", { count: "exact", head: true })
+    .eq("lesson_id", lessonId);
+
+  const { error } = await supabase.from("lesson_attachments").insert({
+    lesson_id: lessonId,
+    name,
+    kind,
+    size,
+    file_path: filePath,
+    position: count ?? 0,
+  });
+  if (error) return { ok: false, message: "تعذّر حفظ المرفق — حاول مجدداً." };
+
+  revalidatePath(`/teacher/me/lessons/${lessonId}`);
+  revalidatePath(`/teacher/${teacher.slug}/lesson/${lessonId}`);
+  return { ok: true, message: "أُضيف المرفق." };
+}
+
+/** حذف مرفق من درس يملكه المعلّم */
+export async function deleteAttachment(formData: FormData): Promise<void> {
+  const { supabase, teacher } = await requireMyTeacher();
+  if (!teacher) return;
+  const id = String(formData.get("attachmentId") ?? "");
+  const lessonId = String(formData.get("lessonId") ?? "");
+  if (!id) return;
+
+  // نتأكّد أن المرفق يتبع درساً يملكه هذا المعلّم قبل الحذف
+  const { data: own } = await supabase
+    .from("lessons")
+    .select("id")
+    .eq("id", lessonId)
+    .eq("teacher_id", teacher.id)
+    .maybeSingle();
+  if (!own) return;
+
+  await supabase.from("lesson_attachments").delete().eq("id", id);
+  revalidatePath(`/teacher/me/lessons/${lessonId}`);
+  revalidatePath(`/teacher/${teacher.slug}/lesson/${lessonId}`);
+}

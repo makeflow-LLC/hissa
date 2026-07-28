@@ -68,6 +68,7 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0007_lesson_media_storage.sql` | `lesson-media` storage bucket + owner-folder upload policies |
 | `0008_student_profiles_messages_grants.sql` | student profile columns, `teacher_messages`, `student_grants`, `is_restricted` + RLS |
 | `0009_reviews_and_parent_reports.sql` | real `reviews` (+ rating trigger) and `parent_reports` |
+| `0010_attachments_and_quiz_attempts.sql` | widen attachment kinds + bucket MIME types, `quiz_attempts` |
 
 ### Removed: live sessions
 
@@ -84,6 +85,20 @@ Eligibility to review is enforced **in RLS, not just the UI**: `reviews_student_
 ### Parent reports
 
 `parent_reports` lets a teacher send a periodic report about a student to that student's **guardian**, who has no account on the platform. The report is stored (the student sees it on `/dashboard`) and `ParentReportForm` builds a prefilled WhatsApp message to `profiles.guardian_phone` — a one-tap send, no messaging infrastructure required. If the student left the guardian number blank the form says so instead of offering a dead button.
+
+### Attachments and quiz results
+
+Both were dead UI until `0010`. The lesson page had always rendered a "📎 المرفقات" section and a quiz, but no teacher could upload a file and no answer was ever stored.
+
+**Attachments** upload from the browser to the same `lesson-media` bucket (`0010` widens its MIME list to documents and raises the limit to 20 MB); `addAttachment` then records the row after re-checking the lesson belongs to the caller. `AttachmentManager` only appears when editing an existing lesson — a new lesson has no id to attach to yet, and the form says so.
+
+**Quiz attempts** are stored one row per (lesson, student), updated on retry. **The grading happens on the server** (`app/actions/quiz.ts`): the client sends only its choices and the action reads `correct_index` from the database. Grading in the browser and trusting a posted score would let any student submit a perfect result. Teachers see per-lesson averages and per-student scores on `/teacher/me/students`.
+
+### Arabic search
+
+`lib/arabic.ts` normalizes before comparing: strips diacritics and tatweel, folds all alef forms to `ا`, `ى`→`ي`, `ة`→`ه`, hamza carriers to `ي`, Arabic-Indic digits to Latin, and punctuation to spaces. Without it "احمد" never matched "أحمد" — an everyday failure in Arabic, not an edge case. `matchesQuery` requires every query word to appear, so "احمد رياضيات" matches even when the words are far apart.
+
+Each `TeacherCard` carries a prebuilt `searchText` (name + subject + bio + qualification + stages + **lesson titles**), so a student can find a teacher by the topic of a lesson, not just by name.
 
 ### Rich lesson content (the `sections` column)
 
