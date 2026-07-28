@@ -104,16 +104,23 @@ export default function TeacherDirectory({ teachers }: { teachers: TeacherCard[]
                   </span>
                 ))}
               </div>
-              <div className="teacher-rating">
-                <Stars rating={Number(t.rating)} />
-                <span className="teacher-rating-value">{t.rating}</span>
-                <span className="teacher-rating-count">({t.rating_count})</span>
-              </div>
+              {t.rating_count > 0 ? (
+                <div className="teacher-rating">
+                  <Stars rating={Number(t.rating)} />
+                  <span className="teacher-rating-value">{t.rating}</span>
+                  <span className="teacher-rating-count">
+                    ({t.rating_count} تقييماً)
+                  </span>
+                </div>
+              ) : (
+                <div className="teacher-rating teacher-rating-none">معلّم جديد</div>
+              )}
               <p className="teacher-counts">
-                🎬 {t.lessonCount} درساً مسجّلاً · 🔴 {t.liveCount} حصص مباشرة
+                👥 {t.studentCount} طالباً · 🎬 {t.lessonCount} درساً · 📚{" "}
+                {t.unitCount} وحدة
               </p>
               <Link href={`/teacher/${t.slug}`} className="btn btn-primary">
-                📚 ادخل إلى الدروس والحصص
+                📚 ادخل إلى الدروس
               </Link>
             </article>
           ))}

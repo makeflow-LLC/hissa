@@ -63,11 +63,20 @@ export default async function TeacherMePage() {
           <span className="stat-label">سنوات خبرة</span>
         </div>
         <div className="stat-box">
-          <span className="stat-value stat-rating">
-            {teacher.rating}
-            <Stars rating={Number(teacher.rating)} />
-          </span>
-          <span className="stat-label">{teacher.rating_count} تقييماً</span>
+          {teacher.rating_count > 0 ? (
+            <>
+              <span className="stat-value stat-rating">
+                {teacher.rating}
+                <Stars rating={Number(teacher.rating)} />
+              </span>
+              <span className="stat-label">{teacher.rating_count} تقييماً</span>
+            </>
+          ) : (
+            <>
+              <span className="stat-value stat-value-muted">—</span>
+              <span className="stat-label">لا تقييمات بعد</span>
+            </>
+          )}
         </div>
         <div className="stat-box">
           <span className="stat-value">{teacher.stages.length}</span>
@@ -99,7 +108,7 @@ export default async function TeacherMePage() {
           </Link>
         </div>
         <p className="drafts-empty">
-          أضِف الوحدات والدروس المسجّلة والحصص المباشرة، وتظهر مباشرةً في{" "}
+          أضِف الوحدات والدروس المسجّلة، وتظهر مباشرةً في{" "}
           <Link href={`/teacher/${teacher.slug}`} className="back-link">
             بروفايلك العام
           </Link>{" "}

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser, getMyTeacher, getTeacherProfile } from "@/lib/data/queries";
 import TeacherTabs from "@/components/TeacherTabs";
+import ReviewSection from "@/components/ReviewSection";
 import FollowButton from "@/components/FollowButton";
 import ConnectionNotice from "@/components/ConnectionNotice";
 import Stars from "@/components/Stars";
@@ -47,8 +48,11 @@ export default async function TeacherProfilePage({
   }
   if (!profile) notFound();
 
-  const { teacher, units, liveSessions } = profile;
+  const { teacher, units } = profile;
   const lessonCount = units.reduce((n, u) => n + u.lessons.length, 0);
+  const completedCount = profile.completedLessonIds.length;
+  // مؤهّل للتقييم: طالب (لا معلّم) أنجز درساً من دروس هذا المعلّم
+  const canReview = Boolean(user) && !isTeacherAccount && completedCount > 0;
   const waDigits = teacher.whatsapp?.replace(/[^0-9]/g, "") ?? "";
 
   return (
@@ -134,15 +138,24 @@ export default async function TeacherProfilePage({
             <span className="stat-label">درساً مسجّلاً</span>
           </div>
           <div className="stat-box">
-            <span className="stat-value">{liveSessions.length}</span>
-            <span className="stat-label">حصص مباشرة</span>
+            <span className="stat-value">{units.length}</span>
+            <span className="stat-label">وحدة دراسية</span>
           </div>
           <div className="stat-box">
-            <span className="stat-value stat-rating">
-              {teacher.rating}
-              <Stars rating={Number(teacher.rating)} />
-            </span>
-            <span className="stat-label">{teacher.rating_count} تقييماً</span>
+            {teacher.rating_count > 0 ? (
+              <>
+                <span className="stat-value stat-rating">
+                  {teacher.rating}
+                  <Stars rating={Number(teacher.rating)} />
+                </span>
+                <span className="stat-label">{teacher.rating_count} تقييماً</span>
+              </>
+            ) : (
+              <>
+                <span className="stat-value stat-value-muted">—</span>
+                <span className="stat-label">لا تقييمات بعد</span>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -151,7 +164,7 @@ export default async function TeacherProfilePage({
         <div className="visitor-banner">
           <strong>أنت تتصفّح كزائر.</strong> ترى عناوين الدروس ووصفها، ودرساً واحداً
           كعيّنة مجانية. سجّل الدخول مجاناً لمشاهدة كل الدروس وتحميل المرفقات
-          والتسجيل في الحصص.
+          وحفظ تقدّمك.
           <Link
             href={`/login?next=${encodeURIComponent(`/teacher/${slug}`)}`}
             className="btn btn-primary btn-sm"
@@ -163,7 +176,7 @@ export default async function TeacherProfilePage({
 
       {isOwner && (
         <div className="owner-preview-banner">
-          👁 هذه صفحتك كما يراها الطالب. لتعديل الدروس والحصص افتح{" "}
+          👁 هذه صفحتك كما يراها الطالب. لتعديل دروسك افتح{" "}
           <Link href="/teacher/me/content" className="back-link">
             إدارة المحتوى
           </Link>
@@ -171,10 +184,15 @@ export default async function TeacherProfilePage({
         </div>
       )}
 
-      <TeacherTabs
-        profile={profile}
-        isAuthed={Boolean(user)}
-        canEnroll={Boolean(user) && !isTeacherAccount}
+      <TeacherTabs profile={profile} isAuthed={Boolean(user)} />
+
+      <ReviewSection
+        teacherId={teacher.id}
+        teacherSlug={teacher.slug}
+        reviews={profile.reviews}
+        myReview={profile.myReview}
+        canReview={canReview}
+        isAuthed={Boolean(user) && !isTeacherAccount}
       />
     </main>
   );

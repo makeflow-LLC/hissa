@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     template: "%s | منصة حصة",
   },
   description:
-    "منصة حصة منصة تعليمية عربية تربط الطلاب بالمعلّمين: تصفّح دليل المعلّمين، شاهد الدروس المسجّلة، وسجّل في الحصص المباشرة. الوصول مجاني تماماً للطالب.",
+    "منصة حصة منصة تعليمية عربية تربط الطلاب بالمعلّمين: تصفّح دليل المعلّمين، شاهد دروسهم المسجّلة، وتابع تقدّمك. الوصول مجاني تماماً للطالب.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "منصة حصة",
-    description: "مدرستك الرقمية: دروس مسجّلة وحصص مباشرة، مجانية تماماً للطالب.",
+    description: "مدرستك الرقمية: دروس مسجّلة بشرح منسّق واختبارات — مجانية تماماً للطالب.",
     url: "https://hissa.sbs",
     siteName: "منصة حصة",
     locale: "ar",
@@ -78,7 +78,7 @@ export default function RootLayout({
             منصة حصة
           </p>
           <p className="footer-text">
-            دروس مسجّلة وحصص مباشرة مع أفضل المعلّمين — مجانية تماماً للطالب.
+            دروس مسجّلة مع أفضل المعلّمين — مجانية تماماً للطالب.
           </p>
           <nav className="footer-links">
             <Link href="/privacy" className="footer-link">

@@ -88,7 +88,7 @@ export async function deleteMessage(formData: FormData): Promise<void> {
 
 /**
  * منح طالب وصولاً إلى محتوى خاص.
- * target: "all" = كل محتوى المعلّم الخاص، أو "lesson:<id>" / "session:<id>".
+ * target: "all" = كل دروس المعلّم الخاصة، أو "lesson:<id>" لدرس بعينه.
  */
 export async function grantAccess(
   _prev: StudentsActionState,
@@ -105,12 +105,9 @@ export async function grantAccess(
     return { ok: false, message: "هذا الطالب لا يتابعك." };
   }
 
-  let lessonId: string | null = null;
-  let sessionId: string | null = null;
-  if (target.startsWith("lesson:")) lessonId = target.slice(7) || null;
-  else if (target.startsWith("session:")) sessionId = target.slice(8) || null;
+  const lessonId = target.startsWith("lesson:") ? target.slice(7) || null : null;
 
-  // العنصر المستهدف يجب أن يكون ملك هذا المعلّم
+  // الدرس المستهدف يجب أن يكون ملك هذا المعلّم
   if (lessonId) {
     const { data } = await supabase
       .from("lessons")
@@ -120,21 +117,11 @@ export async function grantAccess(
       .maybeSingle();
     if (!data) return { ok: false, message: "الدرس المختار غير صالح." };
   }
-  if (sessionId) {
-    const { data } = await supabase
-      .from("live_sessions")
-      .select("id")
-      .eq("id", sessionId)
-      .eq("teacher_id", teacher.id)
-      .maybeSingle();
-    if (!data) return { ok: false, message: "الحصة المختارة غير صالحة." };
-  }
 
   const { error } = await supabase.from("student_grants").insert({
     teacher_id: teacher.id,
     student_id: studentId,
     lesson_id: lessonId,
-    session_id: sessionId,
   });
   // 23505 = المنحة موجودة أصلاً، وهذا ليس خطأ يهمّ المعلّم
   if (error && error.code !== "23505") {
@@ -155,6 +142,62 @@ export async function revokeAccess(formData: FormData): Promise<void> {
     .from("student_grants")
     .delete()
     .eq("id", grantId)
+    .eq("teacher_id", teacher.id);
+  revalidatePath("/teacher/me/students");
+}
+
+/* ------------------------- تقرير وليّ الأمر ------------------------- */
+
+const PERFORMANCE = ["ممتاز", "جيد جداً", "جيد", "يحتاج متابعة"] as const;
+
+/**
+ * تقرير دوري عن الطالب موجَّه لوليّ أمره.
+ * وليّ الأمر لا يملك حساباً على المنصة، فالتقرير يُحفظ هنا (يراه الطالب
+ * أيضاً على لوحته) وتُبنى منه رسالة واتساب يرسلها المعلّم بضغطة.
+ */
+export async function saveParentReport(
+  _prev: StudentsActionState,
+  formData: FormData
+): Promise<StudentsActionState> {
+  const { supabase, teacher } = await requireMyTeacher();
+  if (!teacher) return { ok: false, message: "سجّل الدخول كمعلّم أولاً." };
+
+  const studentId = String(formData.get("studentId") ?? "").trim();
+  if (!studentId) return { ok: false, message: "اختر الطالب." };
+  if (!(await followsMe(supabase, teacher.id, studentId))) {
+    return { ok: false, message: "هذا الطالب لا يتابعك." };
+  }
+
+  const perfRaw = String(formData.get("performance") ?? "جيد");
+  const performance = (PERFORMANCE as readonly string[]).includes(perfRaw)
+    ? perfRaw
+    : "جيد";
+
+  const { error } = await supabase.from("parent_reports").insert({
+    teacher_id: teacher.id,
+    student_id: studentId,
+    period: stripTags(String(formData.get("period") ?? "")).slice(0, 60),
+    performance,
+    strengths: stripTags(String(formData.get("strengths") ?? "")).slice(0, 500),
+    improvements: stripTags(String(formData.get("improvements") ?? "")).slice(0, 500),
+    note: stripTags(String(formData.get("note") ?? "")).slice(0, 500),
+  });
+  if (error) return { ok: false, message: "تعذّر حفظ التقرير — حاول مجدداً." };
+
+  revalidatePath("/teacher/me/students");
+  return { ok: true, message: "حُفظ التقرير — أرسله لوليّ الأمر بالزر أدناه." };
+}
+
+/** حذف تقرير كتبه المعلّم */
+export async function deleteParentReport(formData: FormData): Promise<void> {
+  const { supabase, teacher } = await requireMyTeacher();
+  if (!teacher) return;
+  const id = String(formData.get("reportId") ?? "");
+  if (!id) return;
+  await supabase
+    .from("parent_reports")
+    .delete()
+    .eq("id", id)
     .eq("teacher_id", teacher.id);
   revalidatePath("/teacher/me/students");
 }

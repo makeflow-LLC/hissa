@@ -5,8 +5,8 @@ import type {
   LessonContent,
   LessonMeta,
   LessonPage,
-  LiveSessionRow,
   QuizQuestionRow,
+  ParentReport,
   StudentProfile,
   TeacherCard,
   TeacherMessage,
@@ -66,18 +66,19 @@ export async function getStudentName(): Promise<string | null> {
   }
 }
 
-/** دليل المعلمين: كل المعلمين مع عدد دروسهم وحصصهم */
+/** دليل المعلمين: كل معلم مع عدد دروسه ووحداته وطلابه */
 export async function getTeacherCards(): Promise<TeacherCard[]> {
   const supabase = await createClient();
 
-  const [teachersRes, lessonsRes, liveRes] = await Promise.all([
+  const [teachersRes, lessonsRes, followsRes, unitsRes] = await Promise.all([
     supabase
       .from("teachers")
       .select(TEACHER_COLS)
       .eq("is_published", true)
       .order("created_at"),
     supabase.from("lessons").select("id, teacher_id").eq("status", "published"),
-    supabase.from("live_sessions").select("id, teacher_id").eq("status", "published"),
+    supabase.from("follows").select("teacher_id"),
+    supabase.from("units").select("id, teacher_id"),
   ]);
 
   if (teachersRes.error) throw teachersRes.error;
@@ -86,19 +87,24 @@ export async function getTeacherCards(): Promise<TeacherCard[]> {
   for (const l of lessonsRes.data ?? []) {
     lessonCounts.set(l.teacher_id, (lessonCounts.get(l.teacher_id) ?? 0) + 1);
   }
-  const liveCounts = new Map<string, number>();
-  for (const s of liveRes.data ?? []) {
-    liveCounts.set(s.teacher_id, (liveCounts.get(s.teacher_id) ?? 0) + 1);
+  const studentCounts = new Map<string, number>();
+  for (const f of followsRes.data ?? []) {
+    studentCounts.set(f.teacher_id, (studentCounts.get(f.teacher_id) ?? 0) + 1);
+  }
+  const unitCounts = new Map<string, number>();
+  for (const u of unitsRes.data ?? []) {
+    unitCounts.set(u.teacher_id, (unitCounts.get(u.teacher_id) ?? 0) + 1);
   }
 
   return (teachersRes.data as TeacherRow[]).map((t) => ({
     ...t,
     lessonCount: lessonCounts.get(t.id) ?? 0,
-    liveCount: liveCounts.get(t.id) ?? 0,
+    studentCount: studentCounts.get(t.id) ?? 0,
+    unitCount: unitCounts.get(t.id) ?? 0,
   }));
 }
 
-/** بروفايل معلم: منهجه وحصصه + حالة الطالب الحالي تجاهه */
+/** بروفايل معلم: منهجه + حالة الطالب الحالي تجاهه */
 export async function getTeacherProfile(
   slug: string
 ): Promise<TeacherProfile | null> {
@@ -117,7 +123,7 @@ export async function getTeacherProfile(
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [unitsRes, lessonsRes, liveRes] = await Promise.all([
+  const [unitsRes, lessonsRes] = await Promise.all([
     supabase
       .from("units")
       .select("id, title, description, position")
@@ -129,14 +135,6 @@ export async function getTeacherProfile(
       .eq("teacher_id", teacher.id)
       .eq("status", "published")
       .order("position"),
-    supabase
-      .from("live_sessions")
-      .select(
-        "id, title, description, schedule, duration, seats_left, emoji, gradient, is_paid, price, currency"
-      )
-      .eq("teacher_id", teacher.id)
-      .eq("status", "published")
-      .order("created_at"),
   ]);
 
   const lessons = (lessonsRes.data ?? []) as LessonMeta[];
@@ -145,16 +143,15 @@ export async function getTeacherProfile(
     lessons: lessons.filter((l) => l.unit_id === u.id),
   }));
 
-  // حالة الطالب: متابعة، دروس منجزة، حصص مسجّل فيها
+  // حالة الطالب: متابعة، دروس منجزة، وتقييمه إن كتبه
   let isFollowing = false;
   let completedLessonIds: string[] = [];
-  const enrolledSessionIds: Record<string, string> = {};
+  let myReview: { rating: number; comment: string } | null = null;
 
   if (user) {
     const lessonIds = lessons.map((l) => l.id);
-    const sessionIds = (liveRes.data ?? []).map((s) => s.id);
 
-    const [followRes, progressRes, enrollRes] = await Promise.all([
+    const [followRes, progressRes, reviewRes] = await Promise.all([
       supabase
         .from("follows")
         .select("teacher_id")
@@ -168,29 +165,50 @@ export async function getTeacherProfile(
             .eq("student_id", user.id)
             .in("lesson_id", lessonIds)
         : Promise.resolve({ data: [] as { lesson_id: string }[] }),
-      sessionIds.length
-        ? supabase
-            .from("enrollments")
-            .select("session_id, status")
-            .eq("student_id", user.id)
-            .in("session_id", sessionIds)
-        : Promise.resolve({ data: [] as { session_id: string; status: string }[] }),
+      supabase
+        .from("reviews")
+        .select("rating, comment")
+        .eq("student_id", user.id)
+        .eq("teacher_id", teacher.id)
+        .maybeSingle(),
     ]);
 
     isFollowing = Boolean(followRes.data);
     completedLessonIds = (progressRes.data ?? []).map((p) => p.lesson_id);
-    for (const e of enrollRes.data ?? []) {
-      if (e.status !== "cancelled") enrolledSessionIds[e.session_id] = e.status;
-    }
+    myReview = (reviewRes.data as { rating: number; comment: string } | null) ?? null;
+  }
+
+  // آخر التقييمات المكتوبة لعرضها في الصفحة العامة
+  const { data: reviewRows } = await supabase
+    .from("reviews")
+    .select("id, rating, comment, created_at, student_id")
+    .eq("teacher_id", teacher.id)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  const reviewerIds = (reviewRows ?? []).map((r) => r.student_id as string);
+  const namesById = new Map<string, string>();
+  if (reviewerIds.length) {
+    const { data: names } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", reviewerIds);
+    for (const n of names ?? []) namesById.set(n.id, n.full_name);
   }
 
   return {
     teacher: teacher as TeacherRow,
     units,
-    liveSessions: (liveRes.data ?? []) as LiveSessionRow[],
     isFollowing,
     completedLessonIds,
-    enrolledSessionIds,
+    myReview,
+    reviews: (reviewRows ?? []).map((r) => ({
+      id: String(r.id),
+      rating: Number(r.rating),
+      comment: String(r.comment ?? ""),
+      created_at: String(r.created_at),
+      studentName: namesById.get(r.student_id as string) ?? "طالب",
+    })),
   };
 }
 
@@ -310,12 +328,6 @@ export async function getLessonPage(
 
 /* ===================== لوحة الطالب ===================== */
 
-export interface DashboardEnrollment {
-  id: string;
-  status: string;
-  session: LiveSessionRow & { teacherName: string; teacherSlug: string };
-}
-
 export interface DashboardTeacherProgress {
   teacher: Pick<TeacherRow, "id" | "slug" | "name" | "subject" | "initials" | "gradient" | "avatar_url">;
   units: { id: string; title: string; total: number; done: number }[];
@@ -326,11 +338,10 @@ export interface DashboardTeacherProgress {
 }
 
 export interface StudentDashboard {
-  enrollments: DashboardEnrollment[];
   following: DashboardTeacherProgress[];
 }
 
-/** بيانات لوحة الطالب: حصصي + معلّميّ + تقدّمي */
+/** بيانات لوحة الطالب: معلّميّ + تقدّمي */
 export async function getStudentDashboard(): Promise<StudentDashboard | null> {
   const supabase = await createClient();
   const {
@@ -338,20 +349,7 @@ export async function getStudentDashboard(): Promise<StudentDashboard | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [enrollRes, followRes, progressRes] = await Promise.all([
-    supabase
-      .from("enrollments")
-      .select(
-        `id, status,
-         live_sessions!inner (
-           id, title, description, schedule, duration, seats_left, emoji, gradient,
-           is_paid, price, currency,
-           teachers!inner ( name, slug )
-         )`
-      )
-      .eq("student_id", user.id)
-      .neq("status", "cancelled")
-      .order("created_at", { ascending: false }),
+  const [followRes, progressRes] = await Promise.all([
     supabase
       .from("follows")
       .select(
@@ -367,27 +365,6 @@ export async function getStudentDashboard(): Promise<StudentDashboard | null> {
   // فنطبّع الشكل قبل الاستخدام
   const one = <T,>(v: T | T[] | null | undefined): T | null =>
     Array.isArray(v) ? v[0] ?? null : v ?? null;
-
-  type EnrollJoin = {
-    id: string;
-    status: string;
-    live_sessions:
-      | (LiveSessionRow & { teachers: { name: string; slug: string } | { name: string; slug: string }[] })
-      | (LiveSessionRow & { teachers: { name: string; slug: string } | { name: string; slug: string }[] })[]
-      | null;
-  };
-  const enrollments: DashboardEnrollment[] = [];
-  for (const e of (enrollRes.data ?? []) as unknown as EnrollJoin[]) {
-    const s = one(e.live_sessions);
-    const t = s ? one(s.teachers) : null;
-    if (!s || !t) continue;
-    const { teachers: _drop, ...session } = s;
-    enrollments.push({
-      id: e.id,
-      status: e.status,
-      session: { ...session, teacherName: t.name, teacherSlug: t.slug },
-    });
-  }
 
   const doneIds = new Set((progressRes.data ?? []).map((p) => p.lesson_id));
 
@@ -438,7 +415,7 @@ export async function getStudentDashboard(): Promise<StudentDashboard | null> {
     });
   }
 
-  return { enrollments, following };
+  return { following };
 }
 
 /* ===================== حساب المعلّم ===================== */
@@ -465,7 +442,7 @@ export async function getMyTeacher(): Promise<MyTeacher | null> {
  *
  * القاعدة: البريد الواحد إمّا معلّم وإمّا طالب، لا الاثنين معاً.
  * - «معلّم» = يملك صفاً في teachers.
- * - «طالب نشِط» = له تسجيل أو متابعة أو تقدّم محفوظ؛ لا يجوز أن يفتح
+ * - «طالب نشِط» = يتابع معلّماً أو له تقدّم محفوظ؛ لا يجوز أن يفتح
  *   حساب معلّم على البريد نفسه.
  * - «حساب جديد» = سجّل دخوله ولم يفعل شيئاً بعد؛ يجوز أن يصبح معلّماً
  *   (هذا هو مسار تسجيل المعلّم الطبيعي: دخول ثم إنشاء بروفايل).
@@ -489,11 +466,7 @@ export async function getAccountRole(): Promise<AccountRole> {
       .maybeSingle();
     if (teacher) return "teacher";
 
-    const [enr, fol, prog] = await Promise.all([
-      supabase
-        .from("enrollments")
-        .select("session_id", { count: "exact", head: true })
-        .eq("student_id", user.id),
+    const [fol, prog] = await Promise.all([
       supabase
         .from("follows")
         .select("teacher_id", { count: "exact", head: true })
@@ -504,7 +477,7 @@ export async function getAccountRole(): Promise<AccountRole> {
         .eq("student_id", user.id),
     ]);
 
-    const active = (enr.count ?? 0) + (fol.count ?? 0) + (prog.count ?? 0);
+    const active = (fol.count ?? 0) + (prog.count ?? 0);
     return active > 0 ? "student" : "new";
   } catch {
     return "visitor";
@@ -550,26 +523,10 @@ export interface TeacherUnit {
   }[];
 }
 
-export interface TeacherLive {
-  id: string;
-  title: string;
-  description: string;
-  schedule: string;
-  duration: string;
-  seats_left: number;
-  emoji: string;
-  status: string;
-  is_paid: boolean;
-  price: number;
-  currency: string;
-  is_restricted: boolean;
-}
-
 export interface TeacherContent {
   teacherId: string;
   slug: string;
   units: TeacherUnit[];
-  live: TeacherLive[];
 }
 
 /** كل محتوى المعلّم الحالي (بما فيه المسودات) لإدارته */
@@ -587,7 +544,7 @@ export async function getMyTeacherContent(): Promise<TeacherContent | null> {
     .maybeSingle();
   if (!teacher) return null;
 
-  const [unitsRes, lessonsRes, liveRes] = await Promise.all([
+  const [unitsRes, lessonsRes] = await Promise.all([
     supabase
       .from("units")
       .select("id, title, description, position")
@@ -598,11 +555,6 @@ export async function getMyTeacherContent(): Promise<TeacherContent | null> {
       .select("id, unit_id, title, description, duration, emoji, status, is_free_preview, is_restricted, position")
       .eq("teacher_id", teacher.id)
       .order("position"),
-    supabase
-      .from("live_sessions")
-      .select("id, title, description, schedule, duration, seats_left, emoji, status, is_paid, price, currency, is_restricted")
-      .eq("teacher_id", teacher.id)
-      .order("created_at"),
   ]);
 
   type L = TeacherUnit["lessons"][number] & { unit_id: string | null };
@@ -616,7 +568,6 @@ export async function getMyTeacherContent(): Promise<TeacherContent | null> {
     teacherId: teacher.id,
     slug: teacher.slug,
     units,
-    live: (liveRes.data ?? []) as TeacherLive[],
   };
 }
 
@@ -704,29 +655,6 @@ export async function getMyLessonForEdit(lessonId: string) {
       correct_index: Number(q.correct_index ?? 0),
     })),
   };
-}
-
-/** حصة مباشرة واحدة يملكها المعلّم الحالي (للتعديل) */
-export async function getMyLive(sessionId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase
-    .from("live_sessions")
-    .select(
-      "id, title, description, schedule, duration, seats_left, emoji, is_paid, price, currency, is_restricted, status, teachers!inner(owner_id)"
-    )
-    .eq("id", sessionId)
-    .maybeSingle();
-  const row = data as
-    | (Record<string, unknown> & { teachers: { owner_id: string } | { owner_id: string }[] })
-    | null;
-  if (!row) return null;
-  const owner = Array.isArray(row.teachers) ? row.teachers[0] : row.teachers;
-  if (owner?.owner_id !== user.id) return null;
-  return row;
 }
 
 /* ============== بيانات الطالب ورسائل المعلّم والمنح ============== */
@@ -882,4 +810,45 @@ export async function getMyStudents(): Promise<TeacherStudent[]> {
         .map((g) => ({ id: g.id, lesson_id: g.lesson_id, session_id: g.session_id })),
     };
   });
+}
+
+/** تقارير المعلّمين عن الطالب الحالي (يراها الطالب على لوحته) */
+export async function getMyParentReports(): Promise<
+  (ParentReport & { teacherName: string })[]
+> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+    const { data } = await supabase
+      .from("parent_reports")
+      .select(
+        "id, student_id, period, performance, strengths, improvements, note, created_at, teachers(name)"
+      )
+      .eq("student_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    return (data ?? []).map((r) => {
+      const row = r as Record<string, unknown> & {
+        teachers: { name: string } | { name: string }[];
+      };
+      const t = Array.isArray(row.teachers) ? row.teachers[0] : row.teachers;
+      return {
+        id: String(row.id),
+        student_id: String(row.student_id),
+        period: String(row.period ?? ""),
+        performance: String(row.performance ?? ""),
+        strengths: String(row.strengths ?? ""),
+        improvements: String(row.improvements ?? ""),
+        note: String(row.note ?? ""),
+        created_at: String(row.created_at),
+        teacherName: t?.name ?? "معلّم",
+      };
+    });
+  } catch {
+    return [];
+  }
 }
