@@ -25,16 +25,14 @@ function LoginCard() {
   const next = params.get("next") ?? (isTeacher ? "/teacher/onboarding" : "/dashboard");
   const urlError = params.get("error");
 
-  const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
-  const [busy, setBusy] = useState<"google" | "email" | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const callbackUrl = () =>
     `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
 
   async function signInWithGoogle() {
-    setBusy("google");
+    setBusy(true);
     setError("");
     const supabase = createClient();
 
@@ -46,8 +44,8 @@ function LoginCard() {
     });
 
     if (error || !data?.url) {
-      setError("تعذّر بدء الدخول بجوجل. جرّب الرابط السحري بالبريد بالأسفل.");
-      setBusy(null);
+      setError("تعذّر بدء الدخول بحساب جوجل. حدّث الصفحة وحاول مرّة أخرى.");
+      setBusy(false);
       return;
     }
 
@@ -56,9 +54,9 @@ function LoginCard() {
       const probe = await fetch(data.url, { redirect: "manual" });
       if (probe.status === 400) {
         setError(
-          "الدخول بجوجل غير مفعّل في المنصة بعد. استخدم الرابط السحري بالبريد بالأسفل — يعمل فوراً."
+          "الدخول بحساب جوجل غير مفعّل بعد على المنصة. تواصل مع الدعم — لا توجد طريقة دخول بديلة حالياً."
         );
-        setBusy(null);
+        setBusy(false);
         return;
       }
     } catch {
@@ -66,52 +64,6 @@ function LoginCard() {
     }
 
     window.location.href = data.url;
-  }
-
-  async function sendMagicLink(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy("email");
-    setError("");
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: callbackUrl() },
-    });
-    setBusy(null);
-    if (error) {
-      setError("تعذّر إرسال الرابط — تأكد من صحة البريد وحاول مرة أخرى.");
-      return;
-    }
-    setSent(true);
-  }
-
-  if (sent) {
-    return (
-      <main className="container container-narrow">
-        <div className="login-card">
-          <span className="save-success-icon" aria-hidden="true">
-            📬
-          </span>
-          <h1 className="login-title">تحقّق من بريدك</h1>
-          <p className="login-subtitle">
-            أرسلنا رابط دخول إلى <strong dir="ltr">{email}</strong>. لا تحتاج كلمة
-            مرور — فقط اضغط الرابط.
-          </p>
-          <p className="login-note">
-            📱 <strong>مهم:</strong> افتح الرابط من <strong>نفس المتصفح</strong> الذي
-            طلبته منه. إن فتحه تطبيق البريد في نافذته الخاصة ولم ينجح الدخول، انسخ
-            الرابط والصقه في متصفحك.
-          </p>
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={() => setSent(false)}
-          >
-            إرسال لبريد آخر
-          </button>
-        </div>
-      </main>
-    );
   }
 
   return (
@@ -160,41 +112,14 @@ function LoginCard() {
           type="button"
           className="btn btn-google btn-block"
           onClick={signInWithGoogle}
-          disabled={busy !== null}
+          disabled={busy}
         >
-          {busy === "google" ? "جارٍ التحويل…" : "الدخول بحساب جوجل"}
+          {busy ? "جارٍ التحويل…" : "الدخول بحساب جوجل"}
         </button>
 
-        <div className="login-divider">
-          <span>أو</span>
-        </div>
-
-        <form onSubmit={sendMagicLink} className="login-form">
-          <label className="form-field">
-            <span className="form-label">البريد الإلكتروني</span>
-            <input
-              type="email"
-              dir="ltr"
-              className="search-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              autoComplete="email"
-              required
-            />
-          </label>
-          <button
-            type="submit"
-            className="btn btn-primary btn-block"
-            disabled={busy !== null}
-          >
-            {busy === "email" ? "جارٍ الإرسال…" : "أرسل لي رابط دخول"}
-          </button>
-        </form>
-
         <p className="login-hint">
-          🔒 بلا كلمات مرور: نرسل لك رابطاً سحرياً بالبريد. الدخول بالجوال
-          (رسالة تحقّق) سيُضاف عند توفّر مزوّد رسائل.
+          🔒 الدخول بحساب جوجل وحده — بلا كلمات مرور تُنسى ولا روابط بريد قد
+          تفتح في متصفّح آخر فتفشل.
         </p>
 
         <p className="login-alt">

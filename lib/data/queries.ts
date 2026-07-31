@@ -1,5 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
+import { normalizeSubject } from "@/lib/arabic";
 import type {
+  FollowStatus,
+  JoinRequest,
   MyTeacher,
   AttachmentRow,
   LessonContent,
@@ -10,6 +13,8 @@ import type {
   StudentProfile,
   TeacherCard,
   TeacherMessage,
+  ReportCard,
+  StudentGroup,
   TeacherProfile,
   TeacherRow,
   TeacherStudent,
@@ -21,7 +26,7 @@ const LESSON_META_COLS =
   "id, unit_id, title, description, duration, emoji, gradient, position, is_free_preview";
 
 const TEACHER_COLS =
-  "id, slug, name, subject, stages, bio, initials, gradient, avatar_url, whatsapp, rating, rating_count, qualification, experience_years";
+  "id, slug, name, subject, stages, bio, initials, gradient, avatar_url, whatsapp, rating, rating_count, qualification, experience_years, join_instructions";
 
 /**
  * المستخدم الحالي (null للزائر).
@@ -158,8 +163,10 @@ export async function getTeacherProfile(
     lessons: lessons.filter((l) => l.unit_id === u.id),
   }));
 
-  // حالة الطالب: متابعة، دروس منجزة، وتقييمه إن كتبه
-  let isFollowing = false;
+  // حالة الطالب: طلب الانضمام، دروس منجزة، وتقييمه إن كتبه
+  let followStatus: FollowStatus = "none";
+  let followDecisionNote = "";
+  let subjectClashTeacher = "";
   let completedLessonIds: string[] = [];
   let myReview: { rating: number; comment: string } | null = null;
 
@@ -169,7 +176,7 @@ export async function getTeacherProfile(
     const [followRes, progressRes, reviewRes] = await Promise.all([
       supabase
         .from("follows")
-        .select("teacher_id")
+        .select("teacher_id, status, decision_note")
         .eq("student_id", user.id)
         .eq("teacher_id", teacher.id)
         .maybeSingle(),
@@ -188,9 +195,39 @@ export async function getTeacherProfile(
         .maybeSingle(),
     ]);
 
-    isFollowing = Boolean(followRes.data);
+    const followRow = followRes.data as
+      | { status?: string; decision_note?: string }
+      | null;
+    followStatus = (followRow?.status as FollowStatus) ?? "none";
+    followDecisionNote = String(followRow?.decision_note ?? "");
     completedLessonIds = (progressRes.data ?? []).map((p) => p.lesson_id);
     myReview = (reviewRes.data as { rating: number; comment: string } | null) ?? null;
+
+    /**
+     * معلّم واحد لكل مادة: نكشف التعارض هنا لنشرحه للطالب قبل أن يضغط،
+     * بدل أن يصطدم برفض قاعدة البيانات. الفرض نفسه هناك لا هنا.
+     */
+    if (followStatus === "none" || followStatus === "rejected") {
+      const { data: mine } = await supabase
+        .from("follows")
+        .select("teacher_id, status")
+        .eq("student_id", user.id)
+        .in("status", ["pending", "approved"]);
+      const otherIds = (mine ?? [])
+        .map((f) => f.teacher_id as string)
+        .filter((id) => id !== teacher.id);
+      if (otherIds.length) {
+        const { data: others } = await supabase
+          .from("teachers")
+          .select("name, subject")
+          .in("id", otherIds);
+        const mySubject = normalizeSubject(String(teacher.subject ?? ""));
+        const clash = (others ?? []).find(
+          (o) => normalizeSubject(String(o.subject ?? "")) === mySubject
+        );
+        if (clash) subjectClashTeacher = String(clash.name);
+      }
+    }
   }
 
   // آخر التقييمات المكتوبة لعرضها في الصفحة العامة
@@ -214,7 +251,10 @@ export async function getTeacherProfile(
   return {
     teacher: teacher as TeacherRow,
     units,
-    isFollowing,
+    followStatus,
+    followDecisionNote,
+    subjectClashTeacher,
+    isFollowing: followStatus === "approved",
     completedLessonIds,
     myReview,
     reviews: (reviewRows ?? []).map((r) => ({
@@ -382,6 +422,7 @@ export async function getStudentDashboard(): Promise<StudentDashboard | null> {
          teachers!inner ( id, slug, name, subject, initials, gradient, avatar_url )`
       )
       .eq("student_id", user.id)
+      .eq("status", "approved")
       .order("created_at", { ascending: false }),
     supabase.from("lesson_progress").select("lesson_id").eq("student_id", user.id),
   ]);
@@ -775,17 +816,19 @@ export async function getMyStudents(): Promise<TeacherStudent[]> {
     .maybeSingle();
   if (!teacher) return [];
 
+  // المقبولون فقط — الطلب المعلّق ليس طالباً بعد
   const { data: follows } = await supabase
     .from("follows")
     .select("student_id, created_at")
     .eq("teacher_id", teacher.id)
+    .eq("status", "approved")
     .order("created_at", { ascending: false });
   const followRows = (follows ?? []) as { student_id: string; created_at: string }[];
   if (followRows.length === 0) return [];
 
   const studentIds = followRows.map((f) => f.student_id);
 
-  const [profilesRes, lessonsRes, grantsRes] = await Promise.all([
+  const [profilesRes, lessonsRes, grantsRes, groupsRes] = await Promise.all([
     supabase.from("profiles").select(STUDENT_PROFILE_COLS).in("id", studentIds),
     supabase
       .from("lessons")
@@ -796,7 +839,24 @@ export async function getMyStudents(): Promise<TeacherStudent[]> {
       .from("student_grants")
       .select("id, student_id, lesson_id, session_id")
       .eq("teacher_id", teacher.id),
+    supabase
+      .from("student_groups")
+      .select("id, student_group_members(student_id)")
+      .eq("teacher_id", teacher.id),
   ]);
+
+  // مجموعات كل طالب عند هذا المعلّم
+  const groupsByStudent = new Map<string, string[]>();
+  for (const g of (groupsRes.data ?? []) as {
+    id: string;
+    student_group_members: { student_id: string }[] | null;
+  }[]) {
+    for (const m of g.student_group_members ?? []) {
+      const list = groupsByStudent.get(m.student_id) ?? [];
+      list.push(g.id);
+      groupsByStudent.set(m.student_id, list);
+    }
+  }
 
   const myLessonIds = (lessonsRes.data ?? []).map((l) => l.id as string);
   const totalLessons = myLessonIds.length;
@@ -848,8 +908,198 @@ export async function getMyStudents(): Promise<TeacherStudent[]> {
       }[])
         .filter((g) => g.student_id === f.student_id)
         .map((g) => ({ id: g.id, lesson_id: g.lesson_id, session_id: g.session_id })),
+      groupIds: groupsByStudent.get(f.student_id) ?? [],
     };
   });
+}
+
+/** طلبات الانضمام المعلّقة عند المعلّم الحالي */
+export async function getJoinRequests(): Promise<JoinRequest[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return [];
+
+  const { data: rows } = await supabase
+    .from("follows")
+    .select("student_id, student_note, requested_at")
+    .eq("teacher_id", teacher.id)
+    .eq("status", "pending")
+    .order("requested_at", { ascending: true });
+
+  const reqs = (rows ?? []) as {
+    student_id: string;
+    student_note: string;
+    requested_at: string;
+  }[];
+  if (reqs.length === 0) return [];
+
+  /**
+   * ملف الطالب محجوب عن المعلّم قبل القبول (سياسة 0013)، وهذا مقصود:
+   * الطلب المعلّق لا يفتح بيانات الطالب. نعرض ما كتبه الطالب في طلبه فقط،
+   * ونكمل بالاسم إن سمحت السياسة به.
+   */
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, full_name, grade, school, city, avatar_url")
+    .in(
+      "id",
+      reqs.map((r) => r.student_id)
+    );
+  const byId = new Map(
+    ((profiles ?? []) as Record<string, string | null>[]).map((p) => [
+      String(p.id),
+      p,
+    ])
+  );
+
+  return reqs.map((r) => {
+    const p = byId.get(r.student_id);
+    return {
+      studentId: r.student_id,
+      name: String(p?.full_name ?? "طالب جديد"),
+      grade: String(p?.grade ?? ""),
+      school: String(p?.school ?? ""),
+      city: String(p?.city ?? ""),
+      avatarUrl: (p?.avatar_url as string | null) ?? null,
+      note: String(r.student_note ?? ""),
+      requestedAt: r.requested_at,
+    };
+  });
+}
+
+/** مجموعات المعلّم الحالي مع عدد أعضاء كل مجموعة */
+export async function getMyGroups(): Promise<StudentGroup[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return [];
+
+  const { data } = await supabase
+    .from("student_groups")
+    .select("id, name, description, position, student_group_members(student_id)")
+    .eq("teacher_id", teacher.id)
+    .order("position");
+
+  return ((data ?? []) as {
+    id: string;
+    name: string;
+    description: string;
+    position: number;
+    student_group_members: { student_id: string }[] | null;
+  }[]).map((g) => ({
+    id: g.id,
+    name: g.name,
+    description: g.description ?? "",
+    position: g.position ?? 0,
+    memberCount: (g.student_group_members ?? []).length,
+  }));
+}
+
+/** بطاقات التقييم التي أصدرها المعلّم الحالي */
+export async function getIssuedReportCards(): Promise<ReportCard[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return [];
+
+  const { data } = await supabase
+    .from("report_cards")
+    .select("*")
+    .eq("teacher_id", teacher.id)
+    .order("issued_at", { ascending: false });
+
+  return (data ?? []) as ReportCard[];
+}
+
+/** طلبات الانضمام التي أرسلها الطالب الحالي ولم تُقبل بعد */
+export async function getMyPendingJoins(): Promise<
+  { teacherName: string; teacherSlug: string; status: "pending" | "rejected"; note: string }[]
+> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data } = await supabase
+      .from("follows")
+      .select("status, decision_note, teachers(name, slug)")
+      .eq("student_id", user.id)
+      .in("status", ["pending", "rejected"])
+      .order("requested_at", { ascending: false });
+
+    return ((data ?? []) as {
+      status: string;
+      decision_note: string;
+      teachers: { name: string; slug: string } | { name: string; slug: string }[] | null;
+    }[]).map((r) => {
+      const t = Array.isArray(r.teachers) ? r.teachers[0] : r.teachers;
+      return {
+        teacherName: t?.name ?? "معلّم",
+        teacherSlug: t?.slug ?? "",
+        status: r.status === "rejected" ? ("rejected" as const) : ("pending" as const),
+        note: String(r.decision_note ?? ""),
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+/** بطاقات تقييم الطالب الحالي (يراها على لوحته) */
+export async function getMyReportCards(): Promise<
+  (ReportCard & { teacherName: string; unitTitle: string })[]
+> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data } = await supabase
+      .from("report_cards")
+      .select("*, teachers(name), units(title)")
+      .eq("student_id", user.id)
+      .order("issued_at", { ascending: false });
+
+    return ((data ?? []) as (ReportCard & {
+      teachers: { name: string } | { name: string }[] | null;
+      units: { title: string } | { title: string }[] | null;
+    })[]).map((r) => {
+      const t = Array.isArray(r.teachers) ? r.teachers[0] : r.teachers;
+      const u = Array.isArray(r.units) ? r.units[0] : r.units;
+      return { ...r, teacherName: t?.name ?? "معلّم", unitTitle: u?.title ?? "" };
+    });
+  } catch {
+    return [];
+  }
 }
 
 /** تقارير المعلّمين عن الطالب الحالي (يراها الطالب على لوحته) */

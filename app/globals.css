@@ -3563,3 +3563,130 @@ body {
   .ai-format-btn { align-self: stretch; width: 100%; }
   .ai-actions .btn { flex: 1; }
 }
+
+/* ===== الانضمام بموافقة المعلّم، المجموعات، وبطاقات التقييم ===== */
+
+.join-panel { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.join-state {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.9rem; font-weight: 600;
+}
+.join-state-ok { color: var(--success); }
+.join-state-wait { color: #b45309; }
+.join-state-no { color: #b91c1c; }
+
+.join-blocked {
+  background: #fef2f2; border: 1px solid #fecaca; color: #991b1b;
+  border-radius: var(--radius); padding: 12px 14px; font-size: 0.9rem;
+  line-height: 1.7; max-width: 46ch;
+}
+
+.join-form {
+  display: flex; flex-direction: column; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px; width: min(100%, 480px);
+}
+.join-terms {
+  background: var(--primary-soft); border-radius: 12px; padding: 10px 12px;
+}
+.join-terms h4 { margin: 0 0 4px; font-size: 0.9rem; color: var(--primary-dark); }
+.join-terms p { margin: 0; font-size: 0.9rem; line-height: 1.7; white-space: pre-wrap; }
+
+/* طلبات الانضمام في لوحة المعلّم */
+.requests-list { display: grid; gap: 12px; }
+.request-card {
+  display: flex; flex-direction: column; gap: 10px;
+  background: var(--surface); border: 1px solid #fde68a;
+  border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow);
+}
+.request-note {
+  margin: 0; padding: 8px 12px; background: var(--primary-soft);
+  border-radius: 12px; font-size: 0.9rem; line-height: 1.7;
+}
+
+/* حالة طلبات الطالب على لوحته */
+.join-status-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.join-status-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px 14px;
+}
+.join-status-name { font-weight: 700; color: var(--text); text-decoration: none; }
+.join-status-name:hover { color: var(--primary); }
+
+/* المجموعات */
+.groups-manager { display: flex; flex-direction: column; gap: 12px; }
+.group-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.group-form input {
+  flex: 1 1 200px; min-width: 0; padding: 9px 12px;
+  border: 1px solid var(--border); border-radius: 10px; font: inherit;
+}
+.groups-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.group-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px 14px;
+}
+.group-info { display: flex; flex-direction: column; gap: 2px; }
+.group-name { font-size: 1rem; }
+.group-meta { font-size: 0.82rem; color: var(--text-muted); }
+
+.group-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.group-chips-label { font-size: 0.82rem; color: var(--text-muted); }
+.chip {
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-muted);
+  border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 0.82rem;
+  cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.chip:hover { border-color: var(--primary); color: var(--primary); }
+.chip-on {
+  background: var(--primary-soft); border-color: var(--primary);
+  color: var(--primary-dark); font-weight: 600;
+}
+
+/* بطاقات التقييم — نموذج المعلّم */
+.report-card-block { display: flex; flex-direction: column; gap: 10px; }
+.report-form {
+  display: flex; flex-direction: column; gap: 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px;
+}
+.form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.scales-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.scale-field { display: flex; flex-direction: column; gap: 4px; }
+.scale-field select {
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; font: inherit;
+}
+.report-card-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.report-card-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  flex-wrap: wrap; background: #fffbeb; border: 1px solid #fde68a;
+  border-radius: 12px; padding: 8px 12px; font-size: 0.9rem;
+}
+.report-card-title { font-weight: 600; }
+
+/* بطاقات التقييم — عرض الطالب */
+.report-cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.report-card {
+  display: flex; flex-direction: column; gap: 10px;
+  background: var(--surface); border: 1px solid #fde68a;
+  border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow);
+}
+.report-card-head { display: flex; flex-direction: column; gap: 2px; }
+.report-scales { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.report-scale {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; font-size: 0.88rem;
+}
+.report-stars { color: var(--accent); letter-spacing: 1px; }
+.report-score { margin: 0; font-size: 0.95rem; }
+.report-note { margin: 0; font-size: 0.88rem; line-height: 1.7; }
+
+.form-ok { color: var(--success); font-size: 0.85rem; margin: 0; }
+
+@media (max-width: 720px) {
+  .form-grid-2 { grid-template-columns: 1fr; }
+  .scales-grid { grid-template-columns: 1fr 1fr; }
+  .report-cards { grid-template-columns: 1fr; }
+  .group-form input { flex-basis: 100%; }
+}

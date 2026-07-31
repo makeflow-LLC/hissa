@@ -32,6 +32,8 @@ export interface TeacherRow {
   rating_count: number;
   qualification: string;
   experience_years: number;
+  /** شروط الانضمام التي يكتبها المعلّم، تُعرض للطالب قبل إرسال طلبه */
+  join_instructions: string;
 }
 
 /** ملف المعلّم الحالي (المسجّل بحسابه) — لصفحات إدارة بروفايله */
@@ -92,11 +94,26 @@ export interface QuizQuestionRow {
   correct_index: number;
 }
 
+/**
+ * حالة الطالب تجاه معلّم: الانضمام صار طلباً يبتّه المعلّم.
+ * none = لم يطلب | pending = بانتظار الرد | approved = مقبول | rejected = مرفوض
+ */
+export type FollowStatus = "none" | "pending" | "approved" | "rejected";
+
 /** بروفايل معلم كامل مع منهجه وحصصه */
 export interface TeacherProfile {
   teacher: TeacherRow;
   units: UnitWithLessons[];
-  /** حالة الطالب الحالي تجاه هذا المعلم (فارغة للزائر) */
+  /** حالة الطالب الحالي تجاه هذا المعلم (none للزائر) */
+  followStatus: FollowStatus;
+  /** سبب الرفض إن كتبه المعلّم */
+  followDecisionNote: string;
+  /**
+   * معلّم آخر يتابعه الطالب في نفس المادة — يمنع الانضمام هنا.
+   * فارغ إن لم يوجد تعارض.
+   */
+  subjectClashTeacher: string;
+  /** بقيت للتوافق: مقبول فعلاً */
   isFollowing: boolean;
   completedLessonIds: string[];
   /** تقييم الطالب الحالي لهذا المعلّم إن كتبه */
@@ -169,6 +186,49 @@ export interface TeacherStudent {
   progressPct: number;
   /** منح الوصول التي أعطاها هذا المعلّم لهذا الطالب */
   grants: { id: string; lesson_id: string | null; session_id: string | null }[];
+  /** المجموعات التي وُضع فيها عند هذا المعلّم */
+  groupIds: string[];
+}
+
+/** طلب انضمام ينتظر بتّ المعلّم */
+export interface JoinRequest {
+  studentId: string;
+  name: string;
+  grade: string;
+  school: string;
+  city: string;
+  avatarUrl: string | null;
+  note: string;
+  requestedAt: string;
+}
+
+/** مجموعة طلاب ينشئها المعلّم */
+export interface StudentGroup {
+  id: string;
+  name: string;
+  description: string;
+  position: number;
+  memberCount: number;
+}
+
+/** بطاقة تقييم تصدر في نهاية وحدة أو فصل */
+export interface ReportCard {
+  id: string;
+  teacher_id: string;
+  student_id: string;
+  unit_id: string | null;
+  term: string;
+  title: string;
+  understanding: number | null;
+  participation: number | null;
+  homework: number | null;
+  behavior: number | null;
+  score: number | null;
+  max_score: number | null;
+  strengths: string;
+  improvements: string;
+  note: string;
+  issued_at: string;
 }
 
 /** رسالة من معلّم إلى طالب بعينه أو إلى كل متابعيه */

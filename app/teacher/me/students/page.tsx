@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import {
   getCurrentUser,
+  getIssuedReportCards,
+  getJoinRequests,
+  getMyGroups,
   getMyStudents,
   getMyTeacher,
   getMyQuizStats,
@@ -14,6 +17,10 @@ import StudentActionsPanel, {
   type GrantTarget,
 } from "@/components/StudentActionsPanel";
 import BroadcastForm from "@/components/BroadcastForm";
+import JoinRequestsPanel from "@/components/JoinRequestsPanel";
+import GroupsManager from "@/components/GroupsManager";
+import StudentGroupChips from "@/components/StudentGroupChips";
+import ReportCardForm from "@/components/ReportCardForm";
 import ReplyForm from "@/components/ReplyForm";
 import ConnectionNotice from "@/components/ConnectionNotice";
 
@@ -32,14 +39,21 @@ export default async function TeacherStudentsPage() {
   let content: Awaited<ReturnType<typeof getMyTeacherContent>> = null;
   let quizStats: Awaited<ReturnType<typeof getMyQuizStats>> = [];
   let threads: Awaited<ReturnType<typeof getMyThreads>> = [];
+  let requests: Awaited<ReturnType<typeof getJoinRequests>> = [];
+  let groups: Awaited<ReturnType<typeof getMyGroups>> = [];
+  let cards: Awaited<ReturnType<typeof getIssuedReportCards>> = [];
   let loadError: string | undefined;
   try {
-    [students, content, quizStats, threads] = await Promise.all([
-      getMyStudents(),
-      getMyTeacherContent(),
-      getMyQuizStats(),
-      getMyThreads(),
-    ]);
+    [students, content, quizStats, threads, requests, groups, cards] =
+      await Promise.all([
+        getMyStudents(),
+        getMyTeacherContent(),
+        getMyQuizStats(),
+        getMyThreads(),
+        getJoinRequests(),
+        getMyGroups(),
+        getIssuedReportCards(),
+      ]);
   } catch (e) {
     loadError = e instanceof Error ? e.message : String(e);
   }
@@ -60,6 +74,8 @@ export default async function TeacherStudentsPage() {
   );
 
   const waiting = threads.filter((t) => t.unansweredCount > 0).length;
+
+  const units = (content?.units ?? []).map((u) => ({ id: u.id, title: u.title }));
 
   const avgProgress = students.length
     ? Math.round(students.reduce((n, s) => n + s.progressPct, 0) / students.length)
@@ -86,25 +102,43 @@ export default async function TeacherStudentsPage() {
       <section className="dashboard-stats">
         <div className="stat-box">
           <span className="stat-value">{students.length}</span>
-          <span className="stat-label">طالباً يتابعك</span>
+          <span className="stat-label">طالباً منضمّاً</span>
         </div>
         <div className="stat-box">
           <span className="stat-value">{avgProgress}%</span>
           <span className="stat-label">متوسّط التقدّم</span>
         </div>
         <div className="stat-box">
-          <span className="stat-value">{targets.length}</span>
-          <span className="stat-label">درساً خاصاً</span>
+          <span className="stat-value">{requests.length}</span>
+          <span className="stat-label">طلب انضمام</span>
         </div>
+      </section>
+
+      {requests.length > 0 && (
+        <section className="dashboard-section">
+          <h2 className="section-title">
+            🙋 طلبات الانضمام
+            <span className="pill pill-low"> {requests.length} بانتظار قرارك</span>
+          </h2>
+          <p className="dashboard-subtitle">
+            لا يرى الطالب محتواك الخاص ولا يراسلك قبل قبوله.
+          </p>
+          <JoinRequestsPanel requests={requests} />
+        </section>
+      )}
+
+      <section className="dashboard-section">
+        <h2 className="section-title">🗂️ المجموعات</h2>
+        <GroupsManager groups={groups} />
       </section>
 
       {students.length === 0 ? (
         <p className="drafts-empty">
-          لا يتابعك أي طالب بعد. شارك رابط صفحتك من{" "}
+          لا ينضمّ إليك أي طالب بعد. شارك رابط صفحتك من{" "}
           <Link href="/teacher/me" className="back-link">
             لوحة المعلّم
           </Link>{" "}
-          ليبدأ الطلاب بمتابعتك.
+          ليصلك أول طلب انضمام.
         </p>
       ) : (
         <>
@@ -311,6 +345,19 @@ export default async function TeacherStudentsPage() {
                       ))}
                     </ul>
                   )}
+
+                  <StudentGroupChips
+                    studentId={s.profile.id}
+                    groups={groups}
+                    memberOf={s.groupIds}
+                  />
+
+                  <ReportCardForm
+                    studentId={s.profile.id}
+                    studentName={s.profile.full_name}
+                    units={units}
+                    existing={cards.filter((c) => c.student_id === s.profile.id)}
+                  />
 
                   <StudentActionsPanel
                     studentId={s.profile.id}

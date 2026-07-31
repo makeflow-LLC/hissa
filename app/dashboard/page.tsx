@@ -6,6 +6,8 @@ import {
   getCurrentUser,
   getMyMessages,
   getMyParentReports,
+  getMyPendingJoins,
+  getMyReportCards,
   getMyStudentProfile,
   getStudentDashboard,
   getStudentName,
@@ -22,13 +24,16 @@ export default async function StudentDashboard() {
   // حساب المعلّم له لوحته الخاصة — لا لوحة طالب على البريد نفسه
   if (await isCurrentUserTeacher()) redirect("/teacher/me");
 
-  const [name, data, profile, messages, reports] = await Promise.all([
-    getStudentName(),
-    getStudentDashboard(),
-    getMyStudentProfile(),
-    getMyMessages(),
-    getMyParentReports(),
-  ]);
+  const [name, data, profile, messages, reports, pendingJoins, reportCards] =
+    await Promise.all([
+      getStudentName(),
+      getStudentDashboard(),
+      getMyStudentProfile(),
+      getMyMessages(),
+      getMyParentReports(),
+      getMyPendingJoins(),
+      getMyReportCards(),
+    ]);
   const { following = [] } = data ?? {};
 
   const totalLessons = following.reduce((n, f) => n + f.total, 0);
@@ -66,6 +71,94 @@ export default async function StudentDashboard() {
             أكمل الآن
           </Link>
         </div>
+      )}
+
+      {pendingJoins.length > 0 && (
+        <section className="dashboard-section">
+          <h2 className="section-title">🙋 طلبات انضمامك</h2>
+          <ul className="join-status-list">
+            {pendingJoins.map((j) => (
+              <li key={j.teacherSlug} className="join-status-row">
+                <Link href={`/teacher/${j.teacherSlug}`} className="join-status-name">
+                  {j.teacherName}
+                </Link>
+                {j.status === "pending" ? (
+                  <span className="pill pill-draft">⏳ بانتظار موافقة المعلّم</span>
+                ) : (
+                  <span className="pill pill-low">
+                    لم يُقبل{j.note ? ` — ${j.note}` : ""}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {reportCards.length > 0 && (
+        <section className="dashboard-section">
+          <h2 className="section-title">🏅 بطاقات تقييمي</h2>
+          <div className="report-cards">
+            {reportCards.map((c) => (
+              <article key={c.id} className="report-card">
+                <header className="report-card-head">
+                  <strong>{c.title}</strong>
+                  <span className="group-meta">
+                    {c.teacherName}
+                    {c.unitTitle && <> · {c.unitTitle}</>}
+                    {c.term && <> · {c.term}</>}
+                  </span>
+                </header>
+
+                <ul className="report-scales">
+                  {[
+                    ["الفهم والاستيعاب", c.understanding],
+                    ["المشاركة", c.participation],
+                    ["الواجبات", c.homework],
+                    ["الانضباط", c.behavior],
+                  ]
+                    .filter(([, v]) => v !== null && v !== undefined)
+                    .map(([label, v]) => (
+                      <li key={String(label)} className="report-scale">
+                        <span>{label}</span>
+                        <span className="report-stars" aria-label={`${v} من 5`}>
+                          {"★".repeat(Number(v))}
+                          {"☆".repeat(5 - Number(v))}
+                        </span>
+                      </li>
+                    ))}
+                </ul>
+
+                {c.score !== null && (
+                  <p className="report-score">
+                    الدرجة: <strong>{c.score}</strong>
+                    {c.max_score !== null && <> من {c.max_score}</>}
+                  </p>
+                )}
+
+                {c.strengths && (
+                  <p className="report-note">
+                    <strong>نقاط القوة:</strong> {c.strengths}
+                  </p>
+                )}
+                {c.improvements && (
+                  <p className="report-note">
+                    <strong>ما تحتاج تحسينه:</strong> {c.improvements}
+                  </p>
+                )}
+                {c.note && <p className="report-note">{c.note}</p>}
+
+                <span className="group-meta">
+                  {new Date(c.issued_at).toLocaleDateString("ar-EG", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </span>
+              </article>
+            ))}
+          </div>
+        </section>
       )}
 
       {messages.length > 0 && (

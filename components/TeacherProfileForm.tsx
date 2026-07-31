@@ -193,6 +193,20 @@ export default function TeacherProfileForm({
         />
       </label>
 
+      <label className="form-field">
+        <span className="form-label">شروط الانضمام إلى صفّك</span>
+        <textarea
+          name="join_instructions"
+          rows={3}
+          maxLength={800}
+          defaultValue={initial?.join_instructions ?? ""}
+          placeholder="تُعرض للطالب قبل أن يرسل طلبه — مثلاً: مواعيد الحصص، ما يحتاجه معه، أو كيف يتواصل معك."
+        />
+        <span className="form-hint">
+          يقرؤها الطالب عند طلب الانضمام. الطلبات تصلك للموافقة قبل أن يرى محتواك الخاص.
+        </span>
+      </label>
+
       <div className="form-field">
         <span className="form-label">الصفوف / المراحل التي تدرّسها *</span>
         <div className="stages-picker" role="group" aria-label="المراحل الدراسية">
