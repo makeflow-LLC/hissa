@@ -72,6 +72,7 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0011_two_way_messaging.sql` | `teacher_messages.sender` + student insert/delete policies |
 | `0012_ai_usage_quota.sql` | `ai_usage` ledger enforcing a monthly per-teacher cap |
 | `0013_groups_report_cards_join_requests.sql` | join requests on `follows`, `student_groups`, `report_cards`, `normalize_ar()` + one-teacher-per-subject trigger |
+| `0014_follow_vs_join.sql` | `following` status separating follow from join; review requires an approved join |
 
 ### Removed: live sessions
 
@@ -83,19 +84,32 @@ The `live_sessions` and `enrollments` tables are **left in place, unused and unr
 
 `teachers.rating` / `rating_count` are **derived columns** maintained by the `reviews_recalc` trigger — never write them by hand. A teacher with no reviews shows `0/0`, and every surface renders "معلّم جديد" / "لا تقييمات بعد" instead of stars. The earlier code wrote a hardcoded `5.0` at profile creation, which made every teacher look identically perfect; do not reintroduce that.
 
-Eligibility to review is enforced **in RLS, not just the UI**: `reviews_student_write` requires an existing `lesson_progress` row joined to a lesson owned by that teacher. So a student must actually complete one of the teacher's lessons before rating, and cannot post under another student's id. One review per (teacher, student), editable.
+Eligibility to review is enforced **in RLS, not just the UI**: `reviews_student_write` requires an approved `follows` row for that teacher (see "Following and joining"). So only a student the teacher accepted into the class can rate them, and nobody can post under another student's id. One review per (teacher, student), editable.
 
-### Joining a teacher is a request, not a click
+### Following and joining are two different things
 
-`follows` carries a `status` (`pending` / `approved` / `rejected`). A student sends a request; the teacher approves or rejects it from `/teacher/me/students`, optionally with a reason the student sees. `teachers.join_instructions` is the text the teacher writes **in advance** — conditions, class times, what to bring — shown to the student before they send the request.
+They are separate actions on the teacher's page, not one:
 
-**A pending request grants nothing.** Everything keyed on `follows` now requires `status = 'approved'`: broadcasts, two-way messages, group membership, report cards. The one deliberate exception is `profiles_teacher_reads_followers`, which also matches `pending` — the teacher needs the applicant's name and grade to decide, and the student is the one who applied to that teacher.
+| | متابعة (follow) | انضمام (join) |
+|---|---|---|
+| Takes effect | instantly | only after the teacher approves |
+| Grants messages, groups, report cards, restricted content | ❌ | ✅ |
+| May review the teacher | ❌ | ✅ |
+| Limited to one teacher per subject | ❌ follow as many as you like | ✅ |
+
+Both live in the same `follows.status` column rather than a second table, so every existing `status = 'approved'` check stayed correct when follow was added. The ladder is `following` → `pending` → `approved` / `rejected`; a rejected student stays a follower.
+
+**The join request carries no message from the student.** The direction is the opposite: the teacher writes `teachers.join_instructions` **in advance** in their profile (conditions, class times, what to bring), the student reads them and confirms. Adding a student-written note back would invite a second inbox nobody reads.
+
+**A pending request grants nothing.** Everything keyed on `follows` requires `status = 'approved'`: broadcasts, two-way messages, group membership, report cards. The one deliberate exception is `profiles_teacher_reads_followers`, which also matches `pending` — the teacher needs the applicant's name and grade to decide, and the student is the one who applied to that teacher.
+
+**Only a joined student may review.** `reviews_student_write` requires an approved `follows` row. It used to require a single `lesson_progress` row, which was far too weak a signal — any signed-in student could open a lesson, tick it complete and rate. Being accepted into the class is the teacher's own decision, so it is the stronger evidence that real teaching happened.
 
 Existing rows were backfilled as `approved` (the column default was `'approved'` during the `add column`, then switched to `'pending'`), so nobody following a teacher before the migration was dropped back into a queue.
 
 ### One teacher per subject
 
-A student may follow only one teacher of a given subject — no two maths teachers at once. Enforced by the `follows_one_teacher_per_subject` trigger, **not** by the UI: hiding a button does not stop a request posted straight at the REST API. The error surfaces as `ONE_TEACHER_PER_SUBJECT:<other teacher's name>`, which `requestJoin` translates into an Arabic sentence naming that teacher.
+A student may **join** only one teacher of a given subject — no two maths teachers at once. Following is unrestricted; the rule fires only for `pending` and `approved`. Enforced by the `follows_one_teacher_per_subject` trigger, **not** by the UI: hiding a button does not stop a request posted straight at the REST API. The error surfaces as `ONE_TEACHER_PER_SUBJECT:<other teacher's name>`, which `requestJoin` translates into an Arabic sentence naming that teacher.
 
 Subjects are compared through `normalize_ar()` (SQL) — diacritics, tatweel, alef forms, ة/ى, **and the definite article** all folded — so «الرياضيّات» and «رياضيات» are one subject. `normalizeSubject()` in `lib/arabic.ts` mirrors it exactly so the profile page can explain the clash before the student clicks; **if you change one, change the other**, or the UI will offer a button the database refuses. A rejected request does not reserve the subject.
 
@@ -177,7 +191,7 @@ Security is verified with SQL that switches `role` and `request.jwt.claims` to i
 - **`middleware.ts` + `lib/supabase/middleware.ts`** — refreshes the Supabase session cookie on every request. Without it a student's token expires without renewal and the server sees an anonymous visitor.
 - **`lib/supabase/client.ts` / `server.ts`** — browser and server clients (`@supabase/ssr`).
 - **`lib/data/types.ts` / `queries.ts`** — the only place that reads Supabase. `getCurrentUser()` and `getStudentName()` **fail closed** (any error ⇒ treated as visitor) because they run inside the root layout; a throw there would take down every page including the error boundary. Page-level queries throw and each page catches into `ConnectionNotice`.
-- **`app/actions/student.ts`** — student server actions: `toggleFollow`, `toggleLessonComplete`. Each re-validates auth server-side, rejects teacher accounts, and calls `revalidatePath`. Reviews live in `app/actions/review.ts`.
+- **`app/actions/student.ts`** — student server actions: `toggleFollow` (instant), `requestJoin` / `cancelJoin` (approval), `toggleLessonComplete`. Each re-validates auth server-side, rejects teacher accounts, and calls `revalidatePath`. Reviews live in `app/actions/review.ts`.
 
 ### Routes
 

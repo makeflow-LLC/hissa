@@ -76,14 +76,21 @@ export default async function StudentDashboard() {
       {pendingJoins.length > 0 && (
         <section className="dashboard-section">
           <h2 className="section-title">🙋 طلبات انضمامك</h2>
+          <p className="dashboard-subtitle">
+            هذه الطلبات وحدها ما زالت معلّقة. المعلّمون الذين قُبلت طلبك عندهم
+            يظهرون في «معلّميّ» بالأسفل.
+          </p>
           <ul className="join-status-list">
             {pendingJoins.map((j) => (
               <li key={j.teacherSlug} className="join-status-row">
+                {/* اسم المعلّم أولاً وبوضوح: الطالب قد يكون له أكثر من طلب */}
                 <Link href={`/teacher/${j.teacherSlug}`} className="join-status-name">
                   {j.teacherName}
                 </Link>
                 {j.status === "pending" ? (
-                  <span className="pill pill-draft">⏳ بانتظار موافقة المعلّم</span>
+                  <span className="pill pill-draft">
+                    ⏳ بانتظار موافقة {j.teacherName}
+                  </span>
                 ) : (
                   <span className="pill pill-low">
                     لم يُقبل{j.note ? ` — ${j.note}` : ""}

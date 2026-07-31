@@ -80,8 +80,13 @@ export default async function TeacherProfilePage({
   const { teacher, units } = profile;
   const lessonCount = units.reduce((n, u) => n + u.lessons.length, 0);
   const completedCount = profile.completedLessonIds.length;
-  // مؤهّل للتقييم: طالب (لا معلّم) أنجز درساً من دروس هذا المعلّم
-  const canReview = Boolean(user) && !isTeacherAccount && completedCount > 0;
+  /**
+   * مؤهّل للتقييم: طالب منضمّ إلى الصف فعلاً (قَبِله المعلّم).
+   * المتابعة وحدها لا تكفي — وهي إشارة اهتمام لا علاقة دراسية.
+   * السياسة نفسها مفروضة في RLS، فالإخفاء هنا للتوضيح لا للحماية.
+   */
+  const canReview =
+    Boolean(user) && !isTeacherAccount && profile.followStatus === "approved";
   const waDigits = teacher.whatsapp?.replace(/[^0-9]/g, "") ?? "";
 
   // بيانات منظّمة تساعد جوجل على فهم الصفحة كمعلّم له منهج
