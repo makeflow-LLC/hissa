@@ -3160,8 +3160,42 @@ body {
     padding: 6px 10px;
     font-size: 0.8rem;
   }
+  /**
+   * الشريط العلوي كان صفّاً واحداً لا يلتفّ، وأزراره ممنوعة من التفاف
+   * نصّها — فمجموعها ٢٤٣px مع الشعار يتجاوز شاشة ٣٦٠px، وهو أشيع عرض
+   * على أندرويد (١٠٨٠ فيزيائي ÷ ٣). فيُدفع الشريط والصفحة كلها جانباً.
+   * السماح بالالتفاف يجعل الشريط سطرين على الشاشات الضيقة بدل أن يخرج.
+   */
+  .navbar-inner {
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding-inline: 0.9rem;
+  }
   .navbar-actions {
     gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
+
+/* الشاشات الضيقة جداً: نصغّر الشعار والأزرار قبل أن تُضطر للالتفاف */
+@media (max-width: 420px) {
+  .navbar-brand {
+    font-size: 1.05rem;
+    gap: 0.35rem;
+  }
+  .navbar-logo {
+    width: 32px;
+    height: 32px;
+  }
+  .navbar-actions .btn-sm {
+    padding: 5px 8px;
+    font-size: 0.74rem;
+    min-height: 30px;
+  }
+  .navbar-inner {
+    gap: 0.5rem;
+    padding-inline: 0.75rem;
   }
 }
 
@@ -3863,9 +3897,22 @@ body {
    * ٣ صناديق بعرض أدنى ١٠rem لا تتّسع في ٣٩٠px فينزل الثالث وحده بعرض
    * كامل. نخفض الحدّ الأدنى فتصطفّ الثلاثة في سطر واحد متساوٍ.
    */
+  /**
+   * `1fr` تعني `minmax(auto, 1fr)`، و`auto` لا تنزل تحت مقاس المحتوى —
+   * فثلاثة صناديق مقاسها الأدنى ١٣٦px تفرض ٤٤٧px مهما ضاقت الشاشة.
+   * `minmax(0, 1fr)` هي التي تسمح للعمود بالتقلّص فعلاً.
+   */
   .dashboard-stats {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.6rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  .dashboard-stats .stat-box {
+    padding: 0.7rem 0.4rem;
+    min-width: 0;
+  }
+  .dashboard-stats .stat-label {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   .dashboard-stats .stat-value {
     font-size: 1.25rem;
