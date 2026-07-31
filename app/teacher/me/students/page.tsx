@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PageHeader from "@/components/PageHeader";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import {
@@ -90,21 +91,13 @@ export default async function TeacherStudentsPage() {
   return (
     <main className="container">
       <LiveNotifier role="teacher" userId={user.id} teacherId={teacher.id} />
-      <nav className="breadcrumb">
-        <Link href="/teacher/me" className="back-link">
-          → لوحة المعلّم
-        </Link>
-      </nav>
-
-      <section className="dashboard-header">
-        <div>
-          <h1 className="dashboard-title">👥 طلابي</h1>
-          <p className="dashboard-subtitle">
-            الطلاب الذين يتابعونك وتقدّمهم في منهجك — راسلهم، وأرسل تقريراً
-            لوليّ الأمر، وامنحهم وصولاً لدروسك الخاصة.
-          </p>
-        </div>
-      </section>
+      <PageHeader
+        backHref="/teacher/me"
+        backLabel="لوحة المعلّم"
+        emoji="👥"
+        title="طلابي"
+        subtitle="طلاب صفّك وتقدّمهم في منهجك — راسلهم، وأصدر بطاقات تقييم، وامنحهم وصولاً لدروسك الخاصة."
+      />
 
       <section className="dashboard-stats">
         <div className="stat-box">

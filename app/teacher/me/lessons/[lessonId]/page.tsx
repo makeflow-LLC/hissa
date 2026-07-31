@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PageHeader from "@/components/PageHeader";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import {
@@ -33,12 +34,12 @@ export default async function EditLessonPage({
 
   return (
     <main className="container container-narrow">
-      <nav className="breadcrumb">
-        <Link href="/teacher/me/content" className="back-link">
-          → إدارة المحتوى
-        </Link>
-      </nav>
-      <h1 className="dashboard-title">✏️ تعديل الدرس</h1>
+      <PageHeader
+        backHref="/teacher/me/content"
+        backLabel="إدارة المحتوى"
+        emoji="✏️"
+        title="تعديل الدرس"
+      />
       <LessonForm units={units} initial={initial} aiEnabled={isAiConfigured()} />
     </main>
   );

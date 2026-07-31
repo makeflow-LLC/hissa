@@ -72,7 +72,7 @@ export default async function StudentDashboard() {
             ✏️ بياناتي
           </Link>
           <Link href="/" className="btn btn-outline">
-            ＋ استكشف معلّمين جدداً
+            🔎 معلّمون جدد
           </Link>
         </div>
       </section>

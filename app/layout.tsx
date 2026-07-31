@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import NavbarActions from "@/components/NavbarActions";
+import BottomNav from "@/components/BottomNav";
 import InstallApp from "@/components/InstallApp";
 import ServiceWorker from "@/components/ServiceWorker";
 import "./globals.css";
@@ -71,6 +72,10 @@ export default function RootLayout({
         <InstallApp />
         {children}
         <ServiceWorker />
+        {/* تنقّل سفلي ثابت على الجوال — لا يُترك المستخدم بلا مخرج */}
+        <Suspense fallback={null}>
+          <BottomNav />
+        </Suspense>
         <footer className="footer">
           <p className="footer-brand">
             {/* eslint-disable-next-line @next/next/no-img-element */}
