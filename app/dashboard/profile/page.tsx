@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PageHeader from "@/components/PageHeader";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import {
@@ -21,13 +22,12 @@ export default async function StudentProfilePage() {
 
   return (
     <main className="container container-narrow">
-      <nav className="breadcrumb">
-        <Link href="/dashboard" className="back-link">
-          → لوحتي
-        </Link>
-      </nav>
-
-      <h1 className="dashboard-title">🎓 بياناتي</h1>
+      <PageHeader
+        backHref="/dashboard"
+        backLabel="لوحتي"
+        emoji="🎓"
+        title="بياناتي"
+      />
       <p className="dashboard-subtitle form-page-subtitle">
         تساعد معلّميك على معرفتك ومتابعة مستواك. الاسم والصف مطلوبان، وكل ما
         عداهما اختياري.

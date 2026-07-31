@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PageHeader from "@/components/PageHeader";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser, getMyTeacherContent } from "@/lib/data/queries";
@@ -43,12 +44,12 @@ export default async function NewLessonPage({
 
   return (
     <main className="container container-narrow">
-      <nav className="breadcrumb">
-        <Link href="/teacher/me/content" className="back-link">
-          → إدارة المحتوى
-        </Link>
-      </nav>
-      <h1 className="dashboard-title">➕ درس جديد</h1>
+      <PageHeader
+        backHref="/teacher/me/content"
+        backLabel="إدارة المحتوى"
+        emoji="➕"
+        title="درس جديد"
+      />
       <LessonForm units={units} initial={initial} aiEnabled={isAiConfigured()} />
     </main>
   );

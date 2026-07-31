@@ -259,6 +259,13 @@ Brand: `public/logo.svg` is a hand-built SVG reconstruction of the platform logo
 
 **Google OAuth must therefore be enabled** in Supabase → Authentication → Providers, with the callback URL in the redirect list — there is no fallback sign-in if it is off, and the login page says so. Phone/WhatsApp OTP stays deferred until an SMS provider exists. Re-adding email sign-in means restoring `signInWithOtp` plus a `verifyOtp({token_hash})` route; do not re-add the PKCE-only `?code=` form for emailed links.
 
+### Navigation shell
+
+Two pieces carry navigation, and both exist because a back link at the top of a long page disappears the moment you scroll:
+
+- **`BottomNav`** (server, picks items by role) → **`BottomNavBar`** (client, highlights the active tab from `usePathname`). Fixed to the bottom **on mobile only** (≤720px) — on desktop the sticky top bar is always visible anyway. Three to four items maximum; more turns a shortcut into a menu. `body` gets matching bottom padding, and `env(safe-area-inset-bottom)` keeps it clear of the iPhone home indicator.
+- **`PageHeader`** — one component for every sub-page: a round back button with an explicit `backHref` (never relying on the browser's back), the parent's name above the title, then title, subtitle and actions. Before it, each page drew its own back link with a different label and position.
+
 ### Client vs server components
 
 Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`, `RichTextEditor`.

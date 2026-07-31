@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PageHeader from "@/components/PageHeader";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import {
@@ -30,25 +31,18 @@ export default async function TeacherContentPage() {
 
   return (
     <main className="container">
-      <nav className="breadcrumb">
-        <Link href="/teacher/me" className="back-link">
-          → لوحة المعلّم
-        </Link>
-      </nav>
-
-      <section className="dashboard-header">
-        <div>
-          <h1 className="dashboard-title">🎬 إدارة المحتوى</h1>
-          <p className="dashboard-subtitle">
-            أضِف الوحدات والدروس — تظهر مباشرةً في صفحتك العامة للطلاب.
-          </p>
-        </div>
-        <div className="dashboard-header-actions">
+      <PageHeader
+        backHref="/teacher/me"
+        backLabel="لوحة المعلّم"
+        emoji="🎬"
+        title="إدارة المحتوى"
+        subtitle="أضِف الوحدات والدروس — تظهر مباشرةً في صفحتك العامة للطلاب."
+        actions={
           <Link href="/teacher/me/lessons/new" className="btn btn-primary">
             ➕ درس جديد
           </Link>
-        </div>
-      </section>
+        }
+      />
 
       {/* الوحدات والدروس */}
       <section className="dashboard-section">
