@@ -124,6 +124,12 @@ export interface TeacherProfile {
    * فارغ إن لم يوجد تعارض.
    */
   subjectClashTeacher: string;
+  /**
+   * الطالب عضو في إحدى مجموعات هذا المعلّم.
+   * رقم واتساب المعلّم لا يُعرض إلا لهؤلاء — نشره للعموم يحوّل صفحته
+   * إلى مصدر أرقام لأي زائر أو روبوت.
+   */
+  inTeacherGroup: boolean;
   /** يتابع المعلّم (بأي حالة) */
   isFollowing: boolean;
   completedLessonIds: string[];
@@ -239,6 +245,22 @@ export interface ReportCard {
   improvements: string;
   note: string;
   issued_at: string;
+}
+
+/** طلب طالب لبطاقة تقييم */
+export interface CardRequest {
+  id: string;
+  studentId: string;
+  studentName: string;
+  createdAt: string;
+}
+
+/** طلب بطاقة كما يراه الطالب على لوحته */
+export interface MyCardRequest {
+  id: string;
+  teacherName: string;
+  status: "pending" | "done" | "declined";
+  createdAt: string;
 }
 
 /** رسالة من معلّم إلى طالب بعينه أو إلى كل متابعيه */

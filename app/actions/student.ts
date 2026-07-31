@@ -242,3 +242,55 @@ export async function askTeacher(
   revalidatePath(`/teacher/${teacherSlug}`);
   return { ok: true, message: "أُرسل سؤالك — سيصل معلّمك." };
 }
+
+/**
+ * طلب الطالب بطاقة تقييم من معلّمه.
+ *
+ * الطلب مجرّد بلا نصّ: المعلّم هو من يقرّر الوحدة والفصل والتقديرات عند
+ * الإصدار، فرسالة من الطالب هنا لا تضيف إلا صندوق وارد ثانياً.
+ */
+export async function requestReportCard(
+  teacherId: string
+): Promise<ActionResult> {
+  const { supabase, user, deny } = await requireStudent();
+  if (deny || !user) return deny ?? NEED_LOGIN;
+
+  const { error } = await supabase.from("report_card_requests").insert({
+    teacher_id: teacherId,
+    student_id: user.id,
+    status: "pending",
+  });
+
+  if (error) {
+    // فهرس فريد جزئي يمنع أكثر من طلب معلّق لنفس المعلّم
+    if (error.code === "23505") {
+      return { ok: false, message: "لديك طلب معلّق عند هذا المعلّم بالفعل." };
+    }
+    if (error.code === "42501") {
+      return { ok: false, message: "انضمّ إلى صفّ هذا المعلّم أولاً." };
+    }
+    return { ok: false, message: "تعذّر إرسال الطلب." };
+  }
+
+  revalidatePath("/dashboard");
+  return { ok: true, message: "أُرسل طلبك — سيصدر معلّمك البطاقة عند مراجعته." };
+}
+
+/** سحب طلب بطاقة معلّق */
+export async function cancelReportCardRequest(
+  requestId: string
+): Promise<ActionResult> {
+  const { supabase, user, deny } = await requireStudent();
+  if (deny || !user) return deny ?? NEED_LOGIN;
+
+  const { error } = await supabase
+    .from("report_card_requests")
+    .delete()
+    .eq("id", requestId)
+    .eq("student_id", user.id);
+
+  if (error) return { ok: false, message: "تعذّر سحب الطلب." };
+
+  revalidatePath("/dashboard");
+  return { ok: true, message: "سُحب الطلب." };
+}

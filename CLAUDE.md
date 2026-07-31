@@ -46,7 +46,7 @@ SUPABASE_SERVICE_ROLE_KEY=<secret key>   # npm run seed only — never NEXT_PUBL
 
 ### Tables
 
-In use: `teachers`, `units`, `lessons`, `lesson_attachments`, `quiz_questions`, `profiles`, `follows`, `lesson_progress`, `teacher_messages`, `student_grants`, `reviews`, `parent_reports`, `student_groups`, `student_group_members`, `report_cards`.
+In use: `teachers`, `units`, `lessons`, `lesson_attachments`, `quiz_questions`, `profiles`, `follows`, `lesson_progress`, `teacher_messages`, `student_grants`, `reviews`, `parent_reports`, `student_groups`, `student_group_members`, `report_cards`, `report_card_requests`.
 
 - `lessons.is_free_preview` — the one visitor-visible lesson per teacher.
 - `lessons.is_restricted` — hidden entirely unless the student holds a `student_grants` row.
@@ -73,6 +73,7 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0012_ai_usage_quota.sql` | `ai_usage` ledger enforcing a monthly per-teacher cap |
 | `0013_groups_report_cards_join_requests.sql` | join requests on `follows`, `student_groups`, `report_cards`, `normalize_ar()` + one-teacher-per-subject trigger |
 | `0014_follow_vs_join.sql` | `following` status separating follow from join; review requires an approved join |
+| `0015_report_card_requests_and_realtime.sql` | `report_card_requests` + realtime publication for messages, follows and cards |
 
 ### Removed: live sessions
 
@@ -118,6 +119,24 @@ Subjects are compared through `normalize_ar()` (SQL) — diacritics, tatweel, al
 `student_groups` + `student_group_members` let a teacher sort students into groups (a student may be in several). `report_cards` are end-of-unit or end-of-term evaluations: four 0–5 ratings (understanding, participation, homework, behaviour), an optional score, strengths, improvements and a note. Students read their own cards on `/dashboard`.
 
 Both are teacher-owned and student-readable, and both refuse to reference a student who is not `approved`. The two group policies once referenced each other and sent RLS into infinite recursion; `is_group_member()` (`security definer`) breaks the cycle on one side, the same way `has_grant()` does in `0008`.
+
+### Live notifications
+
+`LiveNotifier` (mounted on both dashboards) subscribes to `teacher_messages`, `follows`, `report_cards` and `report_card_requests` via Supabase Realtime, shows a toast, plays a two-note Web Audio chime, and debounces a `router.refresh()`. No filters are set on the channel — **RLS is the filter**, so a subscriber only ever receives rows it may already read.
+
+Three deliberate details:
+
+- **No audio file.** The chime is generated with oscillators; browsers block audio before the first user gesture, so the `AudioContext` is created lazily on the first `pointerdown`/`keydown`. If it stays blocked, the visual toast still appears.
+- **A system notification only when the tab is hidden**, and only after the user grants permission from the button the component renders. Duplicating a toast that is already on screen is noise.
+- **A polling fallback.** School networks frequently block WebSockets — exactly our audience. If the channel reports `CHANNEL_ERROR`/`TIMED_OUT`/`CLOSED`, or simply never subscribes within 10s, a 20-second poll of the newest message takes over. Without it the feature would die silently on the networks that need it most.
+
+### Students may request a report card
+
+`report_card_requests` lets a joined student ask for an evaluation instead of waiting for the teacher to volunteer one. The request carries **no text** — same reasoning as join requests: the teacher decides the unit, term and ratings when issuing. A partial unique index allows only one `pending` request per (teacher, student), and issuing a new card auto-closes the pending request so it does not linger on the teacher's board.
+
+### The teacher's WhatsApp is not public
+
+`teachers.whatsapp` renders only for a student who is a **member of one of that teacher's groups** (or for the teacher previewing their own page). Publishing it on a public profile turns the directory into a phone-number source for any visitor or scraper. Group membership is the teacher's own decision, so it doubles as the consent signal.
 
 ### Parent reports
 

@@ -220,6 +220,36 @@ export async function decideJoinRequest(
   };
 }
 
+/* ==================== طلبات بطاقة التقييم ==================== */
+
+/** بتّ المعلّم في طلب بطاقة: أُصدرت أو اعتُذر عنها */
+export async function decideCardRequest(
+  requestId: string,
+  done: boolean
+): Promise<GroupsActionState> {
+  const { supabase, teacher } = await requireMyTeacher();
+  if (!teacher) return NOT_TEACHER;
+
+  const { data: changed, error } = await supabase
+    .from("report_card_requests")
+    .update({
+      status: done ? "done" : "declined",
+      decided_at: new Date().toISOString(),
+    })
+    .eq("id", requestId)
+    .eq("teacher_id", teacher.id)
+    .eq("status", "pending")
+    .select("id");
+
+  if (error) return { ok: false, message: "تعذّر حفظ القرار." };
+  if (!changed || changed.length === 0) {
+    return { ok: false, message: "لم يعد هذا الطلب معلّقاً. حدّث الصفحة." };
+  }
+
+  refresh();
+  return { ok: true, message: done ? "عُلّم الطلب منجزاً." : "أُغلق الطلب." };
+}
+
 /* ==================== بطاقات التقييم ==================== */
 
 /** يقرأ تقديراً من ٠ إلى ٥، ويعيد null إن تُرك فارغاً */
@@ -301,6 +331,19 @@ export async function saveReportCard(
     : await supabase.from("report_cards").insert(row);
 
   if (error) return { ok: false, message: "تعذّر حفظ بطاقة التقييم." };
+
+  /**
+   * إصدار البطاقة هو جواب الطلب: نُغلق ما كان معلّقاً لهذا الطالب تلقائياً
+   * حتى لا يبقى الطلب معروضاً على المعلّم بعد أن لبّاه فعلاً.
+   */
+  if (!cardId) {
+    await supabase
+      .from("report_card_requests")
+      .update({ status: "done", decided_at: new Date().toISOString() })
+      .eq("teacher_id", teacher.id)
+      .eq("student_id", studentId)
+      .eq("status", "pending");
+  }
 
   refresh();
   return { ok: true, message: cardId ? "حُفظت البطاقة." : "صدرت بطاقة التقييم." };
