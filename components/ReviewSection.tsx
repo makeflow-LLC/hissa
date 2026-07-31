@@ -93,7 +93,8 @@ export default function ReviewSection({
       ) : (
         isAuthed && (
           <p className="form-hint review-eligibility">
-            💡 يمكنك تقييم هذا المعلّم بعد إنجاز درس واحد على الأقل من دروسه.
+            💡 التقييم لطلاب الصف: انضمّ إلى هذا المعلّم وانتظر قبوله، ثم يمكنك
+            تقييمه. المتابعة وحدها لا تكفي.
           </p>
         )
       )}

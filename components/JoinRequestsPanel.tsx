@@ -59,8 +59,6 @@ export default function JoinRequestsPanel({
             </div>
           </div>
 
-          {r.note && <p className="request-note">«{r.note}»</p>}
-
           {rejecting === r.studentId ? (
             <div className="join-form">
               <label className="form-field">

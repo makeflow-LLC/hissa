@@ -186,7 +186,12 @@ export async function decideJoinRequest(
   const { supabase, teacher } = await requireMyTeacher();
   if (!teacher) return NOT_TEACHER;
 
-  const { error } = await supabase
+  /**
+   * `.select()` مقصود: بدونه يعود التحديث ناجحاً وإن لم يطابق صفاً واحداً
+   * (طلب سُحب، أو بُتّ من نافذة أخرى)، فيرى المعلّم «قُبل الطالب» ولا شيء
+   * تغيّر — نفس صنف العطل الذي أضاع شرح الدرس.
+   */
+  const { data: changed, error } = await supabase
     .from("follows")
     .update({
       status: approve ? "approved" : "rejected",
@@ -195,9 +200,17 @@ export async function decideJoinRequest(
     })
     .eq("teacher_id", teacher.id)
     .eq("student_id", studentId)
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .select("student_id");
 
   if (error) return { ok: false, message: "تعذّر حفظ القرار." };
+  if (!changed || changed.length === 0) {
+    return {
+      ok: false,
+      message:
+        "لم يعد هذا الطلب معلّقاً — ربما سحبه الطالب أو بُتَّ من جهاز آخر. حدّث الصفحة لترى حالته.",
+    };
+  }
 
   refresh();
   revalidatePath(`/teacher/${teacher.slug}`);

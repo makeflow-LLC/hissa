@@ -207,7 +207,7 @@ export async function getTeacherProfile(
      * معلّم واحد لكل مادة: نكشف التعارض هنا لنشرحه للطالب قبل أن يضغط،
      * بدل أن يصطدم برفض قاعدة البيانات. الفرض نفسه هناك لا هنا.
      */
-    if (followStatus === "none" || followStatus === "rejected") {
+    if (followStatus !== "pending" && followStatus !== "approved") {
       const { data: mine } = await supabase
         .from("follows")
         .select("teacher_id, status")
@@ -254,7 +254,7 @@ export async function getTeacherProfile(
     followStatus,
     followDecisionNote,
     subjectClashTeacher,
-    isFollowing: followStatus === "approved",
+    isFollowing: followStatus !== "none",
     completedLessonIds,
     myReview,
     reviews: (reviewRows ?? []).map((r) => ({
@@ -930,22 +930,21 @@ export async function getJoinRequests(): Promise<JoinRequest[]> {
 
   const { data: rows } = await supabase
     .from("follows")
-    .select("student_id, student_note, requested_at")
+    .select("student_id, requested_at")
     .eq("teacher_id", teacher.id)
     .eq("status", "pending")
     .order("requested_at", { ascending: true });
 
   const reqs = (rows ?? []) as {
     student_id: string;
-    student_note: string;
     requested_at: string;
   }[];
   if (reqs.length === 0) return [];
 
   /**
-   * ملف الطالب محجوب عن المعلّم قبل القبول (سياسة 0013)، وهذا مقصود:
-   * الطلب المعلّق لا يفتح بيانات الطالب. نعرض ما كتبه الطالب في طلبه فقط،
-   * ونكمل بالاسم إن سمحت السياسة به.
+   * المعلّم يقرأ ملف مقدّم الطلب ليقرّر عن بيّنة (سياسة 0013): الطالب هو
+   * من بادر إليه بالذات. الطلب نفسه لا يحمل رسالة — الاتجاه معاكس، فالمعلّم
+   * هو من يكتب شروطه مسبقاً والطالب يوافق عليها.
    */
   const { data: profiles } = await supabase
     .from("profiles")
@@ -970,7 +969,6 @@ export async function getJoinRequests(): Promise<JoinRequest[]> {
       school: String(p?.school ?? ""),
       city: String(p?.city ?? ""),
       avatarUrl: (p?.avatar_url as string | null) ?? null,
-      note: String(r.student_note ?? ""),
       requestedAt: r.requested_at,
     };
   });

@@ -95,10 +95,21 @@ export interface QuizQuestionRow {
 }
 
 /**
- * حالة الطالب تجاه معلّم: الانضمام صار طلباً يبتّه المعلّم.
- * none = لم يطلب | pending = بانتظار الرد | approved = مقبول | rejected = مرفوض
+ * حالة الطالب تجاه معلّم.
+ *
+ * المتابعة والانضمام مستويان لا خياران متنافيان:
+ * none      = لا يتابع ولا انضمّ
+ * following = يتابع فقط — إشارة اهتمام لا تمنح صلاحية
+ * pending   = طلب الانضمام وينتظر قرار المعلّم
+ * approved  = منضمّ إلى الصف فعلاً
+ * rejected  = لم يُقبل طلبه (ويظلّ متابعاً)
  */
-export type FollowStatus = "none" | "pending" | "approved" | "rejected";
+export type FollowStatus =
+  | "none"
+  | "following"
+  | "pending"
+  | "approved"
+  | "rejected";
 
 /** بروفايل معلم كامل مع منهجه وحصصه */
 export interface TeacherProfile {
@@ -113,7 +124,7 @@ export interface TeacherProfile {
    * فارغ إن لم يوجد تعارض.
    */
   subjectClashTeacher: string;
-  /** بقيت للتوافق: مقبول فعلاً */
+  /** يتابع المعلّم (بأي حالة) */
   isFollowing: boolean;
   completedLessonIds: string[];
   /** تقييم الطالب الحالي لهذا المعلّم إن كتبه */
@@ -198,7 +209,6 @@ export interface JoinRequest {
   school: string;
   city: string;
   avatarUrl: string | null;
-  note: string;
   requestedAt: string;
 }
 
