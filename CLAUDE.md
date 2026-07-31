@@ -177,6 +177,8 @@ Prompts inject the teacher's own `subject` and `stages`, so wording targets the 
 
 Gemini 3.1 Pro is a reasoning model: reasoning tokens count against `max_tokens`, hence the generous 8000 default. Measured cost is roughly $0.04 per summary and $0.036 per quiz, so the 40-call cap bounds a single teacher at well under $2/month.
 
+**The tools read the editor, not the database.** `loadLessonContext` takes an optional `draft` (`{html, title}`) that the form supplies from its live state, so a teacher can summarize or format text they just typed and have not saved. Requiring a save first meant saving the very text you know needs fixing. `lessonId` is optional too, so the tools work on a brand-new lesson that has no row yet; the saved sections are only a fallback when the editor is empty.
+
 The whole feature is optional: with no `OPENROUTER_API_KEY` set, `isAiConfigured()` returns false and the buttons simply do not render.
 
 ### Rich lesson content (the `sections` column)

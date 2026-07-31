@@ -3788,17 +3788,28 @@ body {
 }
 
 /* لوحة الانضمام في صفحة المعلّم العامة */
+/**
+ * الكتلة كانت تتقلّص إلى مقاس محتواها (align-items: flex-start داخل صفّ
+ * مرن)، فيصير عرض صفّ الأزرار = عرض أطول زر بلا التفاف — ثم يدفعه
+ * justify-content: center خارج الشاشة يميناً ويساراً معاً. تقييد العرض
+ * بالحاوية هو الإصلاح، لا إخفاء التمرير الأفقي.
+ */
 .join-block {
   display: flex;
   flex-direction: column;
   gap: 10px;
   align-items: flex-start;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 .join-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
 }
 .join-terms-panel {
   background: var(--surface);
@@ -3863,10 +3874,21 @@ body {
     font-size: 0.72rem;
   }
 
-  /* على الجوال تمتدّ الأزرار بعرض كامل بدل أن تتفاوت */
+  /**
+   * على الجوال تتقاسم الأزرار السطر بالتساوي وتتقلّص عند الحاجة.
+   * كان flex-basis: 100% مع white-space: nowrap يجعل أدنى عرض للزر هو
+   * عرض نصّه كاملاً، فيتجاوز الشاشة بدل أن يلتفّ.
+   */
   .join-actions .btn,
   .dashboard-header-actions .btn {
-    flex: 1 1 100%;
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+
+  /* نصّ الزر الطويل يلتفّ سطرين بدل أن يمدّ الزر خارج الشاشة */
+  .btn {
+    white-space: normal;
+    padding-inline: 0.75rem;
   }
   /* أزرار القرار متساوية تماماً: 1 1 0 لا 1 1 auto */
   .request-card .card-actions .btn,
@@ -3964,4 +3986,61 @@ body {
 @media (max-width: 720px) {
   .live-toasts { inset-inline: 12px; top: 68px; }
   .live-toast { max-width: none; }
+}
+
+/* ===== السؤال الطويل يُقرأ كاملاً ===== */
+
+/**
+ * السؤال قد يطول (نصّ مسألة، أو آية، أو فقرة استيعاب). لا نقصّه في أي
+ * موضع: يلتفّ ويُقرأ كاملاً عند المعلّم والطالب معاً.
+ */
+.quiz-prompt-input {
+  flex: 1;
+  min-width: 0;
+  resize: vertical;
+  line-height: 1.8;
+  font: inherit;
+}
+
+.quiz-prompt,
+.quiz-option,
+.quiz-stat-head strong,
+.quiz-stat-name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.quiz-prompt {
+  line-height: 1.9;
+}
+
+/* الخيار الطويل يلتفّ بدل أن يمتدّ خارج البطاقة */
+.quiz-option {
+  align-items: flex-start;
+  min-width: 0;
+}
+.quiz-option input {
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+/* رأس المكرّر يلتفّ حتى لا يضغط الحقل النصّي إلى لا شيء */
+.repeater-head {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.repeater-head .search-input,
+.repeater-head .quiz-prompt-input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.quiz-stat-head {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.quiz-stat-row {
+  flex-wrap: wrap;
+  gap: 6px;
 }
