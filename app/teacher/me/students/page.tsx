@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import {
+  getCardRequests,
   getCurrentUser,
   getIssuedReportCards,
   getJoinRequests,
@@ -21,6 +22,9 @@ import JoinRequestsPanel from "@/components/JoinRequestsPanel";
 import GroupsManager from "@/components/GroupsManager";
 import StudentGroupChips from "@/components/StudentGroupChips";
 import ReportCardForm from "@/components/ReportCardForm";
+import CardRequestsPanel from "@/components/CardRequestsPanel";
+import LiveNotifier from "@/components/LiveNotifier";
+import Hint from "@/components/Hint";
 import ReplyForm from "@/components/ReplyForm";
 import ConnectionNotice from "@/components/ConnectionNotice";
 
@@ -42,9 +46,10 @@ export default async function TeacherStudentsPage() {
   let requests: Awaited<ReturnType<typeof getJoinRequests>> = [];
   let groups: Awaited<ReturnType<typeof getMyGroups>> = [];
   let cards: Awaited<ReturnType<typeof getIssuedReportCards>> = [];
+  let cardRequests: Awaited<ReturnType<typeof getCardRequests>> = [];
   let loadError: string | undefined;
   try {
-    [students, content, quizStats, threads, requests, groups, cards] =
+    [students, content, quizStats, threads, requests, groups, cards, cardRequests] =
       await Promise.all([
         getMyStudents(),
         getMyTeacherContent(),
@@ -53,6 +58,7 @@ export default async function TeacherStudentsPage() {
         getJoinRequests(),
         getMyGroups(),
         getIssuedReportCards(),
+        getCardRequests(),
       ]);
   } catch (e) {
     loadError = e instanceof Error ? e.message : String(e);
@@ -83,6 +89,7 @@ export default async function TeacherStudentsPage() {
 
   return (
     <main className="container">
+      <LiveNotifier role="teacher" userId={user.id} teacherId={teacher.id} />
       <nav className="breadcrumb">
         <Link href="/teacher/me" className="back-link">
           → لوحة المعلّم
@@ -120,15 +127,34 @@ export default async function TeacherStudentsPage() {
             🙋 طلبات الانضمام
             <span className="pill pill-low"> {requests.length} بانتظار قرارك</span>
           </h2>
-          <p className="dashboard-subtitle">
-            لا يرى الطالب محتواك الخاص ولا يراسلك قبل قبوله.
-          </p>
+          <Hint>
+            هؤلاء قرؤوا شروطك ووافقوا عليها. قبل قبولك لا يرون محتواك الخاص ولا
+            يراسلونك ولا يُقيّمونك.
+          </Hint>
           <JoinRequestsPanel requests={requests} />
+        </section>
+      )}
+
+      {cardRequests.length > 0 && (
+        <section className="dashboard-section">
+          <h2 className="section-title">
+            🏅 طلبات بطاقات التقييم
+            <span className="pill pill-low"> {cardRequests.length}</span>
+          </h2>
+          <Hint>
+            طلاب يريدون تقييماً مكتوباً — غالباً ليطلعوا عليه أولياء أمورهم.
+            أصدر البطاقة من بطاقة الطالب بالأسفل، ويُغلق الطلب تلقائياً.
+          </Hint>
+          <CardRequestsPanel requests={cardRequests} />
         </section>
       )}
 
       <section className="dashboard-section">
         <h2 className="section-title">🗂️ المجموعات</h2>
+        <Hint>
+          قسّم طلابك حسب موعد الحصة أو المستوى لتتابع كل فئة على حدة. الطالب
+          الواحد قد يكون في أكثر من مجموعة، ورقم واتسابك لا يظهر إلا لأعضائها.
+        </Hint>
         <GroupsManager groups={groups} />
       </section>
 
@@ -143,12 +169,19 @@ export default async function TeacherStudentsPage() {
       ) : (
         <>
           <section className="dashboard-section">
-            <h2 className="section-title">📢 رسالة لكل المتابعين</h2>
+            <h2 className="section-title">📢 رسالة لكل المنضمّين</h2>
+            <Hint>
+              إعلان واحد يصل كل طلاب صفّك دفعةً واحدة — مواعيد، تذكير بواجب، أو
+              تغيير طارئ. المتابعون غير المنضمّين لا يستلمونه.
+            </Hint>
             <BroadcastForm />
           </section>
 
           {threads.length > 0 && (
             <section className="dashboard-section">
+              <Hint>
+                خيط لكل طالب. ما ينتظر ردّك يظهر أولاً حتى لا يضيع سؤال.
+              </Hint>
               <h2 className="section-title">
                 💬 محادثات الطلاب
                 {waiting > 0 && (
@@ -200,6 +233,10 @@ export default async function TeacherStudentsPage() {
           {quizStats.length > 0 && (
             <section className="dashboard-section">
               <h2 className="section-title">📝 نتائج الاختبارات</h2>
+              <Hint>
+                متوسّط كل درس ودرجة كل طالب — يكشف الدرس الذي يحتاج إعادة شرح
+                قبل أن يتراكم الضعف.
+              </Hint>
               <div className="quiz-stats">
                 {quizStats.map((q) => (
                   <article key={q.lessonId} className="quiz-stat-card">
@@ -240,6 +277,10 @@ export default async function TeacherStudentsPage() {
 
           <section className="dashboard-section">
             <h2 className="section-title">قائمة الطلاب</h2>
+            <Hint>
+              كل بطاقة تجمع تقدّم الطالب ومجموعاته وبطاقات تقييمه وأدوات
+              مراسلته ومنحه وصولاً لدرس خاص.
+            </Hint>
             <div className="students-list">
               {students.map((s) => (
                 <article key={s.profile.id} className="student-card">

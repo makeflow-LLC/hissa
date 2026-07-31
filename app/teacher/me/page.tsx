@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getCurrentUser, getMyTeacher } from "@/lib/data/queries";
 import ShareProfile from "@/components/ShareProfile";
+import Hint from "@/components/Hint";
 import Stars from "@/components/Stars";
 
 export const dynamic = "force-dynamic";
@@ -107,6 +108,10 @@ export default async function TeacherMePage() {
             إدارة المحتوى
           </Link>
         </div>
+        <Hint>
+          الوحدة تجمع دروساً متسلسلة، والدرس يحمل الشرح والفيديو والمرفقات
+          والاختبار. ما تحفظه «مسودّة» لا يراه الطلاب حتى تنشره.
+        </Hint>
         <p className="drafts-empty">
           أضِف الوحدات والدروس المسجّلة، وتظهر مباشرةً في{" "}
           <Link href={`/teacher/${teacher.slug}`} className="back-link">

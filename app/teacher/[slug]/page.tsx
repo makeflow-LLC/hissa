@@ -185,7 +185,8 @@ export default async function TeacherProfilePage({
               />
             )
           )}
-          {waDigits && (
+          {/* واتساب المعلّم لأعضاء مجموعاته وحدهم، أو له هو في المعاينة */}
+          {waDigits && (isOwner || profile.inTeacherGroup) && (
             <a
               href={`https://wa.me/${waDigits}`}
               target="_blank"

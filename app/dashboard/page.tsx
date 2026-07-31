@@ -2,9 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import AskTeacherForm from "@/components/AskTeacherForm";
+import LiveNotifier from "@/components/LiveNotifier";
+import RequestReportCard from "@/components/RequestReportCard";
+import Hint from "@/components/Hint";
 import {
   getCurrentUser,
   getMyMessages,
+  getMyCardRequests,
   getMyParentReports,
   getMyPendingJoins,
   getMyReportCards,
@@ -24,8 +28,16 @@ export default async function StudentDashboard() {
   // حساب المعلّم له لوحته الخاصة — لا لوحة طالب على البريد نفسه
   if (await isCurrentUserTeacher()) redirect("/teacher/me");
 
-  const [name, data, profile, messages, reports, pendingJoins, reportCards] =
-    await Promise.all([
+  const [
+    name,
+    data,
+    profile,
+    messages,
+    reports,
+    pendingJoins,
+    reportCards,
+    cardRequests,
+  ] = await Promise.all([
       getStudentName(),
       getStudentDashboard(),
       getMyStudentProfile(),
@@ -33,6 +45,7 @@ export default async function StudentDashboard() {
       getMyParentReports(),
       getMyPendingJoins(),
       getMyReportCards(),
+      getMyCardRequests(),
     ]);
   const { following = [] } = data ?? {};
 
@@ -41,6 +54,7 @@ export default async function StudentDashboard() {
 
   return (
     <main className="container">
+      <LiveNotifier role="student" userId={user.id} />
       <section className="dashboard-header">
         <div className="dashboard-welcome">
           <div className="teacher-avatar" style={{ background: "linear-gradient(135deg, #4f46e5, #8b5cf6)" }}>
@@ -76,6 +90,10 @@ export default async function StudentDashboard() {
       {pendingJoins.length > 0 && (
         <section className="dashboard-section">
           <h2 className="section-title">🙋 طلبات انضمامك</h2>
+          <Hint>
+            الانضمام غير المتابعة: بعد قبول المعلّم تصلك رسائله ومحتواه الخاص
+            وبطاقات تقييمك، ويصير بإمكانك تقييمه.
+          </Hint>
           <p className="dashboard-subtitle">
             هذه الطلبات وحدها ما زالت معلّقة. المعلّمون الذين قُبلت طلبك عندهم
             يظهرون في «معلّميّ» بالأسفل.
@@ -105,6 +123,9 @@ export default async function StudentDashboard() {
       {reportCards.length > 0 && (
         <section className="dashboard-section">
           <h2 className="section-title">🏅 بطاقات تقييمي</h2>
+          <Hint>
+            تقييم مكتوب من معلّمك في نهاية وحدة أو فصل — يصلح لتطلع عليه أسرتك.
+          </Hint>
           <div className="report-cards">
             {reportCards.map((c) => (
               <article key={c.id} className="report-card">
@@ -171,6 +192,10 @@ export default async function StudentDashboard() {
       {messages.length > 0 && (
         <section className="dashboard-section">
           <h2 className="section-title">✉️ مراسلاتك مع معلّميك</h2>
+          <Hint>
+            اسأل معلّمك عمّا لم يتّضح لك في درس. تصلك إشارة صوتية فور وصول ردّه
+            وأنت على هذه الصفحة.
+          </Hint>
           <ul className="messages-list">
             {messages.map((m) => (
               <li
@@ -252,9 +277,30 @@ export default async function StudentDashboard() {
       {/* ===== معلّميّ + تقدّمي ===== */}
       <section className="dashboard-section">
         <h2 className="section-title">👨‍🏫 معلّميّ وتقدّمي</h2>
+        <Hint>
+          صفوفك التي قَبِلك معلّموها. الشريط يبيّن كم أنجزت من منهج كل معلّم،
+          فتعرف أين توقّفت وأين تحتاج أن تلحق.
+        </Hint>
+
+        {following.length > 0 && (
+          <div className="dashboard-subsection">
+            <Hint>
+              تحتاج تقييماً مكتوباً لأسرتك أو لتعرف مستواك؟ اطلبه من معلّمك
+              مباشرة، ويصلك على هذه اللوحة حين يصدره.
+            </Hint>
+            <RequestReportCard
+              teachers={following.map((f) => ({
+                id: f.teacher.id,
+                name: f.teacher.name,
+              }))}
+              myRequests={cardRequests}
+            />
+          </div>
+        )}
+
         {following.length === 0 ? (
           <p className="drafts-empty">
-            لا تتابع أي معلم بعد — افتح صفحة معلّم واضغط «تابع هذا المعلم» ليظهر
+            لم تنضمّ إلى أي صفّ بعد — افتح صفحة معلّم واضغط «انضم إلى الصف» ليظهر
             تقدّمك هنا.{" "}
             <Link href="/" className="back-link">
               ابدأ من الدليل

@@ -13,6 +13,8 @@ import type {
   StudentProfile,
   TeacherCard,
   TeacherMessage,
+  CardRequest,
+  MyCardRequest,
   ReportCard,
   StudentGroup,
   TeacherProfile,
@@ -167,6 +169,7 @@ export async function getTeacherProfile(
   let followStatus: FollowStatus = "none";
   let followDecisionNote = "";
   let subjectClashTeacher = "";
+  let inTeacherGroup = false;
   let completedLessonIds: string[] = [];
   let myReview: { rating: number; comment: string } | null = null;
 
@@ -202,6 +205,24 @@ export async function getTeacherProfile(
     followDecisionNote = String(followRow?.decision_note ?? "");
     completedLessonIds = (progressRes.data ?? []).map((p) => p.lesson_id);
     myReview = (reviewRes.data as { rating: number; comment: string } | null) ?? null;
+
+    /**
+     * عضوية مجموعة عند هذا المعلّم — وهي شرط رؤية رقم واتسابه.
+     * سياستا `groups_student_read` و `group_members_student_read` تقصران
+     * ما يقرأه الطالب على مجموعاته هو، فالاستعلام آمن بذاته.
+     */
+    if (followStatus === "approved") {
+      const { data: myGroups } = await supabase
+        .from("student_group_members")
+        .select("group_id, student_groups!inner(teacher_id)")
+        .eq("student_id", user.id);
+      inTeacherGroup = ((myGroups ?? []) as unknown as {
+        student_groups: { teacher_id: string } | { teacher_id: string }[] | null;
+      }[]).some((m) => {
+        const g = Array.isArray(m.student_groups) ? m.student_groups[0] : m.student_groups;
+        return g?.teacher_id === teacher.id;
+      });
+    }
 
     /**
      * معلّم واحد لكل مادة: نكشف التعارض هنا لنشرحه للطالب قبل أن يضغط،
@@ -254,6 +275,7 @@ export async function getTeacherProfile(
     followStatus,
     followDecisionNote,
     subjectClashTeacher,
+    inTeacherGroup,
     isFollowing: followStatus !== "none",
     completedLessonIds,
     myReview,
@@ -1063,6 +1085,91 @@ export async function getMyPendingJoins(): Promise<
         teacherSlug: t?.slug ?? "",
         status: r.status === "rejected" ? ("rejected" as const) : ("pending" as const),
         note: String(r.decision_note ?? ""),
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+/** طلبات بطاقات التقييم المعلّقة عند المعلّم الحالي */
+export async function getCardRequests(): Promise<CardRequest[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return [];
+
+  const { data } = await supabase
+    .from("report_card_requests")
+    .select("id, student_id, created_at")
+    .eq("teacher_id", teacher.id)
+    .eq("status", "pending")
+    .order("created_at");
+
+  const rows = (data ?? []) as {
+    id: string;
+    student_id: string;
+    created_at: string;
+  }[];
+  if (rows.length === 0) return [];
+
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, full_name")
+    .in(
+      "id",
+      rows.map((r) => r.student_id)
+    );
+  const names = new Map(
+    ((profiles ?? []) as { id: string; full_name: string }[]).map((p) => [
+      p.id,
+      p.full_name,
+    ])
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    studentId: r.student_id,
+    studentName: names.get(r.student_id) ?? "طالب",
+    createdAt: r.created_at,
+  }));
+}
+
+/** طلبات بطاقات التقييم التي أرسلها الطالب الحالي */
+export async function getMyCardRequests(): Promise<MyCardRequest[]> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data } = await supabase
+      .from("report_card_requests")
+      .select("id, status, created_at, teachers(name)")
+      .eq("student_id", user.id)
+      .order("created_at", { ascending: false });
+
+    return ((data ?? []) as {
+      id: string;
+      status: string;
+      created_at: string;
+      teachers: { name: string } | { name: string }[] | null;
+    }[]).map((r) => {
+      const t = Array.isArray(r.teachers) ? r.teachers[0] : r.teachers;
+      return {
+        id: r.id,
+        teacherName: t?.name ?? "معلّم",
+        status: (r.status as MyCardRequest["status"]) ?? "pending",
+        createdAt: r.created_at,
       };
     });
   } catch {
