@@ -16,7 +16,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 | Lesson titles + descriptions | ✅ | ✅ |
 | Full lesson content (video, explanation, gallery) | ❌ — except the one lesson flagged `is_free_preview` per teacher | ✅ all lessons |
 | Attachments, quizzes | ❌ | ✅ |
-| Follow teachers, save progress, review a teacher | ❌ | ✅ |
+| Request to join a teacher, save progress, review a teacher | ❌ | ✅ |
 
 Locked rows show a "سجّل الدخول للمشاهدة" badge; locked lesson pages show a full sign-in panel.
 
@@ -46,7 +46,7 @@ SUPABASE_SERVICE_ROLE_KEY=<secret key>   # npm run seed only — never NEXT_PUBL
 
 ### Tables
 
-In use: `teachers`, `units`, `lessons`, `lesson_attachments`, `quiz_questions`, `profiles`, `follows`, `lesson_progress`, `teacher_messages`, `student_grants`, `reviews`, `parent_reports`.
+In use: `teachers`, `units`, `lessons`, `lesson_attachments`, `quiz_questions`, `profiles`, `follows`, `lesson_progress`, `teacher_messages`, `student_grants`, `reviews`, `parent_reports`, `student_groups`, `student_group_members`, `report_cards`.
 
 - `lessons.is_free_preview` — the one visitor-visible lesson per teacher.
 - `lessons.is_restricted` — hidden entirely unless the student holds a `student_grants` row.
@@ -71,6 +71,7 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0010_attachments_and_quiz_attempts.sql` | widen attachment kinds + bucket MIME types, `quiz_attempts` |
 | `0011_two_way_messaging.sql` | `teacher_messages.sender` + student insert/delete policies |
 | `0012_ai_usage_quota.sql` | `ai_usage` ledger enforcing a monthly per-teacher cap |
+| `0013_groups_report_cards_join_requests.sql` | join requests on `follows`, `student_groups`, `report_cards`, `normalize_ar()` + one-teacher-per-subject trigger |
 
 ### Removed: live sessions
 
@@ -83,6 +84,26 @@ The `live_sessions` and `enrollments` tables are **left in place, unused and unr
 `teachers.rating` / `rating_count` are **derived columns** maintained by the `reviews_recalc` trigger — never write them by hand. A teacher with no reviews shows `0/0`, and every surface renders "معلّم جديد" / "لا تقييمات بعد" instead of stars. The earlier code wrote a hardcoded `5.0` at profile creation, which made every teacher look identically perfect; do not reintroduce that.
 
 Eligibility to review is enforced **in RLS, not just the UI**: `reviews_student_write` requires an existing `lesson_progress` row joined to a lesson owned by that teacher. So a student must actually complete one of the teacher's lessons before rating, and cannot post under another student's id. One review per (teacher, student), editable.
+
+### Joining a teacher is a request, not a click
+
+`follows` carries a `status` (`pending` / `approved` / `rejected`). A student sends a request; the teacher approves or rejects it from `/teacher/me/students`, optionally with a reason the student sees. `teachers.join_instructions` is the text the teacher writes **in advance** — conditions, class times, what to bring — shown to the student before they send the request.
+
+**A pending request grants nothing.** Everything keyed on `follows` now requires `status = 'approved'`: broadcasts, two-way messages, group membership, report cards. The one deliberate exception is `profiles_teacher_reads_followers`, which also matches `pending` — the teacher needs the applicant's name and grade to decide, and the student is the one who applied to that teacher.
+
+Existing rows were backfilled as `approved` (the column default was `'approved'` during the `add column`, then switched to `'pending'`), so nobody following a teacher before the migration was dropped back into a queue.
+
+### One teacher per subject
+
+A student may follow only one teacher of a given subject — no two maths teachers at once. Enforced by the `follows_one_teacher_per_subject` trigger, **not** by the UI: hiding a button does not stop a request posted straight at the REST API. The error surfaces as `ONE_TEACHER_PER_SUBJECT:<other teacher's name>`, which `requestJoin` translates into an Arabic sentence naming that teacher.
+
+Subjects are compared through `normalize_ar()` (SQL) — diacritics, tatweel, alef forms, ة/ى, **and the definite article** all folded — so «الرياضيّات» and «رياضيات» are one subject. `normalizeSubject()` in `lib/arabic.ts` mirrors it exactly so the profile page can explain the clash before the student clicks; **if you change one, change the other**, or the UI will offer a button the database refuses. A rejected request does not reserve the subject.
+
+### Groups and report cards
+
+`student_groups` + `student_group_members` let a teacher sort students into groups (a student may be in several). `report_cards` are end-of-unit or end-of-term evaluations: four 0–5 ratings (understanding, participation, homework, behaviour), an optional score, strengths, improvements and a note. Students read their own cards on `/dashboard`.
+
+Both are teacher-owned and student-readable, and both refuse to reference a student who is not `approved`. The two group policies once referenced each other and sent RLS into infinite recursion; `is_group_member()` (`security definer`) breaks the cycle on one side, the same way `has_grant()` does in `0008`.
 
 ### Parent reports
 
@@ -165,8 +186,8 @@ Security is verified with SQL that switches `role` and `request.jwt.claims` to i
 | `app/page.tsx` | home directory; passes teacher cards to `TeacherDirectory` |
 | `app/teacher/[slug]/page.tsx` | profile: header, follow button, WhatsApp, visitor banner, `TeacherTabs` |
 | `app/teacher/[slug]/lesson/[lessonId]/page.tsx` | lesson; renders locked panel when gated |
-| `app/login/page.tsx` | sign-in for **everyone** (students and teachers): Google OAuth + email magic link |
-| `app/auth/callback/route.ts` | exchanges the OAuth/magic-link code for a session |
+| `app/login/page.tsx` | sign-in for **everyone** (students and teachers): Google account only |
+| `app/auth/callback/route.ts` | exchanges the Google OAuth code for a session |
 | `app/auth/signout/route.ts` | POST sign-out |
 | `app/dashboard/page.tsx` | **student** dashboard: حصصي / معلّميّ / تقدّمي + "أكمل التعلّم" |
 | `app/teacher/join/page.tsx` | teacher signup landing → `/login?role=teacher` |
@@ -199,11 +220,9 @@ Both roles sign in through `/login`; `?role=teacher` only switches the copy and 
 
 Brand: `public/logo.svg` is a hand-built SVG reconstruction of the platform logo (mortarboard + ring + two figures), used in the navbar, footer, and as favicon/OG icon. `metadataBase` is `https://hissa.sbs` (the live custom domain). Contact email placeholder in the legal pages is `support@hissa.sbs`.
 
-**Magic-link flows — two routes, and the reason there are two.** `createBrowserClient` defaults to **PKCE**: the browser that requests the link stores a `code_verifier` cookie, and `/auth/callback` needs that cookie to call `exchangeCodeForSession`. Open the link in a *different* browser — a mail app's in-app webview, or the default browser when the request came from the installed PWA — and the cookie is absent, producing "PKCE code verifier not found in storage". That is not a misconfiguration; `@supabase/ssr` is already used on both sides.
+**Sign-in is Google-only.** The email magic link was removed deliberately: its links kept opening in a different browser than the one that requested them (a mail app's in-app webview, or the default browser when the request came from the installed PWA), and PKCE stores `code_verifier` in a cookie belonging to the *requesting* browser — so those opens failed with "PKCE code verifier not found in storage". Google OAuth completes the whole round trip in one browser, so that failure mode is gone along with the `/auth/confirm` route and the `token_hash` branch of `/auth/callback`.
 
-`/auth/confirm` is the cross-device answer: it calls `verifyOtp({ type, token_hash })`, which needs nothing stored beforehand and therefore works from any browser. `/auth/callback` accepts `token_hash` too, and maps verifier failures to an Arabic instruction instead of leaking the raw English SDK error to users. **Using it requires the Supabase email template to link to `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=magiclink`** (Authentication → Email Templates); until that is changed, links keep using the PKCE `?code=` form and stay same-browser-only.
-
-Auth providers: **email magic link works out of the box**; **Google OAuth must be enabled** in Supabase → Authentication → Providers with the callback URL added to redirect URLs. Phone/WhatsApp OTP is deliberately deferred until an SMS provider exists.
+**Google OAuth must therefore be enabled** in Supabase → Authentication → Providers, with the callback URL in the redirect list — there is no fallback sign-in if it is off, and the login page says so. Phone/WhatsApp OTP stays deferred until an SMS provider exists. Re-adding email sign-in means restoring `signInWithOtp` plus a `verifyOtp({token_hash})` route; do not re-add the PKCE-only `?code=` form for emailed links.
 
 ### Client vs server components
 

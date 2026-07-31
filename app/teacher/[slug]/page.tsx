@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { getCurrentUser, getMyTeacher, getTeacherProfile } from "@/lib/data/queries";
 import TeacherTabs from "@/components/TeacherTabs";
 import ReviewSection from "@/components/ReviewSection";
-import FollowButton from "@/components/FollowButton";
+import JoinTeacherPanel from "@/components/JoinTeacherPanel";
 import ConnectionNotice from "@/components/ConnectionNotice";
 import Stars from "@/components/Stars";
 
@@ -168,10 +168,14 @@ export default async function TeacherProfilePage({
             </>
           ) : (
             !isTeacherAccount && (
-              <FollowButton
+              <JoinTeacherPanel
                 teacherId={teacher.id}
                 teacherSlug={teacher.slug}
-                isFollowing={profile.isFollowing}
+                teacherName={teacher.name}
+                status={profile.followStatus}
+                decisionNote={profile.followDecisionNote}
+                joinInstructions={teacher.join_instructions ?? ""}
+                clashTeacher={profile.subjectClashTeacher}
                 isAuthed={Boolean(user)}
               />
             )

@@ -24,7 +24,10 @@ async function requireMyTeacher() {
   return { supabase, teacher: data as { id: string; slug: string } | null };
 }
 
-/** هل هذا الطالب يتابع المعلّم فعلاً؟ لا نراسل أو نمنح غير المتابعين. */
+/**
+ * هل هذا الطالب منضمّ فعلاً (مقبولاً)؟ لا نراسل ولا نمنح ولا نقيّم من
+ * لم يُقبل بعد — الطلب المعلّق ليس انضماماً.
+ */
 async function followsMe(
   supabase: Awaited<ReturnType<typeof createClient>>,
   teacherId: string,
@@ -35,6 +38,7 @@ async function followsMe(
     .select("teacher_id")
     .eq("teacher_id", teacherId)
     .eq("student_id", studentId)
+    .eq("status", "approved")
     .maybeSingle();
   return Boolean(data);
 }

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { stripTags } from "@/lib/sanitize";
 
 const STAGES = ["ابتدائي", "إعدادي", "ثانوي"] as const;
 
@@ -67,6 +68,10 @@ export async function saveTeacherProfile(
   const subject = String(formData.get("subject") ?? "").trim();
   const bio = String(formData.get("bio") ?? "").trim();
   const qualification = String(formData.get("qualification") ?? "").trim();
+  // تُعرض للطالب قبل إرسال طلب الانضمام — نص صِرف لا HTML
+  const joinInstructions = stripTags(
+    String(formData.get("join_instructions") ?? "")
+  ).slice(0, 800);
   const experience = Math.max(
     0,
     Math.min(60, parseInt(String(formData.get("experience_years") ?? "0"), 10) || 0)
@@ -96,6 +101,7 @@ export async function saveTeacherProfile(
     subject,
     stages,
     bio,
+    join_instructions: joinInstructions,
     qualification,
     experience_years: experience,
     whatsapp,

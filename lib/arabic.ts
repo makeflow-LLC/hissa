@@ -21,6 +21,13 @@ export function normalizeArabic(input: string): string {
   if (!input) return "";
   return input
     .normalize("NFKD")
+    /**
+     * كل العلامات المركّبة تُحذف بعد التفكيك.
+     * لا يكفي نطاق التشكيل المعروف: NFKD يفكّك «إ» إلى ألف + همزة سفلية
+     * (U+0655) وهي خارج ذلك النطاق، فكانت تتحوّل إلى مسافة — أي أن
+     * «الإسلامية» تصير كلمتين ولا تطابق «اسلامية» أبداً.
+     */
+    .replace(/\p{M}+/gu, "")
     .replace(DIACRITICS, "")
     // صور الألف كلها ← ا
     .replace(/[إأآٱا]/g, "ا")
@@ -34,6 +41,21 @@ export function normalizeArabic(input: string): string {
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim()
     .toLowerCase();
+}
+
+/**
+ * تطبيع اسم المادة للمقارنة وحدها — لا للبحث.
+ *
+ * يزيد على `normalizeArabic` إسقاطَ أداة التعريف، فـ«اللغة العربية»
+ * و«لغة عربية» مادة واحدة. هذا ما يمنع الطالب من متابعة معلّمَي مادة
+ * واحدة لمجرّد أن أحدهما كتبها معرّفة. يجب أن يطابق `normalize_ar`
+ * في هجرة 0013 حرفاً بحرف، وإلا سمحت الواجهة بما ترفضه قاعدة البيانات.
+ */
+export function normalizeSubject(input: string): string {
+  return normalizeArabic(input)
+    .replace(/(^| )ال/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**

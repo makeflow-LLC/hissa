@@ -36,11 +36,26 @@ async function isTeacherAccount(
   return Boolean(data);
 }
 
-/** متابعة معلم أو إلغاء متابعته */
-export async function toggleFollow(
+/**
+ * رسالة القاعدة «معلّم واحد لكل مادة» تأتي من مُشغّل قاعدة البيانات
+ * بالصيغة ONE_TEACHER_PER_SUBJECT:<اسم المعلّم الآخر>. نترجمها هنا إلى
+ * جملة يفهمها الطالب بدل تسريب نصّ الخطأ الخام.
+ */
+function subjectClashMessage(raw: string): string | null {
+  const m = raw.match(/ONE_TEACHER_PER_SUBJECT:(.*)$/);
+  if (!m) return null;
+  const other = m[1].trim();
+  return `أنت منضمّ بالفعل إلى ${other} في المادة نفسها. المنصة تسمح بمعلّم واحد لكل مادة، فألغِ انضمامك هناك أولاً إن أردت الانتقال.`;
+}
+
+/**
+ * إرسال طلب انضمام إلى معلّم.
+ * الانضمام لم يعد فورياً: يصل الطلب معلّقاً حتى يبتّه المعلّم.
+ */
+export async function requestJoin(
   teacherId: string,
   teacherSlug: string,
-  following: boolean
+  note = ""
 ): Promise<ActionResult> {
   const supabase = await createClient();
   const {
@@ -49,24 +64,57 @@ export async function toggleFollow(
   if (!user) return NEED_LOGIN;
   if (await isTeacherAccount(supabase, user.id)) return TEACHER_ACCOUNT;
 
-  const { error } = following
-    ? await supabase
-        .from("follows")
-        .delete()
-        .eq("student_id", user.id)
-        .eq("teacher_id", teacherId)
-    : await supabase
-        .from("follows")
-        .upsert(
-          { student_id: user.id, teacher_id: teacherId },
-          { onConflict: "student_id,teacher_id" }
-        );
+  // طلب سابق مرفوض لا يمنع محاولة جديدة — نزيله ثم نطلب من جديد
+  await supabase
+    .from("follows")
+    .delete()
+    .eq("student_id", user.id)
+    .eq("teacher_id", teacherId)
+    .eq("status", "rejected");
 
-  if (error) return { ok: false, message: "تعذّر تحديث المتابعة." };
+  const { error } = await supabase.from("follows").insert({
+    student_id: user.id,
+    teacher_id: teacherId,
+    status: "pending",
+    student_note: stripTags(note).slice(0, 500),
+  });
+
+  if (error) {
+    const clash = subjectClashMessage(error.message ?? "");
+    if (clash) return { ok: false, message: clash };
+    if (error.code === "23505") {
+      return { ok: false, message: "لديك طلب سابق لهذا المعلّم." };
+    }
+    return { ok: false, message: "تعذّر إرسال طلب الانضمام." };
+  }
 
   revalidatePath(`/teacher/${teacherSlug}`);
   revalidatePath("/dashboard");
-  return { ok: true, message: following ? "أُلغيت المتابعة." : "تتابع هذا المعلم الآن." };
+  return { ok: true, message: "أُرسل طلبك، وستظهر النتيجة هنا بعد ردّ المعلّم." };
+}
+
+/** سحب طلب معلّق أو إلغاء انضمام قائم */
+export async function cancelJoin(
+  teacherId: string,
+  teacherSlug: string
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NEED_LOGIN;
+
+  const { error } = await supabase
+    .from("follows")
+    .delete()
+    .eq("student_id", user.id)
+    .eq("teacher_id", teacherId);
+
+  if (error) return { ok: false, message: "تعذّر إلغاء الانضمام." };
+
+  revalidatePath(`/teacher/${teacherSlug}`);
+  revalidatePath("/dashboard");
+  return { ok: true, message: "أُلغي انضمامك لهذا المعلّم." };
 }
 
 /** تعليم درس كمنجز أو التراجع عن ذلك */
