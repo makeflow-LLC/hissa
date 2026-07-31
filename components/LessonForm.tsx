@@ -1,6 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import {
+  useActionState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   saveLesson,
@@ -8,6 +15,7 @@ import {
 } from "@/app/actions/teacher-content";
 import RichTextEditor from "@/components/RichTextEditor";
 import AttachmentManager from "@/components/AttachmentManager";
+import AutoTextarea from "@/components/AutoTextarea";
 import AiAssistPanel, {
   AiFormatButton,
   type AiQuizQuestion,
@@ -112,6 +120,23 @@ export default function LessonForm({
     if (state.ok) router.push("/teacher/me/content");
   }, [state, router]);
 
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * لقطة ممّا في النموذج الآن، لا ممّا حُفظ.
+   * أدوات الذكاء الاصطناعي كانت تقرأ الدرس من قاعدة البيانات، فلا ترى
+   * ما كتبه المعلّم قبل الحفظ — وهو بالضبط النصّ الذي يريد تحسينه.
+   */
+  const draft = useCallback(
+    () => ({
+      html: sections
+        .map((s) => (s.heading ? `<h3>${s.heading}</h3>` : "") + s.html)
+        .join("\n"),
+      title: titleRef.current?.value ?? initial?.title ?? "",
+    }),
+    [sections, initial]
+  );
+
   const sectionsJson = useMemo(
     () =>
       JSON.stringify(
@@ -152,6 +177,7 @@ export default function LessonForm({
       <label className="form-field">
         <span className="form-label">عنوان الدرس *</span>
         <input
+          ref={titleRef}
           type="text"
           name="title"
           className="search-input"
@@ -235,7 +261,9 @@ export default function LessonForm({
 
       <AiAssistPanel
         lessonId={initial?.id ?? ""}
-        enabled={aiEnabled && isEdit}
+        enabled={aiEnabled}
+        // ما في المحرّر الآن — فتعمل الأدوات قبل الحفظ وعلى درس جديد
+        getDraft={draft}
         onSummary={(html) =>
           setSections((prev) => [
             ...prev,
@@ -299,7 +327,8 @@ export default function LessonForm({
               <AiFormatButton
                 lessonId={initial?.id ?? ""}
                 html={s.html}
-                enabled={aiEnabled && isEdit}
+                title={titleRef.current?.value ?? ""}
+                enabled={aiEnabled}
                 onResult={(html) =>
                   setSections((prev) =>
                     prev.map((x, j) => (j === i ? { ...x, html } : x))
@@ -345,9 +374,12 @@ export default function LessonForm({
           {quiz.map((q, i) => (
             <div key={i} className="repeater-item">
               <div className="repeater-head">
-                <input
-                  type="text"
-                  className="search-input"
+                {/*
+                  حقل نصّي متعدّد الأسطر لا سطر واحد: السؤال الطويل كان
+                  ينزلق داخل الحقل فلا يرى المعلّم إلا طرفه.
+                */}
+                <AutoTextarea
+                  className="search-input quiz-prompt-input"
                   value={q.prompt}
                   onChange={(e) =>
                     setQuiz((prev) =>

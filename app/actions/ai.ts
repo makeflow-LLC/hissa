@@ -36,9 +36,15 @@ interface LessonContext {
  * يجمع سياق الدرس بعد التحقّق من أن المستدعي يملكه.
  * المرحلة والمادة تأتيان من صف المعلّم نفسه، فيخاطب النموذجُ المستوى
  * الصحيح دون أن يخمّنه من نصّ الدرس.
+ *
+ * النصّ يأتي من المحرّر لا من قاعدة البيانات (`draft`): المعلّم يريد
+ * تحسين ما كتبه للتوّ، وإلزامه بالحفظ أولاً يعني أن يحفظ نصّاً يعرف أنه
+ * يحتاج تحسيناً. و`lessonId` صار اختيارياً حتى تعمل الأدوات على درس
+ * جديد لم يُحفظ بعد ولا معرّف له.
  */
 async function loadLessonContext(
-  lessonId: string
+  lessonId: string,
+  draft?: { html?: string; title?: string }
 ): Promise<{ data?: LessonContext; error?: string }> {
   const supabase = await createClient();
   const {
@@ -53,16 +59,23 @@ async function loadLessonContext(
     .maybeSingle();
   if (!teacher) return { error: "هذه الميزة للمعلّمين فقط." };
 
-  const { data: lesson } = await supabase
-    .from("lessons")
-    .select("id, title, sections, unit_id")
-    .eq("id", lessonId)
-    .eq("teacher_id", teacher.id)
-    .maybeSingle();
-  if (!lesson) return { error: "الدرس غير موجود أو ليس من دروسك." };
+  // درس محفوظ؟ نقرأه للتحقّق من الملكية وللحصول على الوحدة والعنوان
+  const lesson = lessonId
+    ? (
+        await supabase
+          .from("lessons")
+          .select("id, title, sections, unit_id")
+          .eq("id", lessonId)
+          .eq("teacher_id", teacher.id)
+          .maybeSingle()
+      ).data
+    : null;
+  if (lessonId && !lesson) {
+    return { error: "الدرس غير موجود أو ليس من دروسك." };
+  }
 
   let unitTitle: string | null = null;
-  if (lesson.unit_id) {
+  if (lesson?.unit_id) {
     const { data: unit } = await supabase
       .from("units")
       .select("title")
@@ -71,8 +84,8 @@ async function loadLessonContext(
     unitTitle = unit?.title ?? null;
   }
 
-  const sections = Array.isArray(lesson.sections) ? lesson.sections : [];
-  const html = sections
+  const savedSections = Array.isArray(lesson?.sections) ? lesson.sections : [];
+  const savedHtml = savedSections
     .map((s) => {
       const o = s as Record<string, unknown>;
       const heading = String(o.heading ?? "");
@@ -85,6 +98,9 @@ async function loadLessonContext(
     })
     .join("\n");
 
+  // ما في المحرّر أولى بالمحفوظ؛ ونعود إلى المحفوظ إن جاء المحرّر فارغاً
+  const draftHtml = (draft?.html ?? "").trim();
+  const html = stripTags(draftHtml).trim() ? draftHtml : savedHtml;
   const plainText = stripTags(html).slice(0, MAX_INPUT_CHARS);
 
   return {
@@ -94,7 +110,7 @@ async function loadLessonContext(
       ctx: {
         subject: teacher.subject,
         stages: (teacher.stages ?? []) as string[],
-        lessonTitle: lesson.title,
+        lessonTitle: (draft?.title ?? "").trim() || lesson?.title || "درس جديد",
         unitTitle,
       },
       plainText,
@@ -144,13 +160,14 @@ const QUOTA_MESSAGE = `استنفدت حصّتك الشهرية (${MONTHLY_LIMIT
  */
 export async function aiSummarize(
   lessonId: string,
-  instructions: string
+  instructions: string,
+  draft?: { html?: string; title?: string }
 ): Promise<AiActionState> {
   if (!isAiConfigured()) {
     return { ok: false, message: "ميزات الذكاء الاصطناعي غير مفعّلة." };
   }
 
-  const { data, error } = await loadLessonContext(lessonId);
+  const { data, error } = await loadLessonContext(lessonId, draft);
   if (!data) return { ok: false, message: error };
   if (!data.plainText.trim()) {
     return { ok: false, message: "اكتب شرح الدرس أولاً ثم اطلب التلخيص." };
@@ -197,13 +214,17 @@ export async function aiSummarize(
 export async function aiFormat(
   lessonId: string,
   html: string,
-  instructions: string
+  instructions: string,
+  draft?: { title?: string }
 ): Promise<AiActionState> {
   if (!isAiConfigured()) {
     return { ok: false, message: "ميزات الذكاء الاصطناعي غير مفعّلة." };
   }
 
-  const { data, error } = await loadLessonContext(lessonId);
+  const { data, error } = await loadLessonContext(lessonId, {
+    html,
+    title: draft?.title,
+  });
   if (!data) return { ok: false, message: error };
 
   const source = html.slice(0, MAX_INPUT_CHARS);
@@ -251,13 +272,14 @@ export async function aiFormat(
 export async function aiQuiz(
   lessonId: string,
   count: number,
-  instructions: string
+  instructions: string,
+  draft?: { html?: string; title?: string }
 ): Promise<AiActionState> {
   if (!isAiConfigured()) {
     return { ok: false, message: "ميزات الذكاء الاصطناعي غير مفعّلة." };
   }
 
-  const { data, error } = await loadLessonContext(lessonId);
+  const { data, error } = await loadLessonContext(lessonId, draft);
   if (!data) return { ok: false, message: error };
   if (!data.plainText.trim()) {
     return { ok: false, message: "اكتب شرح الدرس أولاً ثم اطلب توليد الأسئلة." };

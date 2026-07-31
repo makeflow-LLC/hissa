@@ -20,12 +20,16 @@ type Mode = "summary" | "quiz" | null;
 export default function AiAssistPanel({
   lessonId,
   enabled,
+  getDraft,
   onSummary,
   onQuiz,
 }: {
+  /** فارغ لدرس لم يُحفظ بعد — الأدوات تعمل على المكتوب في المحرّر */
   lessonId: string;
-  /** يُعطَّل قبل حفظ الدرس أو حين لا يكون المفتاح مضبوطاً */
+  /** يُعطَّل فقط حين لا يكون مفتاح النموذج مضبوطاً */
   enabled: boolean;
+  /** يقرأ ما في المحرّر لحظة الضغط، لا ما هو محفوظ في قاعدة البيانات */
+  getDraft: () => { html: string; title: string };
   onSummary: (html: string) => void;
   onQuiz: (questions: AiQuizQuestion[]) => void;
 }) {
@@ -41,7 +45,7 @@ export default function AiAssistPanel({
       <div className="ai-panel ai-panel-off">
         <span className="ai-badge">✨ مساعد الذكاء الاصطناعي</span>
         <p className="form-hint">
-          احفظ الدرس أولاً، ثم افتحه للتعديل لتوليد ملخّص وأسئلة من محتواه.
+          مفتاح النموذج غير مضبوط على الخادم، فالأدوات معطّلة.
         </p>
       </div>
     );
@@ -50,10 +54,12 @@ export default function AiAssistPanel({
   function run(kind: "summary" | "quiz") {
     setMsg(null);
     startBusy(async () => {
+      // نلتقط ما في المحرّر الآن — لا يلزم حفظ الدرس قبل الاستفادة
+      const draft = getDraft();
       const res =
         kind === "summary"
-          ? await aiSummarize(lessonId, note)
-          : await aiQuiz(lessonId, count, note);
+          ? await aiSummarize(lessonId, note, draft)
+          : await aiQuiz(lessonId, count, note, draft);
 
       if (!res.ok) {
         setMsg({ ok: false, text: res.message ?? "تعذّر التنفيذ." });
@@ -169,11 +175,14 @@ export default function AiAssistPanel({
 export function AiFormatButton({
   lessonId,
   html,
+  title,
   enabled,
   onResult,
 }: {
   lessonId: string;
   html: string;
+  /** عنوان الدرس كما هو في النموذج الآن — يوجّه صياغة النموذج */
+  title?: string;
   enabled: boolean;
   onResult: (html: string) => void;
 }) {
@@ -191,7 +200,7 @@ export function AiFormatButton({
         onClick={() => {
           setErr("");
           startBusy(async () => {
-            const res = await aiFormat(lessonId, html, "");
+            const res = await aiFormat(lessonId, html, "", { title });
             if (res.ok && res.html) onResult(res.html);
             else setErr(res.message ?? "تعذّر التنسيق.");
           });
