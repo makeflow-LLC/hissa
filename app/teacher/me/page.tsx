@@ -64,6 +64,9 @@ export default async function TeacherMePage() {
           <Link href="/teacher/me/content" className="btn btn-outline btn-sm">
             🎬 المحتوى
           </Link>
+          <Link href="/teacher/me/activities" className="btn btn-outline btn-sm">
+            🎮 الأنشطة
+          </Link>
           <Link href="/teacher/onboarding" className="btn btn-outline btn-sm">
             ✏️ بياناتي
           </Link>

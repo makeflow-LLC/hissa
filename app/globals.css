@@ -5345,3 +5345,303 @@ body {
 .result-list a.result-title:hover {
   color: var(--primary);
 }
+
+/* ===== الأنشطة التفاعلية ===== */
+
+/* اختيار اللعبة: شبكة رقائق، المحتوى لا يتأثّر بالتبديل */
+.kind-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+.kind-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.88rem;
+  padding: 10px 12px;
+  min-height: 48px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  text-align: start;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.kind-chip-on {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+.kind-icon { font-size: 1.2rem; flex-shrink: 0; }
+
+/* جدول العناصر */
+.items-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+.items-table th {
+  text-align: start;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  padding: 4px 6px;
+  font-weight: 700;
+}
+.items-table td {
+  padding: 3px 6px;
+  vertical-align: middle;
+}
+.items-table .search-input { width: 100%; min-width: 0; }
+.items-num {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  width: 1.6rem;
+}
+.activity-builder { display: grid; gap: 1.25rem; }
+
+/* ===== قشرة اللاعب ===== */
+
+.activity-intro,
+.activity-stage {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  text-align: center;
+}
+.activity-kind-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-weight: 700;
+}
+.activity-result { display: grid; gap: 6px; justify-items: center; }
+.game { display: grid; gap: 14px; width: 100%; }
+.game-status {
+  font-weight: 700;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+.game-prompt {
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.game-choices {
+  display: grid;
+  gap: 10px;
+}
+.game-choice {
+  font: inherit;
+  font-weight: 600;
+  padding: 14px 16px;
+  min-height: 52px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  transition: background 0.15s, border-color 0.15s;
+}
+.game-choice:hover:enabled { border-color: var(--primary); }
+.choice-right {
+  background: var(--success-soft);
+  border-color: var(--success);
+  color: var(--success);
+  font-weight: 800;
+}
+.choice-wrong {
+  background: #fee2e2;
+  border-color: #b91c1c;
+  color: #b91c1c;
+  font-weight: 800;
+}
+.choice-dim { opacity: 0.45; }
+.game-nav { justify-content: center; }
+
+/* مطابقة */
+.match-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.match-col {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+.match-cell {
+  width: 100%;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  padding: 12px 10px;
+  min-height: 52px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.match-picked {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+.match-done {
+  background: var(--success-soft);
+  border-color: var(--success);
+  color: var(--success);
+  cursor: default;
+}
+.match-wrong {
+  background: #fee2e2;
+  border-color: #b91c1c;
+}
+
+/* بطاقات */
+.flashcard {
+  width: 100%;
+  min-height: 220px;
+  display: grid;
+  gap: 10px;
+  align-content: center;
+  justify-items: center;
+  padding: 1.5rem;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  font: inherit;
+}
+.flashcard-back {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+}
+.flashcard-text {
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.flashcard-hint { font-size: 0.8rem; color: var(--text-muted); }
+
+/* رتّب الحروف */
+.anagram-slot {
+  font-size: 1.8rem;
+  font-weight: 800;
+  letter-spacing: 4px;
+  min-height: 3rem;
+  padding: 8px 16px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 2px dashed var(--border);
+  overflow-wrap: anywhere;
+}
+.anagram-letters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.anagram-letter {
+  font: inherit;
+  font-size: 1.3rem;
+  font-weight: 800;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+}
+.anagram-letter:disabled { opacity: 0.3; }
+.sort-item { color: var(--primary-dark); }
+
+/* عجلة */
+.wheel-wrap {
+  position: relative;
+  width: min(300px, 78vw);
+  max-width: 100%;
+  aspect-ratio: 1;
+  margin: 18px auto 0;
+}
+/* طبقة القصّ: تحتوي تجاوزَ العجلة المُدارة فلا يمتدّ إلى عرض الصفحة */
+.wheel-clip {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.wheel {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 6px solid var(--primary);
+  background: conic-gradient(var(--primary-soft) 0deg, #fff 60deg, var(--primary-soft) 120deg, #fff 180deg, var(--primary-soft) 240deg, #fff 300deg, var(--primary-soft) 360deg);
+  box-shadow: var(--shadow);
+}
+.wheel-slice {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  /* كل قطاع يدور حول المركز، ونصّه قرب الحافة */
+  transform-origin: 50% 50%;
+}
+.wheel-label {
+  margin-top: 12px;
+  max-width: 42%;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+.wheel-pointer {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.6rem;
+  color: var(--accent);
+  z-index: 2;
+}
+.wheel-result {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--primary-dark);
+  min-height: 2rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .kind-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .items-table th:nth-child(1),
+  .items-table td:nth-child(1) {
+    display: none;
+  }
+  .anagram-letter {
+    width: 46px;
+    height: 46px;
+    font-size: 1.15rem;
+  }
+  .match-cell {
+    font-size: 0.85rem;
+    padding: 10px 6px;
+  }
+}

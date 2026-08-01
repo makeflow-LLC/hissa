@@ -1,3 +1,5 @@
+import type { ActivityItem, ActivityKind } from "@/lib/activityKinds";
+
 /** أنواع صفوف قاعدة البيانات كما تعيدها Supabase */
 
 export type Stage = "ابتدائي" | "إعدادي" | "ثانوي";
@@ -421,4 +423,53 @@ export interface AttemptForGrading {
   manual_score: number;
   max_score: number;
   answers: ExamAnswer[];
+}
+
+/* ==================== الأنشطة التفاعلية ==================== */
+
+/** نشاط كما يملكه المعلّم */
+export interface Activity {
+  id: string;
+  teacher_id: string;
+  group_id: string | null;
+  lesson_id: string | null;
+  title: string;
+  instructions: string;
+  kind: ActivityKind;
+  items: ActivityItem[];
+  status: "draft" | "published";
+  created_at: string;
+}
+
+/** نشاط في قائمة المعلّم مع عدّاداته */
+export interface ActivitySummary extends Activity {
+  /** اسم المجموعة، أو «كل طلابي» */
+  audience: string;
+  playCount: number;
+  playerCount: number;
+}
+
+/** نشاط كما يظهر للطالب */
+export interface StudentActivity {
+  id: string;
+  title: string;
+  instructions: string;
+  kind: ActivityKind;
+  items: ActivityItem[];
+  teacherName: string;
+  /** أفضل نتيجة سجّلها الطالب (null إن لم يلعب أو كانت اللعبة بلا درجة) */
+  bestScore: number | null;
+  bestTotal: number | null;
+  plays: number;
+}
+
+/** لعبة طالب كما يراها المعلّم */
+export interface ActivityPlayRow {
+  id: string;
+  studentId: string;
+  studentName: string;
+  score: number;
+  total: number;
+  seconds: number;
+  played_at: string;
 }

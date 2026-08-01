@@ -2,6 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import { normalizeSubject } from "@/lib/arabic";
 import type { ExamTemplate } from "@/lib/examTemplates";
 import type {
+  ActivityItem,
+  ActivityKind,
+  ActivityTemplate,
+} from "@/lib/activityKinds";
+import type {
   FollowStatus,
   JoinRequest,
   MyTeacher,
@@ -15,6 +20,10 @@ import type {
   TeacherCard,
   TeacherMessage,
   AttemptForGrading,
+  Activity,
+  ActivityPlayRow,
+  ActivitySummary,
+  StudentActivity,
   CardRequest,
   GroupHub,
   GroupMember,
@@ -2236,4 +2245,267 @@ export async function getExamPaper(examId: string): Promise<{
       } | null) ?? null,
     myAnswers,
   };
+}
+
+/* ==================== الأنشطة التفاعلية ==================== */
+
+/** أنشطة المعلّم الحالي مع عدّاداتها */
+export async function getMyActivities(): Promise<ActivitySummary[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return [];
+
+  const { data } = await supabase
+    .from("activities")
+    .select("*, student_groups(name), activity_plays(student_id)")
+    .eq("teacher_id", teacher.id)
+    .order("created_at", { ascending: false });
+
+  return ((data ?? []) as (Activity & {
+    student_groups: { name: string } | { name: string }[] | null;
+    activity_plays: { student_id: string }[] | null;
+  })[]).map((a) => {
+    const g = Array.isArray(a.student_groups) ? a.student_groups[0] : a.student_groups;
+    const plays = a.activity_plays ?? [];
+    return {
+      ...a,
+      items: Array.isArray(a.items) ? a.items : [],
+      audience: g?.name ?? "كل طلابي",
+      playCount: plays.length,
+      playerCount: new Set(plays.map((p) => p.student_id)).size,
+    };
+  });
+}
+
+/** نشاط واحد للمعلّم — لصفحة تحريره */
+export async function getMyActivity(id: string): Promise<Activity | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return null;
+
+  const { data } = await supabase
+    .from("activities")
+    .select("*")
+    .eq("id", id)
+    .eq("teacher_id", teacher.id)
+    .maybeSingle();
+  if (!data) return null;
+
+  const a = data as Activity;
+  return { ...a, items: Array.isArray(a.items) ? a.items : [] };
+}
+
+/** لعبات الطلاب في نشاط — لصفحة نتائجه */
+export async function getActivityPlays(activityId: string): Promise<ActivityPlayRow[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from("activity_plays")
+    .select("id, student_id, score, total, seconds, played_at")
+    .eq("activity_id", activityId)
+    .order("played_at", { ascending: false })
+    .limit(100);
+
+  const rows = (data ?? []) as {
+    id: string;
+    student_id: string;
+    score: number;
+    total: number;
+    seconds: number;
+    played_at: string;
+  }[];
+  if (rows.length === 0) return [];
+
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, full_name")
+    .in("id", [...new Set(rows.map((r) => r.student_id))]);
+  const names = new Map(
+    ((profiles ?? []) as { id: string; full_name: string }[]).map((p) => [p.id, p.full_name])
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    studentId: r.student_id,
+    studentName: names.get(r.student_id) || "طالب",
+    score: Number(r.score),
+    total: Number(r.total),
+    seconds: r.seconds,
+    played_at: r.played_at,
+  }));
+}
+
+/** أنشطة الطالب الحالي — ما نُشر وهو مخوّل بلعبه (RLS هي المرشِّح) */
+export async function getMyStudentActivities(): Promise<StudentActivity[]> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const [{ data }, { data: plays }] = await Promise.all([
+      supabase
+        .from("activities")
+        .select("id, title, instructions, kind, items, teachers(name)")
+        .eq("status", "published")
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("activity_plays")
+        .select("activity_id, score, total")
+        .eq("student_id", user.id),
+    ]);
+
+    const best = new Map<string, { score: number; total: number; plays: number }>();
+    for (const p of (plays ?? []) as {
+      activity_id: string;
+      score: number;
+      total: number;
+    }[]) {
+      const cur = best.get(p.activity_id);
+      const score = Number(p.score);
+      if (!cur) best.set(p.activity_id, { score, total: Number(p.total), plays: 1 });
+      else {
+        cur.plays += 1;
+        if (score > cur.score) {
+          cur.score = score;
+          cur.total = Number(p.total);
+        }
+      }
+    }
+
+    return ((data ?? []) as {
+      id: string;
+      title: string;
+      instructions: string;
+      kind: ActivityKind;
+      items: unknown;
+      teachers: { name: string } | { name: string }[] | null;
+    }[]).map((a) => {
+      const t = Array.isArray(a.teachers) ? a.teachers[0] : a.teachers;
+      const b = best.get(a.id);
+      return {
+        id: a.id,
+        title: a.title,
+        instructions: a.instructions,
+        kind: a.kind,
+        items: Array.isArray(a.items) ? (a.items as ActivityItem[]) : [],
+        teacherName: t?.name ?? "معلّم",
+        bestScore: b ? b.score : null,
+        bestTotal: b ? b.total : null,
+        plays: b?.plays ?? 0,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+/** نشاط واحد ليلعبه الطالب — تُرشّحه RLS، فما وصل جاز لعبه */
+export async function getActivityToPlay(id: string): Promise<StudentActivity | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data } = await supabase
+    .from("activities")
+    .select("id, title, instructions, kind, items, teachers(name)")
+    .eq("id", id)
+    .eq("status", "published")
+    .maybeSingle();
+  if (!data) return null;
+
+  const row = data as {
+    id: string;
+    title: string;
+    instructions: string;
+    kind: ActivityKind;
+    items: unknown;
+    teachers: { name: string } | { name: string }[] | null;
+  };
+  const t = Array.isArray(row.teachers) ? row.teachers[0] : row.teachers;
+
+  const { data: plays } = await supabase
+    .from("activity_plays")
+    .select("score, total")
+    .eq("activity_id", id)
+    .eq("student_id", user.id);
+
+  const list = (plays ?? []) as { score: number; total: number }[];
+  const top = list.reduce<{ score: number; total: number } | null>(
+    (acc, p) => (!acc || Number(p.score) > acc.score
+      ? { score: Number(p.score), total: Number(p.total) }
+      : acc),
+    null
+  );
+
+  return {
+    id: row.id,
+    title: row.title,
+    instructions: row.instructions,
+    kind: row.kind,
+    items: Array.isArray(row.items) ? (row.items as ActivityItem[]) : [],
+    teacherName: t?.name ?? "معلّم",
+    bestScore: top?.score ?? null,
+    bestTotal: top?.total ?? null,
+    plays: list.length,
+  };
+}
+
+/** قوالب الأنشطة التي حفظها المعلّم */
+export async function getMyActivityTemplates(): Promise<ActivityTemplate[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return [];
+
+  const { data } = await supabase
+    .from("activity_templates")
+    .select("id, name, kind, items")
+    .eq("teacher_id", teacher.id)
+    .order("created_at", { ascending: false });
+
+  return ((data ?? []) as {
+    id: string;
+    name: string;
+    kind: ActivityKind;
+    items: unknown;
+  }[]).map((t) => ({
+    id: t.id,
+    name: t.name,
+    kind: t.kind,
+    items: Array.isArray(t.items) ? (t.items as ActivityItem[]) : [],
+  }));
 }

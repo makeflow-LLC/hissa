@@ -46,7 +46,7 @@ SUPABASE_SERVICE_ROLE_KEY=<secret key>   # npm run seed only — never NEXT_PUBL
 
 ### Tables
 
-In use: `teachers`, `units`, `lessons`, `lesson_attachments`, `quiz_questions`, `profiles`, `follows`, `lesson_progress`, `teacher_messages`, `student_grants`, `reviews`, `parent_reports`, `student_groups`, `student_group_members`, `report_cards`, `report_card_requests`.
+In use: `teachers`, `units`, `lessons`, `lesson_attachments`, `quiz_questions`, `profiles`, `follows`, `lesson_progress`, `teacher_messages`, `student_grants`, `reviews`, `parent_reports`, `student_groups`, `student_group_members`, `report_cards`, `report_card_requests`, `exams` (+ `exam_questions` / `exam_attempts` / `exam_answers` / `exam_templates`), `activities` (+ `activity_plays` / `activity_templates`).
 
 - `lessons.is_free_preview` — the one visitor-visible lesson per teacher.
 - `lessons.is_restricted` — hidden entirely unless the student holds a `student_grants` row.
@@ -78,6 +78,7 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0017_group_hub_messaging_availability.sql` | group `whatsapp_link`/`goal`/`schedule`, `teacher_messages.group_id`, `message_dismissals`, `teachers.availability` |
 | `0018_exam_templates.sql` | `exam_templates` — a teacher's reusable exam structure, stored as `jsonb` |
 | `0019_exam_target_points.sql` | `exams.target_points` — the teacher's intended total, compared against the questions' sum |
+| `0020_activities.sql` | `activities` / `activity_plays` / `activity_templates` — Wordwall-style games over one shared item list |
 
 ### Removed: live sessions
 
@@ -199,6 +200,18 @@ A teacher writes an exam, points it at **one group**, and only that group's memb
 
 **A total the teacher declares, checked against the questions.** `exams.target_points` is optional; when set, `ExamBuilder` compares it to the live sum on every keystroke and `setExamStatus` refuses to publish on a mismatch — with the numbers in the message and a "publish anyway" button, since the teacher may have changed their mind about the total. It is never used for grading: `grade_exam_attempt` always sums `exam_questions` itself. `⚖️ وزّع بالتساوي` divides the target across the questions, putting the remainder on the last one so the sum lands exactly.
 
+### Interactive activities: one content set, six games
+
+`activities` is the Wordwall idea: the teacher enters **pairs** once — `items` is `[{a, b}]` — and `kind` decides how they are played. Switching the kind never touches the content, which is the whole point; the meaning of `a` and `b` is what differs (`lib/activityKinds.ts` carries the label, minimum item count and explanation per kind).
+
+Six kinds: `match` · `flashcards` · `quiz` · `anagram` · `sort` · `wheel`. Each is one file under `components/games/`, and `ActivityPlayer` is the shell that dispatches and records. A game's only outlet is `onFinish(score, total)` — it knows nothing about the database, so a seventh kind is one file plus one line.
+
+**An activity is practice, not assessment — and the design says so out loud.** Unlike `exams`, the answers are *sent to the browser*: a match-up cannot be played without the student seeing both sides, so hiding them is impossible rather than merely inconvenient. The score is therefore computed client-side and stored for encouragement only; it never enters a real average, the UI tells the student that, and `recordPlay` clamps the numbers. Anything needing a protected mark belongs in `exams`.
+
+Two smaller decisions: `group_id` is **nullable** (null = every approved student, unlike exams which always target one group) because practice loses nothing by being wider; and `quiz` builds its wrong answers from other items' `b`, so the teacher writes one question and one answer per row and no distractors.
+
+Templates mirror the exam ones exactly — built-in structures, `activity_templates` for the teacher's own, and `duplicateActivity` which always lands as a draft.
+
 ### The teacher's WhatsApp is not public
 
 `teachers.whatsapp` renders only for a student who is a **member of one of that teacher's groups** (or for the teacher previewing their own page). Publishing it on a public profile turns the directory into a phone-number source for any visitor or scraper. Group membership is the teacher's own decision, so it doubles as the consent signal.
@@ -304,6 +317,9 @@ Security is verified with SQL that switches `role` and `request.jwt.claims` to i
 | `app/teacher/me/exams/new` · `exams/[examId]` | create exam metadata (`ExamForm`) → write questions (`ExamBuilder`) + publish (`ExamPublishBar`) |
 | `app/teacher/me/exams/[examId]/grade/page.tsx` | results + manual grading of text answers (`GradingBoard`) |
 | `app/exam/[examId]/page.tsx` | student takes the exam (`ExamTaker`), or reviews their answers and score once submitted |
+| `app/teacher/me/activities/page.tsx` | interactive activities list, with duplicate and delete |
+| `app/teacher/me/activities/new` · `activities/[activityId]` | build an activity (`ActivityBuilder`), preview it as a student sees it, publish, and read who played |
+| `app/activity/[activityId]/page.tsx` | student plays the activity (`ActivityPlayer`) |
 | `app/privacy/page.tsx` · `app/terms/page.tsx` | Arabic legal pages, linked from the footer |
 
 **Teacher accounts** (Supabase Auth, same Google/magic-link as students — there is no separate teacher login): a user is a teacher iff they own a `teachers` row (`owner_id = auth.uid()`). `saveTeacherProfile` (`app/actions/teacher.ts`) creates/updates that row — name, subject, stages, qualification, `experience_years`, bio, whatsapp, avatar (resized data URL in `avatar_url`), auto-generated unique slug (reserved words blocked). `teachers` columns `qualification`, `experience_years`, `is_published` (directory shows published only; RLS: public read = published-or-owner, plus owner INSERT). `getMyTeacher()` / `isCurrentUserTeacher()` drive the navbar and teacher pages.
@@ -341,7 +357,7 @@ Two pieces carry navigation, and both exist because a back link at the top of a 
 
 ### Client vs server components
 
-Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`, `RichTextEditor`, `ExamForm`, `ExamBuilder`, `ExamPublishBar`, `ExamTaker`, `GradingBoard`, `ExamWindow`, `ExamCountdown`, `Hint`, `InfoTip`, `HelpTabs`, `AvailabilityToggle`, `GroupDetailsForm`, `GroupMembersPanel`, `GroupBroadcast`, `GroupLessonAccess`, `MessageActions`, `TemplatePicker`, `DuplicateExamButton`.
+Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`, `RichTextEditor`, `ExamForm`, `ExamBuilder`, `ExamPublishBar`, `ExamTaker`, `GradingBoard`, `ExamWindow`, `ExamCountdown`, `ActivityBuilder`, `ActivityPlayer`, `ActivityPublishBar`, `ActivityRowActions`, the six `components/games/*`, `Hint`, `InfoTip`, `HelpTabs`, `AvailabilityToggle`, `GroupDetailsForm`, `GroupMembersPanel`, `GroupBroadcast`, `GroupLessonAccess`, `MessageActions`, `TemplatePicker`, `DuplicateExamButton`.
 
 `ShareProfile` (`components/ShareProfile.tsx`) on `/teacher/me`: the teacher's public profile URL (`window.location.origin + /teacher/<slug>`, so it's correct on any domain), a scannable QR code generated client-side with the `qrcode` package (downloadable PNG), a copy button, and WhatsApp/Telegram share links.
 
