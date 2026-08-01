@@ -43,6 +43,9 @@ export default async function TeacherMePage() {
           <Link href="/teacher/me/students" className="btn btn-primary">
             👥 طلابي
           </Link>
+          <Link href="/teacher/me/exams" className="btn btn-primary">
+            📝 الاختبارات
+          </Link>
           <Link href="/teacher/onboarding" className="btn btn-outline">
             ✏️ تعديل بياناتي
           </Link>
@@ -119,6 +122,20 @@ export default async function TeacherMePage() {
           </Link>{" "}
           للطلاب.
         </p>
+      </section>
+
+      <section className="dashboard-section">
+        <div className="section-head-row">
+          <h2 className="section-title">📝 الاختبارات</h2>
+          <Link href="/teacher/me/exams" className="btn btn-primary">
+            إدارة الاختبارات
+          </Link>
+        </div>
+        <Hint>
+          الاختبار يُوجَّه إلى مجموعة بعينها فلا يراه غير طلابها، وله وقت فتح
+          وإغلاق وعلامة لكل سؤال. الاختيار من متعدّد وصح/خطأ يُصحَّحان آلياً،
+          وأسئلة «علّل» و«اذكر السبب» تصحّحها بنفسك.
+        </Hint>
       </section>
     </main>
   );
