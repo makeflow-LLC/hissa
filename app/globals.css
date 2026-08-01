@@ -5147,3 +5147,176 @@ body {
 .exam-question-head .card-actions {
   gap: 6px;
 }
+
+/* ===== العدّاد التنازلي لفتح الاختبار ===== */
+
+.exam-countdown {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  text-align: center;
+  padding: 1.5rem 1rem;
+}
+.exam-countdown-label {
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.exam-countdown-clock {
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: var(--primary-dark);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1px;
+}
+.cd-part { font-size: 1.4rem; }
+
+/* ===== قائمة الطلاب: صفٌّ يفتح ملفّ الطالب ===== */
+
+.student-rows {
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+/*
+ * `min-width: 0` على عنصر الشبكة: قيمته الافتراضية `auto` لا تنزل تحت
+ * المقاس الأدنى لمحتواه، فكان الصفّ يفرض ٤٦٠px مهما ضاقت الشاشة.
+ */
+.student-rows > li {
+  min-width: 0;
+}
+.student-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 0.85rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+.student-row:hover,
+.student-row:focus-visible {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+}
+.student-row-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.student-row-bar {
+  display: block;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+  margin-top: 2px;
+}
+.student-row-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+}
+.student-row-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+/* شريط تواصل الطالب أعلى ملفّه */
+.profile-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 1.25rem;
+}
+.member-id-link {
+  text-decoration: none;
+  color: inherit;
+}
+.member-id-link:hover .member-name {
+  color: var(--primary);
+}
+
+/* صفوف النتائج في ملفّ الطالب */
+.result-list {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+.result-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 0.7rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.result-title {
+  flex: 1 1 160px;
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .student-row {
+    align-items: flex-start;
+  }
+  /* على الجوال ينزل عمود الحالة سطراً كاملاً تحت الاسم بدل مزاحمته */
+  .student-row-body {
+    flex: 1 1 100%;
+  }
+  .student-row-side {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+  .student-row .follow-head-go {
+    margin-inline-start: auto;
+  }
+  .result-row {
+    align-items: stretch;
+  }
+  .exam-countdown-clock {
+    font-size: 2rem;
+  }
+}
+
+/* رأس محاولة الطالب: زرّ الطيّ ورابط ملفّه جنباً إلى جنب */
+.attempt-head-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding-inline-end: 10px;
+}
+.attempt-head-row .attempt-head {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.attempt-profile-link {
+  align-self: center;
+  flex-shrink: 0;
+}
+
+/*
+ * الاسم الطويل يلتفّ داخل الصفّ.
+ * `white-space: nowrap` موروثة من قاعدة أقدم (جدول)، وهي تجعل أدنى عرضٍ
+ * للصفّ هو عرض الاسم كاملاً فيتجاوز شاشة ٣٢٠px.
+ */
+.student-row .student-name,
+.student-row .student-meta,
+.member-name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

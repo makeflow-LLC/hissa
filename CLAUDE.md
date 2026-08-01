@@ -124,6 +124,14 @@ Subjects are compared through `normalize_ar()` (SQL) — diacritics, tatweel, al
 
 Both are teacher-owned and student-readable, and both refuse to reference a student who is not `approved`. The two group policies once referenced each other and sent RLS into infinite recursion; `is_group_member()` (`security definer`) breaks the cycle on one side, the same way `has_grant()` does in `0008`.
 
+### A student's page, and where marks are not shown
+
+`getStudentForTeacher()` backs `/teacher/me/students/[studentId]` — one batched read of everything a teacher knows about one student. It resolves the student through an **approved** `follows` row for the caller's own teacher id and returns `null` otherwise, so passing a stranger's id opens nothing.
+
+It exists because the roster had grown into a wall: every student's card carried the report-card form, the grant panel, the group chips and the message thread at once. The list is now a list; the detail opens when it is wanted. Every place a student's name appears — roster, group members, grading board, card requests — links here.
+
+**Marks do not appear on either dashboard.** A dashboard gets opened in front of whoever is passing the screen — a sibling, a classmate — so the student's own board shows an exam's *state* ("صُحِّح" / "بانتظار تصحيح معلّمك") and a link, and the score lives inside the exam page next to the answers that produced it. The group hub likewise shows progress and "قدّم ٣ اختبارات", never an average; per-student marks are on that student's page.
+
 ### The group hub (`/teacher/me/groups/[groupId]`)
 
 A group used to be a label pinned on a student and nothing more. `0017` turns it into a class with its own page: members with their lesson progress, their average across **this group's** exams, their latest report card, and an "awaiting your reply" flag when the last message in the thread came from them; a broadcast that reaches only its members; a WhatsApp invite link; a goal and a meeting time; the group's exams; and bulk access to restricted lessons.
@@ -205,7 +213,7 @@ Both were dead UI until `0010`. The lesson page had always rendered a "📎 ال
 
 **Attachments** upload from the browser to the same `lesson-media` bucket (`0010` widens its MIME list to documents and raises the limit to 20 MB); `addAttachment` then records the row after re-checking the lesson belongs to the caller. `AttachmentManager` only appears when editing an existing lesson — a new lesson has no id to attach to yet, and the form says so.
 
-**Quiz attempts** are stored one row per (lesson, student), updated on retry. **The grading happens on the server** (`app/actions/quiz.ts`): the client sends only its choices and the action reads `correct_index` from the database. Grading in the browser and trusting a posted score would let any student submit a perfect result. Teachers see per-lesson averages and per-student scores on `/teacher/me/students`.
+**Quiz attempts** are stored one row per (lesson, student), updated on retry. **The grading happens on the server** (`app/actions/quiz.ts`): the client sends only its choices and the action reads `correct_index` from the database. Grading in the browser and trusting a posted score would let any student submit a perfect result. A teacher reads a student's quiz scores on that student's own page.
 
 ### Arabic search
 
@@ -288,7 +296,8 @@ Security is verified with SQL that switches `role` and `request.jwt.claims` to i
 | `app/teacher/me/content/page.tsx` | content manager: units + lessons, with delete forms |
 | `app/teacher/me/lessons/new` · `lessons/[lessonId]` | create/edit a recorded lesson (`LessonForm`) |
 | `app/dashboard/profile/page.tsx` | student fills their own data (`StudentProfileForm`) |
-| `app/teacher/me/students/page.tsx` | teacher's followers: profiles, progress, messages, access grants |
+| `app/teacher/me/students/page.tsx` | roster: one clickable row per student, plus join/card requests, groups and the all-students broadcast |
+| `app/teacher/me/students/[studentId]/page.tsx` | one student's whole record: contacts, progress, exam and quiz results, the message thread, groups, grants, report cards |
 | `app/teacher/me/groups/[groupId]/page.tsx` | one group as a class: members + progress + exam averages, group broadcast, WhatsApp link, group exams, bulk lesson access |
 | `app/help/page.tsx` | Arabic usage guide, two tabs (student / teacher), public and indexed |
 | `app/teacher/me/exams/page.tsx` | teacher's exam list, with a "بانتظار تصحيحك" count per exam |
@@ -332,7 +341,7 @@ Two pieces carry navigation, and both exist because a back link at the top of a 
 
 ### Client vs server components
 
-Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`, `RichTextEditor`, `ExamForm`, `ExamBuilder`, `ExamPublishBar`, `ExamTaker`, `GradingBoard`, `ExamWindow`, `Hint`, `InfoTip`, `HelpTabs`, `AvailabilityToggle`, `GroupDetailsForm`, `GroupMembersPanel`, `GroupBroadcast`, `GroupLessonAccess`, `MessageActions`, `TemplatePicker`, `DuplicateExamButton`.
+Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`, `RichTextEditor`, `ExamForm`, `ExamBuilder`, `ExamPublishBar`, `ExamTaker`, `GradingBoard`, `ExamWindow`, `ExamCountdown`, `Hint`, `InfoTip`, `HelpTabs`, `AvailabilityToggle`, `GroupDetailsForm`, `GroupMembersPanel`, `GroupBroadcast`, `GroupLessonAccess`, `MessageActions`, `TemplatePicker`, `DuplicateExamButton`.
 
 `ShareProfile` (`components/ShareProfile.tsx`) on `/teacher/me`: the teacher's public profile URL (`window.location.origin + /teacher/<slug>`, so it's correct on any domain), a scannable QR code generated client-side with the `qrcode` package (downloadable PNG), a copy button, and WhatsApp/Telegram share links.
 

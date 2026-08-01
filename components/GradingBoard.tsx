@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { gradeAnswer } from "@/app/actions/exams";
 import type { AttemptForGrading, ExamQuestion } from "@/lib/data/types";
@@ -59,29 +60,42 @@ export default function GradingBoard({
 
           return (
             <li key={a.id} className="attempt-card">
-              <button
-                type="button"
-                className="attempt-head"
-                aria-expanded={isOpen}
-                onClick={() => setOpen(isOpen ? null : a.id)}
-              >
-                <span className="attempt-name">{a.studentName}</span>
-                <span className="attempt-badges">
-                  {a.status === "in_progress" ? (
-                    <span className="pill pill-draft">لم يسلّم بعد</span>
-                  ) : pending > 0 ? (
-                    <span className="pill pill-low">✍️ {pending} بانتظار تصحيحك</span>
-                  ) : (
-                    <span className="pill pill-live">✓ مكتمل</span>
-                  )}
-                  {/* «من» لا «/»: الشرطة في سياق عربي تُقرأ معكوسة فتوهم
-                      أن العلامة الكاملة هي الأصغر */}
-                  <span className="attempt-score">
-                    {total} من {a.max_score}
+              {/*
+                الرابط خارج الزرّ لا داخله: <a> داخل <button> ترميزٌ غير
+                صالح، والمتصفّح يفكّه فيختلف ما يرسمه العميل عمّا أرسله
+                الخادم.
+              */}
+              <div className="attempt-head-row">
+                <button
+                  type="button"
+                  className="attempt-head"
+                  aria-expanded={isOpen}
+                  onClick={() => setOpen(isOpen ? null : a.id)}
+                >
+                  <span className="attempt-name">{a.studentName}</span>
+                  <span className="attempt-badges">
+                    {a.status === "in_progress" ? (
+                      <span className="pill pill-draft">لم يسلّم بعد</span>
+                    ) : pending > 0 ? (
+                      <span className="pill pill-low">✍️ {pending} بانتظار تصحيحك</span>
+                    ) : (
+                      <span className="pill pill-live">✓ مكتمل</span>
+                    )}
+                    {/* «من» لا «/»: الشرطة في سياق عربي تُقرأ معكوسة فتوهم
+                        أن العلامة الكاملة هي الأصغر */}
+                    <span className="attempt-score">
+                      {total} من {a.max_score}
+                    </span>
+                    <span aria-hidden="true">{isOpen ? "▲" : "▼"}</span>
                   </span>
-                  <span aria-hidden="true">{isOpen ? "▲" : "▼"}</span>
-                </span>
-              </button>
+                </button>
+                <Link
+                  href={`/teacher/me/students/${a.studentId}`}
+                  className="btn btn-outline btn-sm attempt-profile-link"
+                >
+                  📋 ملفّه
+                </Link>
+              </div>
 
               {isOpen && (
                 <ol className="attempt-answers">

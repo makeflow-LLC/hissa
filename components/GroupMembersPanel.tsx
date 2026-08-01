@@ -81,15 +81,23 @@ export default function GroupMembersPanel({
                     {m.name.slice(0, 2)}
                   </span>
                 )}
-                <div className="member-id">
+                {/* الاسم مدخلٌ إلى ملفّ الطالب الكامل، لا نصّاً جامداً */}
+                <Link
+                  href={`/teacher/me/students/${m.studentId}`}
+                  className="member-id member-id-link"
+                >
                   <strong className="member-name">{m.name}</strong>
                   <span className="group-meta">{m.grade || "بلا صفّ مسجّل"}</span>
-                </div>
+                </Link>
                 {m.awaitingReply && (
                   <span className="pill pill-low">✉️ ينتظر ردّك</span>
                 )}
               </div>
 
+              {/*
+                التقدّم وحده هنا. الدرجات تخصّ الطالب، ومكانها ملفّه لا
+                لوحةٌ تُفتح أمام كل من يمرّ بالشاشة.
+              */}
               <div className="member-stats">
                 <span className="member-stat">
                   📘 {m.completedLessons} من {m.totalLessons} درساً
@@ -98,13 +106,7 @@ export default function GroupMembersPanel({
                   </span>
                 </span>
                 <span className="member-stat">
-                  📝{" "}
-                  {m.examAvg === null
-                    ? "لم يقدّم اختباراً بعد"
-                    : `معدّل الاختبارات ${m.examAvg}% (${m.examsTaken})`}
-                </span>
-                <span className="member-stat">
-                  🏅 {m.lastCardTitle ?? "لا بطاقة تقييم بعد"}
+                  📝 {m.examsTaken > 0 ? `قدّم ${m.examsTaken} اختباراً` : "لم يقدّم اختباراً بعد"}
                 </span>
               </div>
 
@@ -119,7 +121,10 @@ export default function GroupMembersPanel({
                 >
                   ✉️ رسالة خاصّة
                 </button>
-                <Link href="/teacher/me/students" className="btn btn-outline btn-sm">
+                <Link
+                  href={`/teacher/me/students/${m.studentId}`}
+                  className="btn btn-outline btn-sm"
+                >
                   📋 ملفّه الكامل
                 </Link>
                 <button

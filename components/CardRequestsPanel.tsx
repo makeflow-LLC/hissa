@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { decideCardRequest } from "@/app/actions/teacher-groups";
@@ -41,7 +42,13 @@ export default function CardRequestsPanel({
             </span>
           </div>
           <div className="form-row">
-            {/* الإصدار نفسه من بطاقة الطالب بالأسفل — هنا نغلق الطلب فقط */}
+            {/* الطريق المباشر إلى ما طلبه الطالب: نموذج البطاقة في ملفّه */}
+            <Link
+              href={`/teacher/me/students/${r.studentId}`}
+              className="btn btn-primary btn-sm"
+            >
+              🏅 أصدر البطاقة
+            </Link>
             <button
               type="button"
               className="btn btn-outline btn-sm"
