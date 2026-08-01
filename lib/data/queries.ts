@@ -13,8 +13,15 @@ import type {
   StudentProfile,
   TeacherCard,
   TeacherMessage,
+  AttemptForGrading,
   CardRequest,
+  Exam,
+  ExamAnswer,
+  ExamPaperQuestion,
+  ExamQuestion,
+  ExamSummary,
   MyCardRequest,
+  StudentExam,
   ReportCard,
   StudentGroup,
   TeacherProfile,
@@ -1390,4 +1397,265 @@ export async function getMyThreads(): Promise<StudentThread[]> {
       };
     })
     .sort((a, b) => b.unansweredCount - a.unansweredCount);
+}
+
+
+/* ==================== الاختبارات ==================== */
+
+/** اختبارات المعلّم الحالي مع عدّاداتها */
+export async function getMyExams(): Promise<ExamSummary[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return [];
+
+  const { data } = await supabase
+    .from("exams")
+    .select("*, student_groups(name), exam_questions(points), exam_attempts(status)")
+    .eq("teacher_id", teacher.id)
+    .order("created_at", { ascending: false });
+
+  return ((data ?? []) as (Exam & {
+    student_groups: { name: string } | { name: string }[] | null;
+    exam_questions: { points: number }[] | null;
+    exam_attempts: { status: string }[] | null;
+  })[]).map((e) => {
+    const g = Array.isArray(e.student_groups) ? e.student_groups[0] : e.student_groups;
+    const qs = e.exam_questions ?? [];
+    const attempts = e.exam_attempts ?? [];
+    return {
+      ...e,
+      groupName: g?.name ?? "مجموعة",
+      questionCount: qs.length,
+      totalPoints: qs.reduce((n, q) => n + Number(q.points || 0), 0),
+      submittedCount: attempts.filter((a) => a.status !== "in_progress").length,
+      needsGrading: attempts.filter((a) => a.status === "submitted").length,
+    };
+  });
+}
+
+/** اختبار واحد للمعلّم مع أسئلته الكاملة (بالإجابات الصحيحة) */
+export async function getMyExam(
+  examId: string
+): Promise<{ exam: Exam; questions: ExamQuestion[] } | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return null;
+
+  const { data: exam } = await supabase
+    .from("exams")
+    .select("*")
+    .eq("id", examId)
+    .eq("teacher_id", teacher.id)
+    .maybeSingle();
+  if (!exam) return null;
+
+  const { data: qs } = await supabase
+    .from("exam_questions")
+    .select("*")
+    .eq("exam_id", examId)
+    .order("position");
+
+  return {
+    exam: exam as Exam,
+    questions: ((qs ?? []) as ExamQuestion[]).map((q) => ({
+      ...q,
+      options: Array.isArray(q.options) ? q.options : [],
+    })),
+  };
+}
+
+/** محاولات الطلاب في اختبار — لشاشة التصحيح */
+export async function getExamAttempts(examId: string): Promise<AttemptForGrading[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from("exam_attempts")
+    .select("*, exam_answers(*)")
+    .eq("exam_id", examId)
+    .order("submitted_at", { ascending: true });
+
+  const rows = (data ?? []) as (AttemptForGrading & {
+    student_id: string;
+    exam_answers: AttemptForGrading["answers"];
+  })[];
+  if (rows.length === 0) return [];
+
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, full_name")
+    .in("id", rows.map((r) => r.student_id));
+  const names = new Map(
+    ((profiles ?? []) as { id: string; full_name: string }[]).map((p) => [p.id, p.full_name])
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    studentId: r.student_id,
+    studentName: names.get(r.student_id) ?? "طالب",
+    status: r.status,
+    submitted_at: r.submitted_at,
+    auto_score: Number(r.auto_score),
+    manual_score: Number(r.manual_score),
+    max_score: Number(r.max_score),
+    answers: r.exam_answers ?? [],
+  }));
+}
+
+/** اختبارات الطالب الحالي (من مجموعاته) */
+export async function getMyStudentExams(): Promise<StudentExam[]> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data } = await supabase
+      .from("exams")
+      .select("*, teachers(name), exam_questions(points)")
+      .eq("status", "published")
+      .order("created_at", { ascending: false });
+
+    const exams = (data ?? []) as (Exam & {
+      teachers: { name: string } | { name: string }[] | null;
+      exam_questions: { points: number }[] | null;
+    })[];
+    if (exams.length === 0) return [];
+
+    const { data: attempts } = await supabase
+      .from("exam_attempts")
+      .select("id, exam_id, status, auto_score, manual_score, max_score")
+      .eq("student_id", user.id);
+    const byExam = new Map(
+      ((attempts ?? []) as { exam_id: string }[]).map((a) => [a.exam_id, a])
+    );
+
+    return exams.map((e) => {
+      const t = Array.isArray(e.teachers) ? e.teachers[0] : e.teachers;
+      const qs = e.exam_questions ?? [];
+      const a = byExam.get(e.id) as
+        | {
+            id: string;
+            status: StudentExam["attempt"] extends null ? never : "in_progress" | "submitted" | "graded";
+            auto_score: number;
+            manual_score: number;
+            max_score: number;
+          }
+        | undefined;
+      return {
+        id: e.id,
+        title: e.title,
+        description: e.description,
+        teacherName: t?.name ?? "معلّم",
+        opens_at: e.opens_at,
+        closes_at: e.closes_at,
+        duration_minutes: e.duration_minutes,
+        questionCount: qs.length,
+        totalPoints: qs.reduce((n, q) => n + Number(q.points || 0), 0),
+        attempt: a
+          ? {
+              id: a.id,
+              status: a.status,
+              auto_score: Number(a.auto_score),
+              manual_score: Number(a.manual_score),
+              max_score: Number(a.max_score),
+            }
+          : null,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * ورقة الأسئلة كما يراها الطالب — بلا إجابات صحيحة.
+ *
+ * الأسئلة تأتي من `get_exam_paper` لا من الجدول: سياسة `exam_questions`
+ * تمنع الطالب أصلاً، والدالة تُسقط `correct_index` و`correct_bool` و
+ * `model_answer` قبل أن يصله شيء. إجاباته هو يقرؤها عادياً.
+ */
+export async function getExamPaper(examId: string): Promise<{
+  exam: Exam;
+  questions: ExamPaperQuestion[];
+  attempt: {
+    id: string;
+    status: "in_progress" | "submitted" | "graded";
+    started_at: string;
+    auto_score: number;
+    manual_score: number;
+    max_score: number;
+  } | null;
+  myAnswers: ExamAnswer[];
+} | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: exam } = await supabase
+    .from("exams")
+    .select("*")
+    .eq("id", examId)
+    .maybeSingle();
+  if (!exam) return null;
+
+  const { data: qs } = await supabase.rpc("get_exam_paper", { e_id: examId });
+
+  const { data: attempt } = await supabase
+    .from("exam_attempts")
+    .select("id, status, started_at, auto_score, manual_score, max_score")
+    .eq("exam_id", examId)
+    .eq("student_id", user.id)
+    .maybeSingle();
+
+  let myAnswers: ExamAnswer[] = [];
+  if (attempt) {
+    const { data: ans } = await supabase
+      .from("exam_answers")
+      .select("*")
+      .eq("attempt_id", (attempt as { id: string }).id);
+    myAnswers = (ans ?? []) as ExamAnswer[];
+  }
+
+  return {
+    exam: exam as Exam,
+    questions: ((qs ?? []) as ExamPaperQuestion[]).map((q) => ({
+      ...q,
+      options: Array.isArray(q.options) ? q.options : [],
+    })),
+    attempt:
+      (attempt as {
+        id: string;
+        status: "in_progress" | "submitted" | "graded";
+        started_at: string;
+        auto_score: number;
+        manual_score: number;
+        max_score: number;
+      } | null) ?? null,
+    myAnswers,
+  };
 }

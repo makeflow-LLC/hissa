@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import AskTeacherForm from "@/components/AskTeacherForm";
+import ExamWindow from "@/components/ExamWindow";
 import LiveNotifier from "@/components/LiveNotifier";
 import RequestReportCard from "@/components/RequestReportCard";
 import Hint from "@/components/Hint";
@@ -12,6 +13,7 @@ import {
   getMyParentReports,
   getMyPendingJoins,
   getMyReportCards,
+  getMyStudentExams,
   getMyStudentProfile,
   getStudentDashboard,
   getStudentName,
@@ -37,6 +39,7 @@ export default async function StudentDashboard() {
     pendingJoins,
     reportCards,
     cardRequests,
+    exams,
   ] = await Promise.all([
       getStudentName(),
       getStudentDashboard(),
@@ -46,6 +49,7 @@ export default async function StudentDashboard() {
       getMyPendingJoins(),
       getMyReportCards(),
       getMyCardRequests(),
+      getMyStudentExams(),
     ]);
   const { following = [] } = data ?? {};
 
@@ -116,6 +120,68 @@ export default async function StudentDashboard() {
                 )}
               </li>
             ))}
+          </ul>
+        </section>
+      )}
+
+      {exams.length > 0 && (
+        <section className="dashboard-section">
+          <h2 className="section-title">📝 اختباراتي</h2>
+          <Hint>
+            اختبارات يوجّهها معلّمك إلى مجموعتك. لكل اختبار وقتٌ محدّد ومحاولة
+            واحدة، والدرجة تظهر فور التسليم إلا الأسئلة النصّية فينتظر تصحيح
+            معلّمك.
+          </Hint>
+          <ul className="exam-list">
+            {exams.map((e) => {
+              const a = e.attempt;
+              return (
+                <li key={e.id} className="exam-card">
+                  <div className="exam-card-main">
+                    <h3 className="exam-card-title">
+                      <Link href={`/exam/${e.id}`}>{e.title}</Link>
+                    </h3>
+                    <p className="exam-card-meta">
+                      👩‍🏫 {e.teacherName} · {e.questionCount} سؤالاً ·{" "}
+                      {e.totalPoints} علامة
+                    </p>
+                    <p className="exam-card-meta">
+                      🕒 <ExamWindow opens={e.opens_at} closes={e.closes_at} />
+                      {e.duration_minutes ? ` · ${e.duration_minutes} دقيقة` : ""}
+                    </p>
+                  </div>
+                  <div className="exam-card-side">
+                    {!a ? (
+                      <Link href={`/exam/${e.id}`} className="btn btn-primary btn-sm">
+                        ▶️ ابدأ
+                      </Link>
+                    ) : a.status === "in_progress" ? (
+                      <Link href={`/exam/${e.id}`} className="btn btn-primary btn-sm">
+                        ↩️ أكمل الاختبار
+                      </Link>
+                    ) : (
+                      <>
+                        <span
+                          className={
+                            a.status === "graded" ? "pill pill-live" : "pill pill-draft"
+                          }
+                        >
+                          {a.status === "graded"
+                            ? "✓ صُحِّح"
+                            : "⏳ بانتظار تصحيح معلّمك"}
+                        </span>
+                        <span className="attempt-score">
+                          {a.auto_score + a.manual_score} من {a.max_score}
+                        </span>
+                        <Link href={`/exam/${e.id}`} className="btn btn-outline btn-sm">
+                          عرض إجاباتي
+                        </Link>
+                      </>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}
@@ -313,12 +379,20 @@ export default async function StudentDashboard() {
               const pct = f.total ? Math.round((f.done / f.total) * 100) : 0;
               return (
                 <article key={f.teacher.id} className="unit-progress-card">
-                  <header className="follow-head">
+                  {/*
+                    الرأس كلّه رابط: الطالب يضغط الصورة أو الاسم فيصل إلى
+                    دروس معلّمه مباشرةً، بدل أن يعود إلى الدليل ويبحث عنه.
+                  */}
+                  <Link
+                    href={`/teacher/${f.teacher.slug}`}
+                    className="follow-head follow-head-link"
+                    aria-label={`دروس ${f.teacher.name}`}
+                  >
                     {f.teacher.avatar_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={f.teacher.avatar_url}
-                        alt={f.teacher.name}
+                        alt=""
                         className="follow-avatar"
                       />
                     ) : (
@@ -331,14 +405,13 @@ export default async function StudentDashboard() {
                       </span>
                     )}
                     <div>
-                      <h3 className="unit-progress-title">
-                        <Link href={`/teacher/${f.teacher.slug}`} className="plain-link">
-                          {f.teacher.name}
-                        </Link>
-                      </h3>
+                      <h3 className="unit-progress-title">{f.teacher.name}</h3>
                       <span className="tag tag-subject">{f.teacher.subject}</span>
                     </div>
-                  </header>
+                    <span className="follow-head-go" aria-hidden="true">
+                      ‹
+                    </span>
+                  </Link>
 
                   <div className="progress-track">
                     <div className="progress-fill" style={{ width: `${pct}%` }} />

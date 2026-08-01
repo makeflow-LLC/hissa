@@ -74,6 +74,7 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0013_groups_report_cards_join_requests.sql` | join requests on `follows`, `student_groups`, `report_cards`, `normalize_ar()` + one-teacher-per-subject trigger |
 | `0014_follow_vs_join.sql` | `following` status separating follow from join; review requires an approved join |
 | `0015_report_card_requests_and_realtime.sql` | `report_card_requests` + realtime publication for messages, follows and cards |
+| `0016_exams.sql` | group-targeted `exams`, `exam_questions`, `exam_attempts`, `exam_answers`, `get_exam_paper()` + server-side grading functions |
 
 ### Removed: live sessions
 
@@ -133,6 +134,20 @@ Three deliberate details:
 ### Students may request a report card
 
 `report_card_requests` lets a joined student ask for an evaluation instead of waiting for the teacher to volunteer one. The request carries **no text** — same reasoning as join requests: the teacher decides the unit, term and ratings when issuing. A partial unique index allows only one `pending` request per (teacher, student), and issuing a new card auto-closes the pending request so it does not linger on the teacher's board.
+
+### Exams
+
+A teacher writes an exam, points it at **one group**, and only that group's members ever see it. Distinct from `quiz_questions` (which belong to a lesson): an exam is standalone, has an open/close window and an optional per-attempt duration, and carries a mark per question. Three question kinds: `mcq`, `truefalse`, `text`.
+
+**The correct answers are never sent to the student.** RLS filters rows, not columns, and column privileges distinguish `anon` from `authenticated` — not student from teacher, since both are `authenticated`. So `exam_questions` grants the student nothing at all; the only way in is the `security definer` function `get_exam_paper(exam_id)`, which returns the questions with `correct_index`, `correct_bool` and `model_answer` stripped, and only when `can_take_exam()` or `owns_exam()` holds. **Do not add a student SELECT policy on `exam_questions`** — one would hand every student a perfect score through the REST API.
+
+**Grading runs in the database**, not the browser: `grade_exam_attempt(attempt, payload)` reads the correct answers itself, so the client only ever posts its choices. It refuses an attempt that is not the caller's own or is no longer `in_progress`, which is what stops re-submitting for a better mark. An attempt lands in `submitted` when any text question exists (waiting on the teacher) and `graded` otherwise; `recalc_attempt_score` re-totals after each manual mark and flips to `graded` once nothing is pending. Verified by role-switching SQL: a non-member sees zero exams/questions/paper rows and cannot insert an attempt; a member reads 3 paper questions but 0 rows from `exam_questions`; and a student updating their own `awarded` or `manual_score` changes 0 rows.
+
+**Questions lock once anyone starts.** `saveExamQuestions` replaces the set wholesale, so editing after answers exist would silently re-grade them against different questions; `ExamBuilder` renders read-only instead and asks the teacher to create a new exam.
+
+**The time window is enforced server-side** in `submitExam` — the window itself, plus `duration_minutes` measured from `started_at` with a two-minute grace for slow networks. The countdown in `ExamTaker` is a courtesy, and a student can stop it from devtools. One deliberate asymmetry: the countdown auto-submits when it reaches zero **while the page is open**, but a student who returns to an already-expired attempt is *not* auto-submitted — posting a blank paper on their behalf would burn their only attempt.
+
+Times render through `ExamWindow`, a client component: the server runs in UTC, so formatting a window there would show the teacher an hour they never typed.
 
 ### The teacher's WhatsApp is not public
 
@@ -232,6 +247,10 @@ Security is verified with SQL that switches `role` and `request.jwt.claims` to i
 | `app/teacher/me/lessons/new` · `lessons/[lessonId]` | create/edit a recorded lesson (`LessonForm`) |
 | `app/dashboard/profile/page.tsx` | student fills their own data (`StudentProfileForm`) |
 | `app/teacher/me/students/page.tsx` | teacher's followers: profiles, progress, messages, access grants |
+| `app/teacher/me/exams/page.tsx` | teacher's exam list, with a "بانتظار تصحيحك" count per exam |
+| `app/teacher/me/exams/new` · `exams/[examId]` | create exam metadata (`ExamForm`) → write questions (`ExamBuilder`) + publish (`ExamPublishBar`) |
+| `app/teacher/me/exams/[examId]/grade/page.tsx` | results + manual grading of text answers (`GradingBoard`) |
+| `app/exam/[examId]/page.tsx` | student takes the exam (`ExamTaker`), or reviews their answers and score once submitted |
 | `app/privacy/page.tsx` · `app/terms/page.tsx` | Arabic legal pages, linked from the footer |
 
 **Teacher accounts** (Supabase Auth, same Google/magic-link as students — there is no separate teacher login): a user is a teacher iff they own a `teachers` row (`owner_id = auth.uid()`). `saveTeacherProfile` (`app/actions/teacher.ts`) creates/updates that row — name, subject, stages, qualification, `experience_years`, bio, whatsapp, avatar (resized data URL in `avatar_url`), auto-generated unique slug (reserved words blocked). `teachers` columns `qualification`, `experience_years`, `is_published` (directory shows published only; RLS: public read = published-or-owner, plus owner INSERT). `getMyTeacher()` / `isCurrentUserTeacher()` drive the navbar and teacher pages.
@@ -249,6 +268,7 @@ Both roles sign in through `/login`; `?role=teacher` only switches the copy and 
 **Teacher content** lives in Supabase, written by `app/actions/teacher-content.ts`: `createUnit` / `renameUnit` / `deleteUnit`, `saveLesson` / `deleteLesson`, `saveLive` / `deleteLive`. Every action re-resolves the caller's own `teachers` row and scopes each write by `teacher_id`, so a signed-in user can only touch their own curriculum (owner-write RLS from `0002_rls.sql` is the second line of defence — no migration was needed for this feature). Notes:
 
 - `saveLesson` replaces `quiz_questions` wholesale (delete + insert), enforces **one** `is_free_preview` lesson per teacher by clearing the flag on the teacher's other lessons, and sanitizes every section's HTML (see "Rich lesson content").
+- `app/actions/exams.ts` holds both sides of the exam: `saveExam` / `saveExamQuestions` / `setExamStatus` / `deleteExam` for the teacher, `startExam` / `submitExam` for the student, and `gradeAnswer` for manual marks. Every teacher action re-resolves the caller's own `teachers` row and scopes the write by it; `gradeAnswer` clamps the mark to the question's own `points` before writing.
 - `app/actions/teacher-students.ts` covers the teacher↔student side: `sendMessage` (one student or broadcast), `grantAccess` / `revokeAccess`, `saveParentReport` / `deleteParentReport`. Every one re-checks that the target actually follows this teacher.
 - `status` is `draft` | `published`; public queries filter `status = 'published'`, so drafts never reach students.
 - `VideoPlayer` embeds YouTube links (`youtube-nocookie`, watch/youtu.be/embed/shorts forms) and falls back to a `<video>` element for direct MP4 URLs.
@@ -268,7 +288,7 @@ Two pieces carry navigation, and both exist because a back link at the top of a 
 
 ### Client vs server components
 
-Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`, `RichTextEditor`.
+Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`, `RichTextEditor`, `ExamForm`, `ExamBuilder`, `ExamPublishBar`, `ExamTaker`, `GradingBoard`, `ExamWindow`.
 
 `ShareProfile` (`components/ShareProfile.tsx`) on `/teacher/me`: the teacher's public profile URL (`window.location.origin + /teacher/<slug>`, so it's correct on any domain), a scannable QR code generated client-side with the `qrcode` package (downloadable PNG), a copy button, and WhatsApp/Telegram share links.
 

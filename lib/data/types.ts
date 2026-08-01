@@ -273,3 +273,96 @@ export interface TeacherMessage {
   /** من كتبها — الخيط الواحد يحمل رسائل الطرفين */
   sender: "teacher" | "student";
 }
+
+/* ==================== الاختبارات ==================== */
+
+export type QuestionKind = "mcq" | "truefalse" | "text";
+
+/** سؤال كما يراه المعلّم — بإجابته الصحيحة */
+export interface ExamQuestion {
+  id: string;
+  position: number;
+  kind: QuestionKind;
+  prompt: string;
+  options: string[];
+  correct_index: number | null;
+  correct_bool: boolean | null;
+  model_answer: string;
+  points: number;
+}
+
+/** سؤال كما يراه الطالب — بلا إجابة صحيحة (من get_exam_paper) */
+export interface ExamPaperQuestion {
+  id: string;
+  position: number;
+  kind: QuestionKind;
+  prompt: string;
+  options: string[];
+  points: number;
+}
+
+export interface Exam {
+  id: string;
+  teacher_id: string;
+  group_id: string;
+  title: string;
+  description: string;
+  opens_at: string | null;
+  closes_at: string | null;
+  duration_minutes: number | null;
+  status: "draft" | "published";
+  created_at: string;
+}
+
+/** اختبار في قائمة المعلّم مع عدّاداته */
+export interface ExamSummary extends Exam {
+  groupName: string;
+  questionCount: number;
+  totalPoints: number;
+  submittedCount: number;
+  needsGrading: number;
+}
+
+/** اختبار كما يظهر للطالب على لوحته */
+export interface StudentExam {
+  id: string;
+  title: string;
+  description: string;
+  teacherName: string;
+  opens_at: string | null;
+  closes_at: string | null;
+  duration_minutes: number | null;
+  questionCount: number;
+  totalPoints: number;
+  /** حالة محاولته إن بدأها */
+  attempt: {
+    id: string;
+    status: "in_progress" | "submitted" | "graded";
+    auto_score: number;
+    manual_score: number;
+    max_score: number;
+  } | null;
+}
+
+export interface ExamAnswer {
+  id: string;
+  question_id: string;
+  choice_index: number | null;
+  bool_answer: boolean | null;
+  text_answer: string;
+  awarded: number;
+  graded: boolean;
+}
+
+/** محاولة طالب كما يراها المعلّم عند التصحيح */
+export interface AttemptForGrading {
+  id: string;
+  studentId: string;
+  studentName: string;
+  status: "in_progress" | "submitted" | "graded";
+  submitted_at: string | null;
+  auto_score: number;
+  manual_score: number;
+  max_score: number;
+  answers: ExamAnswer[];
+}

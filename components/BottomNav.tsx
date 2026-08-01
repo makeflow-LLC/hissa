@@ -27,7 +27,8 @@ export default async function BottomNav() {
       { href: "/teacher/me", label: "لوحتي", icon: "🏠" },
       { href: "/teacher/me/content", label: "المحتوى", icon: "🎬" },
       { href: "/teacher/me/students", label: "طلابي", icon: "👥" },
-      { href: `/teacher/${teacher.slug}`, label: "صفحتي", icon: "👁" },
+      // معاينة الصفحة العامة تُفتح من اللوحة؛ الاختبارات وجهة يومية أولى بالشريط
+      { href: "/teacher/me/exams", label: "الاختبارات", icon: "📝" },
     ];
     return <BottomNavBar items={items} />;
   }

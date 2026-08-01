@@ -4279,3 +4279,403 @@ body {
 .quiz-stat-card {
   border-radius: 18px;
 }
+
+/* بطاقة المعلّم في لوحة الطالب: الرأس كلّه هدف ضغط واحد */
+.follow-head-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+  padding: 6px;
+  margin: -6px -6px 4px;
+  border-radius: 14px;
+  transition: background 0.15s;
+}
+.follow-head-link:hover,
+.follow-head-link:focus-visible {
+  background: var(--primary-soft);
+}
+.follow-head-link .unit-progress-title {
+  color: var(--text);
+}
+.follow-head-go {
+  margin-inline-start: auto;
+  color: var(--primary);
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* ===== الاختبارات ===== */
+
+/* قائمة الاختبارات — عند المعلّم وعند الطالب معاً */
+.exam-list {
+  list-style: none;
+  display: grid;
+  gap: 12px;
+  margin-top: 1rem;
+}
+.exam-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.exam-card-main {
+  /* أساس صفري يمنع النصّ الطويل من دفع البطاقة خارج الشاشة */
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.exam-card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+}
+.exam-card-title a {
+  color: var(--text);
+  text-decoration: none;
+}
+.exam-card-title a:hover {
+  color: var(--primary);
+}
+.exam-card-meta {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.exam-card-side {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.exam-card-side .card-actions {
+  margin: 0;
+}
+
+/* شريط النشر */
+.exam-publish-bar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.25rem;
+  box-shadow: var(--shadow);
+}
+
+/* نموذج بيانات الاختبار */
+.exam-form {
+  display: grid;
+  gap: 1rem;
+}
+.exam-form .form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.exam-form .form-row > .form-field {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+/* بناء الأسئلة */
+.exam-builder {
+  display: grid;
+  gap: 1rem;
+}
+.exam-builder-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.exam-questions,
+.exam-paper,
+.exam-readonly,
+.attempt-answers {
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+.exam-question,
+.exam-paper-question {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1rem;
+  display: grid;
+  gap: 10px;
+}
+.exam-question-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+.exam-question-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-weight: 800;
+  font-size: 0.85rem;
+  margin-inline-end: 8px;
+}
+.exam-kind {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.exam-points {
+  flex: 0 1 110px;
+}
+.exam-kind-hint {
+  margin: 0;
+}
+.exam-locked {
+  display: grid;
+  gap: 10px;
+}
+.exam-readonly li {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.7rem 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+/* شاشة تقديم الطالب */
+.exam-intro {
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+  overflow-wrap: anywhere;
+}
+.exam-start {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+.exam-taker-bar {
+  position: sticky;
+  top: 64px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border-radius: 14px;
+  /* معتم تماماً: التدرّج الشفّاف كان يُظهر نصّ السؤال من تحته */
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+/* السؤال كاملاً دائماً — لا قصّ ولا تجاوز للشاشة */
+.exam-paper-prompt {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.exam-choices {
+  display: grid;
+  gap: 8px;
+}
+.exam-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.exam-choice:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.exam-choice input {
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+.exam-submit-row {
+  margin-top: 1rem;
+}
+.exam-score {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--primary-dark);
+}
+
+/* لوحة التصحيح */
+.grading-board {
+  display: grid;
+  gap: 12px;
+}
+.attempt-list {
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+.attempt-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.attempt-head {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0.9rem 1rem;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.attempt-head:hover {
+  background: var(--primary-soft);
+}
+.attempt-name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.attempt-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.attempt-score {
+  font-weight: 800;
+  color: var(--primary-dark);
+}
+.attempt-answers {
+  padding: 0 1rem 1rem;
+}
+.attempt-answer {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  display: grid;
+  gap: 6px;
+}
+.attempt-prompt {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.attempt-right { color: var(--success); }
+.attempt-wrong { color: #b91c1c; }
+.attempt-correct { color: var(--text-muted); font-weight: 600; }
+.attempt-empty { color: var(--text-muted); }
+.attempt-text,
+.attempt-model {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.6rem 0.8rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.attempt-model {
+  background: var(--primary-soft);
+  border-color: #c7d2fe;
+  font-size: 0.88rem;
+}
+.attempt-text-block {
+  display: grid;
+  gap: 8px;
+}
+.attempt-grade-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.attempt-grade-input {
+  width: 90px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+}
+
+@media (max-width: 720px) {
+  .exam-card,
+  .exam-card-side {
+    /* عمود واحد على الجوال: الصفّ الأفقي كان يدفع الأزرار خارج الشاشة */
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .exam-card-side .btn,
+  .exam-start .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .exam-points {
+    flex-basis: 100%;
+  }
+  .exam-taker-bar {
+    top: 56px;
+  }
+  .attempt-grade-input {
+    width: 100%;
+  }
+}
+
+/*
+ * حقول التاريخ لا تنكمش: عرضها الأدنى الداخلي (~150px للحقل) كان يفرض
+ * على شبكة النموذج مساراً بعرض 307px، فتتجاوز شاشة 320px كلُّها لا الحقلان
+ * وحدهما. تصفير الحدّ الأدنى لأبناء الشبكة ثم تكديس الحقلين على الجوال.
+ */
+.exam-form {
+  grid-template-columns: minmax(0, 1fr);
+}
+.exam-form > * {
+  min-width: 0;
+}
+@media (max-width: 720px) {
+  .exam-form .form-row {
+    flex-direction: column;
+  }
+}
+
+/* رأس السؤال: رقمه وزر حذفه في سطر مستقلّ */
+.exam-question-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.exam-question-head .exam-question-num {
+  margin-inline-end: 0;
+}
+.exam-question-top {
+  align-items: stretch;
+}
+@media (max-width: 720px) {
+  .exam-question-top {
+    /* الحقلان جنباً إلى جنب يضيّقان قائمة النوع حتى تُقرأ بصعوبة */
+    flex-direction: column;
+  }
+  /* في العمود يصير flex-basis ارتفاعاً لا عرضاً — فيفتح 180px فجوة فارغة */
+  .exam-kind,
+  .exam-points {
+    flex: 0 0 auto;
+  }
+}
