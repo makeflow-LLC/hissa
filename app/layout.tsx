@@ -5,6 +5,7 @@ import NavbarActions from "@/components/NavbarActions";
 import BottomNav from "@/components/BottomNav";
 import InstallApp from "@/components/InstallApp";
 import ServiceWorker from "@/components/ServiceWorker";
+import LiveNotifierMount from "@/components/LiveNotifierMount";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -70,6 +71,10 @@ export default function RootLayout({
           </div>
         </header>
         <InstallApp />
+        {/* الإشعارات اللحظية على كل صفحة، لا على اللوحتين وحدهما */}
+        <Suspense fallback={null}>
+          <LiveNotifierMount />
+        </Suspense>
         {children}
         <ServiceWorker />
         {/* تنقّل سفلي ثابت على الجوال — لا يُترك المستخدم بلا مخرج */}

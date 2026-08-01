@@ -94,6 +94,7 @@ export default async function EditExamPage({
           initialQuestions={questions}
           locked={attempts.length > 0}
           myTemplates={templates}
+          targetPoints={exam.target_points}
         />
       </section>
     </main>

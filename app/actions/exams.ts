@@ -10,6 +10,8 @@ export interface ExamActionState {
   message?: string;
   /** معرّف الاختبار بعد الإنشاء، ليحوّل النموذج إلى صفحة تحريره */
   examId?: string;
+  /** مجموع الأسئلة يخالف العلامة الكلّية — تعرضه الواجهة مع خيار النشر رغم ذلك */
+  pointsMismatch?: { sum: number; target: number };
 }
 
 const NOT_TEACHER: ExamActionState = {
@@ -37,10 +39,18 @@ function refresh(examId?: string) {
   if (examId) revalidatePath(`/teacher/me/exams/${examId}`);
 }
 
-/** نصّ تاريخ من حقل datetime-local إلى ISO، أو null إن تُرك فارغاً */
+/**
+ * لحظة مطلقة يرسلها النموذج، أو null إن تُرك الحقل فارغاً.
+ *
+ * **يجب أن يصل النصّ حاملاً منطقته الزمنية** (`…Z` أو أوفست): النموذج
+ * يحسبها في المتصفّح لأنه وحده يعرف منطقة المعلّم. نصّاً بلا منطقة —
+ * كالذي يعطيه `datetime-local` مباشرةً — يفهمه الخادم بتوقيت UTC، وكان
+ * ذلك يضيف فرق المنطقة إلى كل حفظ (١١:٣٥ تعود ١٤:٣٥ في غزة).
+ */
 function when(formData: FormData, key: string): string | null {
   const raw = String(formData.get(key) ?? "").trim();
   if (!raw) return null;
+  if (!/(?:Z|[+-]\d{2}:?\d{2})$/.test(raw)) return null;
   const d = new Date(raw);
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
@@ -64,6 +74,10 @@ export async function saveExam(
   const closesAt = when(formData, "closesAt");
   const durRaw = String(formData.get("duration") ?? "").trim();
   const duration = durRaw ? Math.max(1, Math.min(600, Number(durRaw) || 0)) : null;
+  const targetRaw = String(formData.get("targetPoints") ?? "").trim();
+  const targetPoints = targetRaw
+    ? Math.max(1, Math.min(1000, Number(targetRaw) || 0))
+    : null;
 
   if (!title) return { ok: false, message: "اكتب عنوان الاختبار." };
   if (!groupId) return { ok: false, message: "اختر المجموعة المستهدفة." };
@@ -88,6 +102,7 @@ export async function saveExam(
     opens_at: opensAt,
     closes_at: closesAt,
     duration_minutes: duration,
+    target_points: targetPoints,
   };
 
   if (examId) {
@@ -246,20 +261,50 @@ export async function saveExamQuestions(
   return { ok: true, message: `حُفظ ${questions.length} سؤالاً.`, examId };
 }
 
+/**
+ * نشر الاختبار أو إعادته مسودّة.
+ *
+ * قبل النشر نجمع علامات الأسئلة ونقارنها بالعلامة الكلّية التي قصدها
+ * المعلّم: «الاختبار من ١٠» ومجموع أسئلته ٨ خطأٌ لا يكتشفه أحد إلا بعد
+ * أن يقدّم الطلاب. ومع ذلك لا نمنعه منعاً باتّاً — `force` تتيح النشر
+ * كما هو، لأن المعلّم قد يقصد فعلاً مجموعاً مخالفاً لما كتبه أوّلاً.
+ */
 export async function setExamStatus(
   examId: string,
-  publish: boolean
+  publish: boolean,
+  force = false
 ): Promise<ExamActionState> {
   const { supabase, teacher } = await requireMyTeacher();
   if (!teacher) return NOT_TEACHER;
 
   if (publish) {
-    const { count } = await supabase
-      .from("exam_questions")
-      .select("id", { count: "exact", head: true })
-      .eq("exam_id", examId);
-    if ((count ?? 0) === 0) {
+    const [{ data: qs }, { data: exam }] = await Promise.all([
+      supabase.from("exam_questions").select("points").eq("exam_id", examId),
+      supabase
+        .from("exams")
+        .select("target_points")
+        .eq("id", examId)
+        .eq("teacher_id", teacher.id)
+        .maybeSingle(),
+    ]);
+
+    const rows = (qs ?? []) as { points: number }[];
+    if (rows.length === 0) {
       return { ok: false, message: "أضِف سؤالاً واحداً على الأقل قبل النشر." };
+    }
+
+    const sum = rows.reduce((n, q) => n + Number(q.points || 0), 0);
+    const target = Number((exam as { target_points: number | null } | null)?.target_points ?? 0);
+    if (!force && target > 0 && Math.abs(sum - target) > 0.001) {
+      const diff = Math.round(Math.abs(sum - target) * 100) / 100;
+      return {
+        ok: false,
+        message:
+          sum < target
+            ? `مجموع علامات الأسئلة ${sum} والاختبار من ${target} — ينقص ${diff}. صحّح العلامات أو غيّر العلامة الكلّية.`
+            : `مجموع علامات الأسئلة ${sum} والاختبار من ${target} — يزيد ${diff}. صحّح العلامات أو غيّر العلامة الكلّية.`,
+        pointsMismatch: { sum, target },
+      };
     }
   }
 
@@ -638,6 +683,7 @@ export async function duplicateExam(examId: string): Promise<ExamActionState> {
     opens_at: string | null;
     closes_at: string | null;
     duration_minutes: number | null;
+    target_points: number | null;
   };
 
   const { data: created, error } = await supabase
@@ -650,6 +696,7 @@ export async function duplicateExam(examId: string): Promise<ExamActionState> {
       opens_at: src.opens_at,
       closes_at: src.closes_at,
       duration_minutes: src.duration_minutes,
+      target_points: src.target_points,
       status: "draft",
     })
     .select("id")

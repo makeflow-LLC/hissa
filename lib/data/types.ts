@@ -364,6 +364,8 @@ export interface Exam {
   opens_at: string | null;
   closes_at: string | null;
   duration_minutes: number | null;
+  /** العلامة الكلّية التي يقصدها المعلّم — للمقارنة والتنبيه لا للتصحيح */
+  target_points: number | null;
   status: "draft" | "published";
   created_at: string;
 }

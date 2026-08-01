@@ -4,7 +4,6 @@ import type { Metadata } from "next";
 import AskTeacherForm from "@/components/AskTeacherForm";
 import ExamWindow from "@/components/ExamWindow";
 import MessageActions from "@/components/MessageActions";
-import LiveNotifier from "@/components/LiveNotifier";
 import RequestReportCard from "@/components/RequestReportCard";
 import Hint from "@/components/Hint";
 import {
@@ -59,7 +58,6 @@ export default async function StudentDashboard() {
 
   return (
     <main className="container">
-      <LiveNotifier role="student" userId={user.id} />
       <section className="dashboard-header">
         <div className="dashboard-welcome">
           <div className="teacher-avatar" style={{ background: "linear-gradient(135deg, #4f46e5, #8b5cf6)" }}>

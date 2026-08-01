@@ -77,6 +77,7 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0016_exams.sql` | group-targeted `exams`, `exam_questions`, `exam_attempts`, `exam_answers`, `get_exam_paper()` + server-side grading functions |
 | `0017_group_hub_messaging_availability.sql` | group `whatsapp_link`/`goal`/`schedule`, `teacher_messages.group_id`, `message_dismissals`, `teachers.availability` |
 | `0018_exam_templates.sql` | `exam_templates` — a teacher's reusable exam structure, stored as `jsonb` |
+| `0019_exam_target_points.sql` | `exams.target_points` — the teacher's intended total, compared against the questions' sum |
 
 ### Removed: live sessions
 
@@ -157,7 +158,7 @@ A student may **remove** a message from their own list. Deleting the row is only
 
 ### Live notifications
 
-`LiveNotifier` (mounted on both dashboards) subscribes to `teacher_messages`, `follows`, `report_cards` and `report_card_requests` via Supabase Realtime, shows a toast, plays a two-note Web Audio chime, and debounces a `router.refresh()`. No filters are set on the channel — **RLS is the filter**, so a subscriber only ever receives rows it may already read.
+`LiveNotifier` (mounted in the root layout via `LiveNotifierMount`, so it runs on **every** page — it used to sit on the two dashboards only, and a teacher editing a lesson or grading an exam got nothing) subscribes to `teacher_messages`, `follows`, `report_cards` and `report_card_requests` via Supabase Realtime, shows a toast, plays a two-note Web Audio chime, and debounces a `router.refresh()`. No filters are set on the channel — **RLS is the filter**, so a subscriber only ever receives rows it may already read.
 
 Three deliberate details:
 
@@ -186,7 +187,9 @@ A teacher writes an exam, points it at **one group**, and only that group's memb
 
 **The time window is enforced server-side** in `submitExam` — the window itself, plus `duration_minutes` measured from `started_at` with a two-minute grace for slow networks. The countdown in `ExamTaker` is a courtesy, and a student can stop it from devtools. One deliberate asymmetry: the countdown auto-submits when it reaches zero **while the page is open**, but a student who returns to an already-expired attempt is *not* auto-submitted — posting a blank paper on their behalf would burn their only attempt.
 
-Times render through `ExamWindow`, a client component: the server runs in UTC, so formatting a window there would show the teacher an hour they never typed.
+**The window is submitted as an absolute instant, computed in the browser.** A `datetime-local` field yields `2026-08-01T11:35` with no zone, and whoever parses it assumes their own — so the UTC server stored 11:35Z for a teacher who meant 11:35 in Gaza (UTC+3), and the browser then displayed it back as 14:35. Every save shifted it again. `ExamForm` now sends hidden ISO fields it computes itself, and `when()` **rejects any string without a zone** so the old shape cannot silently return. Times render through `ExamWindow`, a client component, for the same reason.
+
+**A total the teacher declares, checked against the questions.** `exams.target_points` is optional; when set, `ExamBuilder` compares it to the live sum on every keystroke and `setExamStatus` refuses to publish on a mismatch — with the numbers in the message and a "publish anyway" button, since the teacher may have changed their mind about the total. It is never used for grading: `grade_exam_attempt` always sums `exam_questions` itself. `⚖️ وزّع بالتساوي` divides the target across the questions, putting the remainder on the last one so the sum lands exactly.
 
 ### The teacher's WhatsApp is not public
 
