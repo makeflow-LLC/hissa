@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import AskTeacherForm from "@/components/AskTeacherForm";
 import ExamWindow from "@/components/ExamWindow";
+import { kindSpec } from "@/lib/activityKinds";
 import MessageActions from "@/components/MessageActions";
 import RequestReportCard from "@/components/RequestReportCard";
 import Hint from "@/components/Hint";
@@ -13,6 +14,7 @@ import {
   getMyParentReports,
   getMyPendingJoins,
   getMyReportCards,
+  getMyStudentActivities,
   getMyStudentExams,
   getMyStudentProfile,
   getStudentDashboard,
@@ -40,6 +42,7 @@ export default async function StudentDashboard() {
     reportCards,
     cardRequests,
     exams,
+    activities,
   ] = await Promise.all([
       getStudentName(),
       getStudentDashboard(),
@@ -50,6 +53,7 @@ export default async function StudentDashboard() {
       getMyReportCards(),
       getMyCardRequests(),
       getMyStudentExams(),
+      getMyStudentActivities(),
     ]);
   const { following = [] } = data ?? {};
 
@@ -185,6 +189,51 @@ export default async function StudentDashboard() {
                         </Link>
                       </>
                     )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {activities.length > 0 && (
+        <section className="dashboard-section">
+          <h2 className="section-title">🎮 أنشطة تفاعلية</h2>
+          <Hint>
+            ألعاب قصيرة للتدريب: مطابقة، وبطاقات، واختيار سريع، وترتيب حروف،
+            وتصنيف. العبها كما شئت — نتيجتها تشجيعٌ لك ولا تدخل في علاماتك
+            الرسمية.
+          </Hint>
+          <ul className="exam-list">
+            {activities.map((a) => {
+              const spec = kindSpec(a.kind);
+              return (
+                <li key={a.id} className="exam-card">
+                  <div className="exam-card-main">
+                    <h3 className="exam-card-title">
+                      <Link href={`/activity/${a.id}`}>
+                        {spec.icon} {a.title}
+                      </Link>
+                    </h3>
+                    <p className="exam-card-meta">
+                      {spec.label} · 👩‍🏫 {a.teacherName}
+                    </p>
+                    {a.instructions && (
+                      <p className="exam-card-meta">{a.instructions}</p>
+                    )}
+                  </div>
+                  <div className="exam-card-side">
+                    {a.bestScore !== null && a.bestTotal ? (
+                      <span className="pill pill-free">
+                        أفضل نتيجة {a.bestScore} من {a.bestTotal}
+                      </span>
+                    ) : a.plays > 0 ? (
+                      <span className="pill pill-live">✓ لعبتها</span>
+                    ) : null}
+                    <Link href={`/activity/${a.id}`} className="btn btn-primary btn-sm">
+                      {a.plays > 0 ? "🔁 العب مجدداً" : "▶️ العب"}
+                    </Link>
                   </div>
                 </li>
               );
