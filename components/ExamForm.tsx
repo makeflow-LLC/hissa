@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveExam, type ExamActionState } from "@/app/actions/exams";
 import Hint from "@/components/Hint";
+import InfoTip from "@/components/InfoTip";
 import type { Exam, StudentGroup } from "@/lib/data/types";
 
 const initial: ExamActionState = { ok: false };
@@ -22,6 +23,20 @@ function toLocalInput(iso: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
     d.getHours()
   )}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * تحويل ما كتبه المعلّم إلى لحظة مطلقة (ISO بأوفست) **في المتصفّح**.
+ *
+ * حقل `datetime-local` يعطي «2026-08-01T11:35» بلا منطقة زمنية، ومن يقرؤه
+ * يفترض توقيته هو. فكان الخادم — ويعمل بـ UTC — يفهمها ١١:٣٥ UTC، ثم
+ * يعيدها المتصفّح بتوقيت المعلّم فتظهر ١٤:٣٥ في غزة (UTC+3): ثلاث ساعات
+ * تُضاف في كل حفظ. المتصفّح وحده يعرف منطقة المستخدم، فليحسبها هو.
+ */
+function toAbsolute(local: string): string {
+  if (!local) return "";
+  const d = new Date(local);
+  return Number.isNaN(d.getTime()) ? "" : d.toISOString();
 }
 
 export default function ExamForm({
@@ -122,12 +137,17 @@ export default function ExamForm({
           اتركهما فارغين ليبقى الاختبار مفتوحاً بلا حدّ. الوقت يُفحص على الخادم،
           فلا ينفع تغيير ساعة الجهاز.
         </Hint>
+        {/*
+          الحقلان المرئيّان بلا `name`: ما يُرسَل هو الحقلان المخفيّان
+          باللحظة المطلقة، وقد حُسبت في المتصفّح حيث تُعرف منطقة المعلّم.
+        */}
+        <input type="hidden" name="opensAt" value={toAbsolute(opensAt)} />
+        <input type="hidden" name="closesAt" value={toAbsolute(closesAt)} />
         <div className="form-row">
           <label className="form-field">
             <span className="form-label">يفتح في</span>
             <input
               type="datetime-local"
-              name="opensAt"
               className="search-input"
               value={opensAt}
               onChange={(e) => setOpensAt(e.target.value)}
@@ -137,27 +157,55 @@ export default function ExamForm({
             <span className="form-label">يغلق في</span>
             <input
               type="datetime-local"
-              name="closesAt"
               className="search-input"
               value={closesAt}
               onChange={(e) => setClosesAt(e.target.value)}
             />
           </label>
         </div>
+        {(opensAt || closesAt) && (
+          <p className="form-hint">
+            🕒 بتوقيت جهازك:{" "}
+            {opensAt ? `يفتح ${new Date(opensAt).toLocaleString("ar-EG")}` : "مفتوح الآن"}
+            {closesAt ? ` · يغلق ${new Date(closesAt).toLocaleString("ar-EG")}` : ""}
+          </p>
+        )}
       </div>
 
-      <label className="form-field">
-        <span className="form-label">مدّة الإجابة بالدقائق</span>
-        <input
-          type="number"
-          name="duration"
-          className="search-input"
-          min={1}
-          max={600}
-          defaultValue={exam?.duration_minutes ?? ""}
-          placeholder="اتركه فارغاً لبلا حدّ"
-        />
-      </label>
+      <div className="form-row">
+        <label className="form-field">
+          <span className="form-label">مدّة الإجابة بالدقائق</span>
+          <input
+            type="number"
+            name="duration"
+            className="search-input"
+            min={1}
+            max={600}
+            defaultValue={exam?.duration_minutes ?? ""}
+            placeholder="اتركه فارغاً لبلا حدّ"
+          />
+        </label>
+        <label className="form-field">
+          <span className="form-label">
+            الاختبار من كم علامة؟
+            <InfoTip>
+              اكتب العلامة الكلّية التي تقصدها — مثلاً ١٠. تُقارَن بمجموع علامات
+              أسئلتك ويُنبَّهك إن اختلفا، فلا تكتشف أن الاختبار من ٨ بعد أن
+              يقدّمه طلابك. اتركه فارغاً إن لم ترد سقفاً محدّداً.
+            </InfoTip>
+          </span>
+          <input
+            type="number"
+            name="targetPoints"
+            className="search-input"
+            min={1}
+            max={1000}
+            step={0.25}
+            defaultValue={exam?.target_points ?? ""}
+            placeholder="مثال: 10"
+          />
+        </label>
+      </div>
 
       <div className="card-actions">
         <button type="submit" className="btn btn-primary" disabled={pending}>

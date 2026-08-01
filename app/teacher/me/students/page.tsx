@@ -24,7 +24,6 @@ import GroupsManager from "@/components/GroupsManager";
 import StudentGroupChips from "@/components/StudentGroupChips";
 import ReportCardForm from "@/components/ReportCardForm";
 import CardRequestsPanel from "@/components/CardRequestsPanel";
-import LiveNotifier from "@/components/LiveNotifier";
 import Hint from "@/components/Hint";
 import ReplyForm from "@/components/ReplyForm";
 import ConnectionNotice from "@/components/ConnectionNotice";
@@ -90,7 +89,6 @@ export default async function TeacherStudentsPage() {
 
   return (
     <main className="container">
-      <LiveNotifier role="teacher" userId={user.id} teacherId={teacher.id} />
       <PageHeader
         backHref="/teacher/me"
         backLabel="لوحة المعلّم"

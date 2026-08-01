@@ -26,17 +26,28 @@ export default function ExamPublishBar({
   const [busy, startTransition] = useTransition();
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+  /** ظهر خلافٌ بين مجموع الأسئلة والعلامة الكلّية ⇒ نعرض «انشر رغم ذلك» */
+  const [mismatch, setMismatch] = useState(false);
 
-  function run(fn: () => Promise<{ ok: boolean; message?: string }>, after?: () => void) {
+  function run(
+    fn: () => Promise<{
+      ok: boolean;
+      message?: string;
+      pointsMismatch?: { sum: number; target: number };
+    }>,
+    after?: () => void
+  ) {
     setMsg("");
     setErr("");
     startTransition(async () => {
       const res = await fn();
       if (res.ok) {
         setMsg(res.message ?? "");
+        setMismatch(false);
         after?.();
       } else {
         setErr(res.message ?? "تعذّر تنفيذ الأمر.");
+        setMismatch(Boolean(res.pointsMismatch));
       }
       router.refresh();
     });
@@ -97,6 +108,21 @@ export default function ExamPublishBar({
       )}
       {msg && <p className="form-ok">{msg}</p>}
       {err && <p className="form-error">{err}</p>}
+
+      {/*
+        التنبيه لا يمنع: قد يكون المعلّم قصد فعلاً مجموعاً غير الذي كتبه
+        أوّلاً، فالمنع الباتّ يحبسه في رقم غيّر رأيه فيه.
+      */}
+      {mismatch && (
+        <button
+          type="button"
+          className="btn btn-outline btn-sm"
+          disabled={busy}
+          onClick={() => run(() => setExamStatus(examId, true, true))}
+        >
+          انشر رغم اختلاف المجموع
+        </button>
+      )}
     </div>
   );
 }

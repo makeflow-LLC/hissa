@@ -26,6 +26,9 @@ interface QuestionUI {
 let seq = 0;
 const newId = () => `q${++seq}-${Math.random().toString(36).slice(2, 7)}`;
 
+/** تقريبٌ إلى ربع علامة — يمنع 9.999999999 من الظهور في المجموع */
+const round = (n: number) => Math.round(n * 100) / 100;
+
 const KINDS: { value: QuestionKind; label: string; hint: string }[] = [
   {
     value: "mcq",
@@ -43,6 +46,14 @@ const KINDS: { value: QuestionKind; label: string; hint: string }[] = [
     hint: "تصحّحه بنفسك بعد التسليم.",
   },
 ];
+
+/** تبديل موضعَي سؤالين — إعادة الترتيب بلا سحب ولا إفلات */
+function swap(list: QuestionUI[], a: number, b: number): QuestionUI[] {
+  if (b < 0 || b >= list.length) return list;
+  const next = [...list];
+  [next[a], next[b]] = [next[b], next[a]];
+  return next;
+}
 
 function blank(kind: QuestionKind): QuestionUI {
   return {
@@ -62,6 +73,7 @@ export default function ExamBuilder({
   initialQuestions,
   locked,
   myTemplates,
+  targetPoints,
 }: {
   examId: string;
   initialQuestions: ExamQuestion[];
@@ -69,6 +81,8 @@ export default function ExamBuilder({
   locked: boolean;
   /** قوالب حفظها المعلّم بنفسه، تُضاف إلى قوالب المنصة */
   myTemplates: ExamTemplate[];
+  /** العلامة الكلّية التي قصدها المعلّم — تُقارَن بالمجموع لحظةً بلحظة */
+  targetPoints: number | null;
 }) {
   const [state, action, pending] = useActionState(saveExamQuestions, initial);
   const [questions, setQuestions] = useState<QuestionUI[]>(
@@ -87,9 +101,30 @@ export default function ExamBuilder({
   );
 
   const totalPoints = useMemo(
-    () => questions.reduce((n, q) => n + (Number(q.points) || 0), 0),
+    () => round(questions.reduce((n, q) => n + (Number(q.points) || 0), 0)),
     [questions]
   );
+  const pointsOk = !targetPoints || Math.abs(totalPoints - targetPoints) < 0.001;
+
+  /**
+   * ما يمنع الحفظ، معروضاً وهو يُكتب لا بعد الضغط.
+   *
+   * الخادم يرفض السؤال بلا نصّ، والاختيارَ بأقلّ من خيارين — وكان يردّ
+   * رسالةً واحدة عامّة بعد الحفظ لا تقول أيّ سؤال هو المعطوب.
+   */
+  const problems = useMemo(() => {
+    const out: string[] = [];
+    questions.forEach((q, i) => {
+      if (!q.prompt.trim()) out.push(`السؤال ${i + 1} بلا نصّ`);
+      else if (q.kind === "mcq") {
+        const filled = q.options.filter((o) => o.trim()).length;
+        if (filled < 2) out.push(`السؤال ${i + 1} يحتاج خيارين على الأقل`);
+        else if (!q.options[q.correct_index]?.trim())
+          out.push(`السؤال ${i + 1}: الإجابة الصحيحة المختارة فارغة`);
+      }
+    });
+    return out;
+  }, [questions]);
 
   const payload = useMemo(
     () =>
@@ -160,7 +195,41 @@ export default function ExamBuilder({
         <span className="pill pill-free">
           {questions.length} سؤالاً · مجموع {totalPoints} علامة
         </span>
+        {targetPoints ? (
+          <span className={`pill ${pointsOk ? "pill-live" : "pill-low"}`}>
+            {pointsOk
+              ? `✓ يطابق العلامة الكلّية (${targetPoints})`
+              : totalPoints < targetPoints
+                ? `⚠ الاختبار من ${targetPoints} — ينقص ${round(targetPoints - totalPoints)}`
+                : `⚠ الاختبار من ${targetPoints} — يزيد ${round(totalPoints - targetPoints)}`}
+          </span>
+        ) : null}
+        {targetPoints && !pointsOk && questions.length > 0 && (
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={() => {
+              /* توزيع متساوٍ مع ضبط الكسر على السؤال الأخير حتى يضبط المجموع تماماً */
+              const each = Math.round((targetPoints / questions.length) * 4) / 4;
+              setQuestions((prev) =>
+                prev.map((q, i) =>
+                  i === prev.length - 1
+                    ? { ...q, points: round(targetPoints - each * (prev.length - 1)) }
+                    : { ...q, points: each }
+                )
+              );
+            }}
+          >
+            ⚖️ وزّع {targetPoints} بالتساوي
+          </button>
+        )}
       </div>
+
+      {problems.length > 0 && (
+        <p className="form-hint exam-problems">
+          ⚠ قبل الحفظ: {problems.join(" · ")}
+        </p>
+      )}
 
       <ol className="exam-questions">
         {questions.map((q, i) => (
@@ -169,14 +238,51 @@ export default function ExamBuilder({
                 على الجوال كان يترك زر الحذف وحيداً في آخر السطر */}
             <div className="exam-question-head">
               <span className="exam-question-num">{i + 1}</span>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm btn-danger"
-                onClick={() => setQuestions((p) => p.filter((_, j) => j !== i))}
-                aria-label={`حذف السؤال ${i + 1}`}
-              >
-                ✕ حذف
-              </button>
+              <span className="card-actions">
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  disabled={i === 0}
+                  onClick={() => setQuestions((p) => swap(p, i, i - 1))}
+                  aria-label={`تحريك السؤال ${i + 1} لأعلى`}
+                  title="لأعلى"
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  disabled={i === questions.length - 1}
+                  onClick={() => setQuestions((p) => swap(p, i, i + 1))}
+                  aria-label={`تحريك السؤال ${i + 1} لأسفل`}
+                  title="لأسفل"
+                >
+                  ▼
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() =>
+                    setQuestions((p) => [
+                      ...p.slice(0, i + 1),
+                      { ...p[i], id: newId() },
+                      ...p.slice(i + 1),
+                    ])
+                  }
+                  aria-label={`تكرار السؤال ${i + 1}`}
+                  title="تكرار"
+                >
+                  ⧉
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm btn-danger"
+                  onClick={() => setQuestions((p) => p.filter((_, j) => j !== i))}
+                  aria-label={`حذف السؤال ${i + 1}`}
+                >
+                  ✕
+                </button>
+              </span>
             </div>
 
             <div className="exam-question-top">

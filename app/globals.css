@@ -5131,3 +5131,19 @@ body {
     flex: 1 1 auto;
   }
 }
+
+/* قائمة ما يمنع حفظ الأسئلة — تُعرض وهي تُكتب لا بعد الضغط */
+.exam-problems {
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  color: #92400e;
+  border-radius: 12px;
+  padding: 0.6rem 0.9rem;
+  overflow-wrap: anywhere;
+}
+.exam-builder-head {
+  align-items: center;
+}
+.exam-question-head .card-actions {
+  gap: 6px;
+}
