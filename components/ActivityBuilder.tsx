@@ -159,6 +159,22 @@ export default function ActivityBuilder({
           </label>
         </div>
 
+        <label className="stage-option leaderboard-toggle">
+          <input
+            type="checkbox"
+            name="showLeaderboard"
+            defaultChecked={activity ? activity.show_leaderboard : true}
+          />
+          <span>
+            🏆 أظهر لوحة الصدارة للطلاب
+            <InfoTip>
+              ترتيب أفضل النتائج بين من لعبوا. المنافسة تدفع التكرار، والتكرار
+              هو التدريب — لكن صفّاً فيه متعثّر يرى اسمه آخر القائمة كل مرّة قد
+              ينفر، فالخيار لك.
+            </InfoTip>
+          </span>
+        </label>
+
         <label className="form-field">
           <span className="form-label">تعليمات للطالب (اختياري)</span>
           <input

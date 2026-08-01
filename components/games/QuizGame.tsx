@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { buildChoices, shuffle, type GameProps } from "@/components/games/shared";
+import { useGameSound } from "@/components/games/useGameSound";
 
 /**
  * اختيار سريع: سؤال وأربعة خيارات.
@@ -10,6 +11,7 @@ import { buildChoices, shuffle, type GameProps } from "@/components/games/shared
  * يجعل النشاط أرخص من الاختبار الرسمي: صفٌّ واحد بسؤال وجوابه يكفي.
  */
 export default function QuizGame({ items, onFinish }: GameProps) {
+  const play = useGameSound();
   const order = useMemo(() => shuffle(items.map((_, i) => i)), [items]);
   const [step, setStep] = useState(0);
   const [score, setScore] = useState(0);
@@ -26,9 +28,11 @@ export default function QuizGame({ items, onFinish }: GameProps) {
     setChosen(c);
     const right = c === correct;
     if (right) setScore((s) => s + 1);
+    play(right ? "right" : "wrong");
 
     setTimeout(() => {
       if (step + 1 >= order.length) {
+        if (right && score + 1 === order.length) play("win");
         onFinish(right ? score + 1 : score, order.length);
       } else {
         setStep((s) => s + 1);

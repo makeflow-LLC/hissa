@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { shuffle, type GameProps } from "@/components/games/shared";
+import { useGameSound } from "@/components/games/useGameSound";
 
 /**
  * مطابقة: عمودان مبعثران، يضغط الطالب طرفاً ثم ما يقابله.
@@ -10,6 +11,7 @@ import { shuffle, type GameProps } from "@/components/games/shared";
  * المنصة كلّه تقريباً على الجوال.
  */
 export default function MatchGame({ items, onFinish }: GameProps) {
+  const play = useGameSound();
   const left = useMemo(() => shuffle(items.map((_, i) => i)), [items]);
   const right = useMemo(() => shuffle(items.map((_, i) => i)), [items]);
 
@@ -24,12 +26,14 @@ export default function MatchGame({ items, onFinish }: GameProps) {
       const next = [...done, i];
       setDone(next);
       setPicked(null);
+      play(next.length === items.length ? "win" : "right");
       if (next.length === items.length) {
         // الدرجة: العناصر كلّها ناقصاً الأخطاء، ولا تنزل تحت الصفر
         onFinish(Math.max(0, items.length - misses), items.length);
       }
     } else {
       setMisses((m) => m + 1);
+      play("wrong");
       setWrong(i);
       setTimeout(() => setWrong(null), 500);
       setPicked(null);

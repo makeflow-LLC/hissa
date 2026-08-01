@@ -3,11 +3,13 @@ import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import PageHeader from "@/components/PageHeader";
 import ActivityPlayer from "@/components/ActivityPlayer";
+import ActivityLeaderboard from "@/components/ActivityLeaderboard";
 import ConnectionNotice from "@/components/ConnectionNotice";
 import { kindSpec } from "@/lib/activityKinds";
 import {
   getCurrentUser,
   getActivityToPlay,
+  getActivityLeaderboard,
   isCurrentUserTeacher,
 } from "@/lib/data/queries";
 
@@ -39,6 +41,10 @@ export default async function PlayActivityPage({
   if (!activity) notFound();
 
   const spec = kindSpec(activity.kind);
+  // الدالّة نفسها تتحقّق من إذن المعلّم، والشرط هنا يوفّر نداءً بلا طائل
+  const leaders = activity.showLeaderboard
+    ? await getActivityLeaderboard(activity.id)
+    : [];
 
   return (
     <main className="container container-narrow">
@@ -51,6 +57,13 @@ export default async function PlayActivityPage({
       />
 
       <ActivityPlayer activity={activity} />
+
+      {activity.showLeaderboard && (
+        <section className="dashboard-section">
+          <h2 className="section-title">🏆 أفضل النتائج</h2>
+          <ActivityLeaderboard rows={leaders} meId={user.id} />
+        </section>
+      )}
 
       <p className="content-foot-hint">
         <Link href="/dashboard" className="back-link">

@@ -5627,9 +5627,368 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* ===== ذاكرة البطاقات ===== */
+
+/* `auto-fit` بدل عدد أعمدة ثابت: ١٦ بطاقة على جوال ضيّق تصير أربعة أعمدة
+   وعلى شاشة أوسع ستّة، بلا استعلام وسائط لكل مقاس */
+.memory-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+.memory-card {
+  min-height: 78px;
+  padding: 6px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #fff;
+  background: var(--primary);
+  border: 1px solid var(--primary-dark);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.memory-card:not(.memory-open) .memory-face {
+  font-size: 1.5rem;
+}
+.memory-open {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--primary);
+}
+.memory-found {
+  background: var(--success-soft);
+  color: var(--success);
+  border-color: var(--success);
+  cursor: default;
+}
+.memory-face {
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+/* ===== صح أو خطأ ===== */
+
+.tf-statement {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.8;
+}
+.tf-a,
+.tf-b {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.tf-eq {
+  color: var(--primary);
+  font-size: 1.4rem;
+}
+.tf-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* ===== فرقعة البالونات ===== */
+
+.balloon-sky {
+  position: relative;
+  width: 100%;
+  height: 280px;
+  overflow: hidden;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #dbeafe 0%, #f0f9ff 100%);
+}
+/* الصعود حركة CSS لا مؤقّت جافاسكربت: يرسمها المتصفّح على بطاقة الرسوميات
+   فتبقى ناعمة على الأجهزة الضعيفة، وهي أجهزة جمهورنا */
+.balloon {
+  position: absolute;
+  /* قريبةٌ من الحافّة عمداً: لو بدأت من عمقٍ بعيد لمرّ ثلث زمن الجولة
+     والسماء خالية، فيظنّ الطالب أن شيئاً لم يبدأ */
+  bottom: -78px;
+  width: 22%;
+  min-width: 66px;
+  padding: 18px 6px 22px;
+  display: grid;
+  place-items: center;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #fff;
+  border: none;
+  border-radius: 50% 50% 46% 46% / 42% 42% 58% 58%;
+  cursor: pointer;
+  animation-name: balloon-rise;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+  transition: opacity 0.25s, filter 0.25s;
+}
+/* تتجمّد البالونة عند إعلان النتيجة بدل أن تكمل صعودها وتختفي */
+.balloon:disabled {
+  animation-play-state: paused;
+}
+.balloon-text {
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.35);
+}
+.balloon-0 { inset-inline-start: 2%; background: #ef4444; }
+.balloon-1 { inset-inline-start: 27%; background: #3b82f6; }
+.balloon-2 { inset-inline-start: 52%; background: #f59e0b; }
+.balloon-3 { inset-inline-start: 76%; background: #10b981; }
+.balloon-pop {
+  opacity: 0.2;
+  filter: brightness(1.5) saturate(0.4);
+}
+.balloon-bad {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+.balloon-reveal {
+  outline: 3px solid var(--success);
+  outline-offset: 2px;
+}
+@keyframes balloon-rise {
+  from { transform: translateY(0); }
+  to { transform: translateY(-430px); }
+}
+
+/* ===== تحدّي السرعة ===== */
+
+.speed-bar {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.speed-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  transition: width 1s linear;
+}
+.speed-bar > span.speed-low {
+  background: #dc2626;
+}
+
+/* ===== احتفال الدرجة الكاملة ===== */
+
+.activity-result {
+  position: relative;
+}
+.confetti {
+  position: absolute;
+  inset-inline: 0;
+  top: -20px;
+  height: 200px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.confetti-bit {
+  position: absolute;
+  top: -16px;
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  animation: confetti-fall 1.7s ease-in forwards;
+}
+.confetti-0 { background: #ef4444; }
+.confetti-1 { background: #3b82f6; }
+.confetti-2 { background: #f59e0b; }
+.confetti-3 { background: #10b981; }
+.confetti-4 { background: #a855f7; }
+.confetti-bit:nth-child(1)  { inset-inline-start: 4%;  animation-delay: 0ms; }
+.confetti-bit:nth-child(2)  { inset-inline-start: 11%; animation-delay: 90ms; }
+.confetti-bit:nth-child(3)  { inset-inline-start: 19%; animation-delay: 40ms; }
+.confetti-bit:nth-child(4)  { inset-inline-start: 26%; animation-delay: 160ms; }
+.confetti-bit:nth-child(5)  { inset-inline-start: 34%; animation-delay: 20ms; }
+.confetti-bit:nth-child(6)  { inset-inline-start: 41%; animation-delay: 210ms; }
+.confetti-bit:nth-child(7)  { inset-inline-start: 49%; animation-delay: 70ms; }
+.confetti-bit:nth-child(8)  { inset-inline-start: 56%; animation-delay: 130ms; }
+.confetti-bit:nth-child(9)  { inset-inline-start: 64%; animation-delay: 30ms; }
+.confetti-bit:nth-child(10) { inset-inline-start: 71%; animation-delay: 190ms; }
+.confetti-bit:nth-child(11) { inset-inline-start: 79%; animation-delay: 60ms; }
+.confetti-bit:nth-child(12) { inset-inline-start: 86%; animation-delay: 150ms; }
+.confetti-bit:nth-child(13) { inset-inline-start: 92%; animation-delay: 10ms; }
+.confetti-bit:nth-child(14) { inset-inline-start: 97%; animation-delay: 110ms; }
+@keyframes confetti-fall {
+  from { transform: translateY(0) rotate(0deg); opacity: 1; }
+  to { transform: translateY(190px) rotate(420deg); opacity: 0; }
+}
+
+/* ===== لوحة الصدارة ===== */
+
+.leaderboard {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+.leader-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 0.7rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.leader-row > .group-meta {
+  grid-column: 2 / -1;
+}
+.leader-rank {
+  font-size: 1.15rem;
+  font-weight: 800;
+  min-width: 1.7rem;
+  text-align: center;
+}
+.leader-name {
+  font-weight: 700;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.leader-score {
+  font-weight: 800;
+  color: var(--primary-dark);
+  white-space: nowrap;
+}
+.leader-me {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.leaderboard-toggle {
+  align-items: flex-start;
+}
+
+/* ===== صفحة شرح الأنشطة ===== */
+
+.guide-steps {
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+.guide-step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.guide-num {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 800;
+}
+.guide-step-title {
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+.guide-step-text {
+  color: var(--text-muted);
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.demo-shell {
+  display: grid;
+  gap: 14px;
+}
+.demo-body {
+  display: grid;
+  gap: 12px;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+.demo-about {
+  line-height: 1.9;
+}
+.demo-facts {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.demo-facts li {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 0.6rem 0.7rem;
+  background: var(--primary-soft);
+  border-radius: 10px;
+}
+.demo-facts strong {
+  overflow-wrap: anywhere;
+}
+.demo-example {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-weight: 700;
+}
+/* المثلّث الافتراضي يختفي متى صار العرض غير `list-item`، فنرسم بديله */
+summary.help-q {
+  list-style: none;
+}
+summary.help-q::-webkit-details-marker {
+  display: none;
+}
+summary.help-q::after {
+  content: "＋";
+  flex-shrink: 0;
+  font-size: 1.2rem;
+  color: var(--primary);
+}
+details[open] > summary.help-q::after {
+  content: "－";
+}
+
+/* من يكره الحركة لا تصعد عنده بالونة ولا يتساقط قصاص ورق */
+@media (prefers-reduced-motion: reduce) {
+  .balloon {
+    animation: none;
+    bottom: 28px;
+  }
+  .confetti {
+    display: none;
+  }
+}
+
 @media (max-width: 720px) {
   .kind-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .balloon-sky {
+    height: 240px;
+  }
+  .balloon {
+    font-size: 0.78rem;
+    padding: 14px 4px 18px;
+  }
+  .tf-statement {
+    font-size: 1.05rem;
   }
   .items-table th:nth-child(1),
   .items-table td:nth-child(1) {

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { stripTags } from "@/lib/sanitize";
 import {
+  KINDS,
   activityProblem,
   cleanItems,
   kindSpec,
@@ -42,14 +43,15 @@ function refresh(id?: string) {
   if (id) revalidatePath(`/teacher/me/activities/${id}`);
 }
 
-/** النوع المرسَل، أو `match` إن جاء بما لا نعرفه */
+/**
+ * النوع المرسَل، أو `match` إن جاء بما لا نعرفه.
+ *
+ * القائمة تُشتقّ من `KINDS` لا تُكتب هنا مرّةً ثانية: لعبةٌ تُضاف هناك
+ * وتُنسى هنا تُرفض صامتةً وتُحفظ «مطابقة».
+ */
 function readKind(raw: unknown): ActivityKind {
   const k = String(raw ?? "");
-  return (["match", "flashcards", "quiz", "anagram", "sort", "wheel"] as const).includes(
-    k as ActivityKind
-  )
-    ? (k as ActivityKind)
-    : "match";
+  return KINDS.some((x) => x.value === k) ? (k as ActivityKind) : "match";
 }
 
 /** العناصر تصل نصّاً JSON من المحرّر، وتُنظَّف وتُعقَّم هنا */
@@ -90,6 +92,7 @@ export async function saveActivity(
   const kind = readKind(formData.get("kind"));
   const items = readItems(formData.get("items"), kind);
   const groupId = String(formData.get("groupId") ?? "").trim() || null;
+  const showLeaderboard = formData.get("showLeaderboard") !== null;
   const lessonId = String(formData.get("lessonId") ?? "").trim() || null;
 
   if (!title) return { ok: false, message: "اكتب عنوان النشاط." };
@@ -122,6 +125,7 @@ export async function saveActivity(
     instructions,
     kind,
     items,
+    show_leaderboard: showLeaderboard,
   };
 
   if (id) {
