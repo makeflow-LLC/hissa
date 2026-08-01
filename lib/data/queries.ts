@@ -1371,6 +1371,105 @@ export async function getMyThreads(): Promise<StudentThread[]> {
 }
 
 
+/** نتيجة طالب في اختبار، لعرضها على لوحة المعلّم */
+export interface ExamResultRow {
+  attemptId: string;
+  examId: string;
+  examTitle: string;
+  studentId: string;
+  studentName: string;
+  status: "submitted" | "graded";
+  score: number;
+  maxScore: number;
+  pct: number;
+  submitted_at: string | null;
+}
+
+/**
+ * أحدث نتائج طلاب المعلّم في اختباراته.
+ *
+ * على لوحته مباشرةً: المعلّم يريد أن يعرف من قدّم وكم أخذ دون أن يفتح كل
+ * اختبار على حدة. المحاولات الجارية مستبعَدة — لا نتيجة لورقةٍ لم تُسلَّم.
+ */
+export async function getRecentExamResults(limit = 12): Promise<ExamResultRow[]> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data: teacher } = await supabase
+      .from("teachers")
+      .select("id")
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    if (!teacher) return [];
+
+    const { data } = await supabase
+      .from("exams")
+      .select(
+        "id, title, exam_attempts(id, student_id, status, auto_score, manual_score, max_score, submitted_at)"
+      )
+      .eq("teacher_id", teacher.id);
+
+    const rows = ((data ?? []) as {
+      id: string;
+      title: string;
+      exam_attempts:
+        | {
+            id: string;
+            student_id: string;
+            status: string;
+            auto_score: number;
+            manual_score: number;
+            max_score: number;
+            submitted_at: string | null;
+          }[]
+        | null;
+    }[]).flatMap((e) =>
+      (e.exam_attempts ?? [])
+        .filter((a) => a.status !== "in_progress")
+        .map((a) => {
+          const score = Number(a.auto_score) + Number(a.manual_score);
+          const max = Number(a.max_score);
+          return {
+            attemptId: a.id,
+            examId: e.id,
+            examTitle: e.title,
+            studentId: a.student_id,
+            studentName: "طالب",
+            status: a.status as "submitted" | "graded",
+            score,
+            maxScore: max,
+            pct: max > 0 ? Math.round((score / max) * 100) : 0,
+            submitted_at: a.submitted_at,
+          };
+        })
+    );
+
+    if (rows.length === 0) return [];
+
+    rows.sort((a, b) => (b.submitted_at ?? "").localeCompare(a.submitted_at ?? ""));
+    const top = rows.slice(0, limit);
+
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", [...new Set(top.map((r) => r.studentId))]);
+    const names = new Map(
+      ((profiles ?? []) as { id: string; full_name: string }[]).map((p) => [
+        p.id,
+        p.full_name,
+      ])
+    );
+
+    return top.map((r) => ({ ...r, studentName: names.get(r.studentId) || "طالب" }));
+  } catch {
+    return [];
+  }
+}
+
 /* ==================== ملفّ الطالب عند معلّمه ==================== */
 
 /** كل ما يعرفه المعلّم عن طالب واحد، مجموعاً في صفحة واحدة */

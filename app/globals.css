@@ -4642,6 +4642,13 @@ body {
     flex-direction: column;
     align-items: stretch;
   }
+  /*
+   * في العمود يصير `flex-basis` ارتفاعاً لا عرضاً، فكان الأساس 240px
+   * يفتح فجوةً فارغة بين بيانات الاختبار ونتيجته.
+   */
+  .exam-card-main {
+    flex: 0 0 auto;
+  }
   .exam-card-side .btn,
   .exam-start .btn {
     width: 100%;
@@ -5319,4 +5326,22 @@ body {
 .member-name {
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+/* نتيجة الطالب على لوحته: رقمٌ يُقرأ من بعيد لا وسمٌ صغير */
+.exam-result {
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--primary-dark);
+  background: var(--primary-soft);
+  border-radius: 999px;
+  padding: 6px 14px;
+  white-space: nowrap;
+}
+.result-list .result-title {
+  color: inherit;
+  text-decoration: none;
+}
+.result-list a.result-title:hover {
+  color: var(--primary);
 }

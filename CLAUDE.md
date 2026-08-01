@@ -130,7 +130,7 @@ Both are teacher-owned and student-readable, and both refuse to reference a stud
 
 It exists because the roster had grown into a wall: every student's card carried the report-card form, the grant panel, the group chips and the message thread at once. The list is now a list; the detail opens when it is wanted. Every place a student's name appears — roster, group members, grading board, card requests — links here.
 
-**Marks do not appear on either dashboard.** A dashboard gets opened in front of whoever is passing the screen — a sibling, a classmate — so the student's own board shows an exam's *state* ("صُحِّح" / "بانتظار تصحيح معلّمك") and a link, and the score lives inside the exam page next to the answers that produced it. The group hub likewise shows progress and "قدّم ٣ اختبارات", never an average; per-student marks are on that student's page.
+**Marks are shown wherever the person they belong to would look for them.** A student's own board prints "نتيجتك ٦ من ٦" on each exam card, with "إجاباتي" opening the per-question breakdown. The teacher's hub carries a **latest results** list (`getRecentExamResults`) — student, exam, mark, and a "صحّح" link when a text answer is still pending — and the group hub shows each member's exam average. Marks were briefly hidden from both boards; that was reverted, because a result the student has to hunt for is a result they assume was never given.
 
 ### The group hub (`/teacher/me/groups/[groupId]`)
 

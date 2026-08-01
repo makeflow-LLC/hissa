@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { getCurrentUser, getMyTeacher } from "@/lib/data/queries";
+import {
+  getCurrentUser,
+  getMyTeacher,
+  getRecentExamResults,
+} from "@/lib/data/queries";
 import ShareProfile from "@/components/ShareProfile";
 import Hint from "@/components/Hint";
 import Stars from "@/components/Stars";
@@ -17,6 +21,9 @@ export default async function TeacherMePage() {
 
   const teacher = await getMyTeacher();
   if (!teacher) redirect("/teacher/onboarding");
+
+  const results = await getRecentExamResults();
+  const needGrading = results.filter((r) => r.status === "submitted").length;
 
   return (
     <main className="container">
@@ -147,7 +154,12 @@ export default async function TeacherMePage() {
 
       <section className="dashboard-section">
         <div className="section-head-row">
-          <h2 className="section-title">📝 الاختبارات</h2>
+          <h2 className="section-title">
+            📝 الاختبارات
+            {needGrading > 0 && (
+              <span className="pill pill-low"> {needGrading} بانتظار تصحيحك</span>
+            )}
+          </h2>
           <Link href="/teacher/me/exams" className="btn btn-primary">
             إدارة الاختبارات
           </Link>
@@ -157,6 +169,40 @@ export default async function TeacherMePage() {
           وإغلاق وعلامة لكل سؤال. الاختيار من متعدّد وصح/خطأ يُصحَّحان آلياً،
           وأسئلة «علّل» و«اذكر السبب» تصحّحها بنفسك.
         </Hint>
+
+        {/* أحدث النتائج على اللوحة نفسها: من قدّم وكم أخذ، بلا تنقّل */}
+        {results.length === 0 ? (
+          <p className="drafts-empty">لا نتائج بعد — لم يقدّم أحد اختباراً.</p>
+        ) : (
+          <ul className="result-list">
+            {results.map((r) => (
+              <li key={r.attemptId} className="result-row">
+                <Link
+                  href={`/teacher/me/students/${r.studentId}`}
+                  className="result-title"
+                >
+                  {r.studentName}
+                </Link>
+                <span className="group-meta">{r.examTitle}</span>
+                <span
+                  className={`pill ${
+                    r.pct >= 70 ? "pill-live" : r.pct >= 40 ? "pill-draft" : "pill-low"
+                  }`}
+                >
+                  {r.score} من {r.maxScore} ({r.pct}%)
+                </span>
+                {r.status === "submitted" && (
+                  <Link
+                    href={`/teacher/me/exams/${r.examId}/grade`}
+                    className="btn btn-outline btn-sm"
+                  >
+                    ✍️ صحّح
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </main>
   );
