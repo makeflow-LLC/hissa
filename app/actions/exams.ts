@@ -492,3 +492,194 @@ export async function gradeAnswer(
   revalidatePath("/dashboard");
   return { ok: true, message: "حُفظت العلامة." };
 }
+
+/* ==================== القوالب والاستنساخ ==================== */
+
+/**
+ * قراءة أسئلة قالب.
+ *
+ * أرخى من `parseQuestions` في موضع واحد: **لا يشترط نصّ السؤال**. القالب
+ * قد يكون هيكلاً محضاً — «ستّة اختيار وأربعة صح وخطأ وسؤالان نصّيان» —
+ * وهو أنفع صوره؛ ولو أسقطنا السؤال الفارغ لخرج القالب خالياً. أمّا
+ * التحقّق من النوع والعلامة والخيارات فباقٍ كما هو.
+ */
+function parseTemplateQuestions(raw: unknown): QuestionInput[] {
+  let arr: unknown;
+  try {
+    arr = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(arr)) return [];
+
+  return arr.slice(0, 100).map((q) => {
+    const o = (q ?? {}) as Record<string, unknown>;
+    const kind: QuestionKind =
+      o.kind === "truefalse" || o.kind === "text" ? o.kind : "mcq";
+    const points = Math.max(0.25, Math.min(100, Number(o.points ?? 1) || 1));
+    const prompt = stripTags(String(o.prompt ?? "")).trim().slice(0, 2000);
+    const options = Array.isArray(o.options)
+      ? (o.options as unknown[]).slice(0, 8).map((x) => stripTags(String(x)).trim())
+      : [];
+
+    if (kind === "mcq") {
+      const ci = Number(o.correct_index ?? 0);
+      const max = Math.max(options.length, 1);
+      return {
+        kind,
+        prompt,
+        options: options.length ? options : ["", "", "", ""],
+        correct_index: Number.isInteger(ci) && ci >= 0 && ci < max ? ci : 0,
+        correct_bool: null,
+        model_answer: "",
+        points,
+      };
+    }
+    if (kind === "truefalse") {
+      return {
+        kind,
+        prompt,
+        options: [],
+        correct_index: null,
+        correct_bool: o.correct_bool === true,
+        model_answer: "",
+        points,
+      };
+    }
+    return {
+      kind: "text" as const,
+      prompt,
+      options: [],
+      correct_index: null,
+      correct_bool: null,
+      model_answer: stripTags(String(o.model_answer ?? "")).slice(0, 2000),
+      points,
+    };
+  });
+}
+
+/**
+ * حفظ أسئلة المعلّم الحالية قالباً لإعادة استعمالها.
+ *
+ * لقطةٌ جامدة: تعديل الاختبار بعدها لا يغيّر القالب، وتعديل القالب لا
+ * يمسّ اختباراً استُعمل فيه. لولا ذلك لتغيّرت اختبارات سابقة من تحت يد
+ * المعلّم.
+ */
+export async function saveExamTemplate(
+  _prev: ExamActionState,
+  formData: FormData
+): Promise<ExamActionState> {
+  const { supabase, teacher } = await requireMyTeacher();
+  if (!teacher) return NOT_TEACHER;
+
+  const name = stripTags(String(formData.get("name") ?? "")).trim().slice(0, 100);
+  if (!name) return { ok: false, message: "اكتب اسماً للقالب." };
+
+  const questions = parseTemplateQuestions(formData.get("questions"));
+  if (questions.length === 0) {
+    return { ok: false, message: "أضِف سؤالاً واحداً على الأقل قبل حفظ القالب." };
+  }
+
+  const { error } = await supabase.from("exam_templates").insert({
+    teacher_id: teacher.id,
+    name,
+    description: `${questions.length} سؤالاً · ${questions.reduce(
+      (n, q) => n + q.points,
+      0
+    )} علامة`,
+    questions,
+  });
+  if (error) return { ok: false, message: "تعذّر حفظ القالب." };
+
+  revalidatePath("/teacher/me/exams");
+  return { ok: true, message: `حُفظ القالب «${name}».` };
+}
+
+export async function deleteExamTemplate(
+  templateId: string
+): Promise<ExamActionState> {
+  const { supabase, teacher } = await requireMyTeacher();
+  if (!teacher) return NOT_TEACHER;
+
+  const { error } = await supabase
+    .from("exam_templates")
+    .delete()
+    .eq("id", templateId)
+    .eq("teacher_id", teacher.id);
+  if (error) return { ok: false, message: "تعذّر حذف القالب." };
+
+  revalidatePath("/teacher/me/exams");
+  return { ok: true, message: "حُذف القالب." };
+}
+
+/**
+ * استنساخ اختبار قائم: نسخة مسودّة بأسئلته كاملةً بلا محاولات.
+ *
+ * النسخة تولد **مسودّة دائماً** مهما كان الأصل منشوراً: نسخةٌ تصل الطلاب
+ * لحظة إنشائها قبل أن يراجعها المعلّم أسوأ من لا شيء. والنافذة الزمنية
+ * تُنسخ كما هي ليعدّلها، لا لتُترك فارغة فيُفتح الاختبار أبداً.
+ */
+export async function duplicateExam(examId: string): Promise<ExamActionState> {
+  const { supabase, teacher } = await requireMyTeacher();
+  if (!teacher) return NOT_TEACHER;
+
+  const { data: exam } = await supabase
+    .from("exams")
+    .select("*")
+    .eq("id", examId)
+    .eq("teacher_id", teacher.id)
+    .maybeSingle();
+  if (!exam) return { ok: false, message: "هذا الاختبار ليس لك." };
+
+  const src = exam as {
+    group_id: string;
+    title: string;
+    description: string;
+    opens_at: string | null;
+    closes_at: string | null;
+    duration_minutes: number | null;
+  };
+
+  const { data: created, error } = await supabase
+    .from("exams")
+    .insert({
+      teacher_id: teacher.id,
+      group_id: src.group_id,
+      title: `${src.title} — نسخة`.slice(0, 150),
+      description: src.description,
+      opens_at: src.opens_at,
+      closes_at: src.closes_at,
+      duration_minutes: src.duration_minutes,
+      status: "draft",
+    })
+    .select("id")
+    .single();
+  if (error || !created) return { ok: false, message: "تعذّر استنساخ الاختبار." };
+
+  const newId = created.id as string;
+
+  const { data: qs } = await supabase
+    .from("exam_questions")
+    .select("position, kind, prompt, options, correct_index, correct_bool, model_answer, points")
+    .eq("exam_id", examId)
+    .order("position");
+
+  const rows = (qs ?? []) as Record<string, unknown>[];
+  if (rows.length > 0) {
+    const { error: qErr } = await supabase
+      .from("exam_questions")
+      .insert(rows.map((q) => ({ ...q, exam_id: newId })));
+    if (qErr) {
+      // لا نترك اختباراً فارغاً معلّقاً إن فشل نسخ الأسئلة
+      await supabase.from("exams").delete().eq("id", newId).eq("teacher_id", teacher.id);
+      return { ok: false, message: "تعذّر نسخ الأسئلة." };
+    }
+  }
+
+  refresh(newId);
+  return {
+    ok: true,
+    message: `أُنشئت نسخة مسودّة بـ${rows.length} سؤالاً — عدّلها ثم انشرها.`,
+    examId: newId,
+  };
+}

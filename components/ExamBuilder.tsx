@@ -6,6 +6,8 @@ import {
   type ExamActionState,
 } from "@/app/actions/exams";
 import AutoTextarea from "@/components/AutoTextarea";
+import TemplatePicker from "@/components/TemplatePicker";
+import type { ExamTemplate } from "@/lib/examTemplates";
 import type { ExamQuestion, QuestionKind } from "@/lib/data/types";
 
 const initial: ExamActionState = { ok: false };
@@ -59,11 +61,14 @@ export default function ExamBuilder({
   examId,
   initialQuestions,
   locked,
+  myTemplates,
 }: {
   examId: string;
   initialQuestions: ExamQuestion[];
   /** بدأ طلاب الاختبار ⇒ الأسئلة مقفلة حفاظاً على عدالة التصحيح */
   locked: boolean;
+  /** قوالب حفظها المعلّم بنفسه، تُضاف إلى قوالب المنصة */
+  myTemplates: ExamTemplate[];
 }) {
   const [state, action, pending] = useActionState(saveExamQuestions, initial);
   const [questions, setQuestions] = useState<QuestionUI[]>(
@@ -129,6 +134,27 @@ export default function ExamBuilder({
     <form action={action} className="exam-builder">
       <input type="hidden" name="examId" value={examId} />
       <input type="hidden" name="questions" value={payload} />
+
+      <TemplatePicker
+        myTemplates={myTemplates}
+        currentPayload={payload}
+        hasQuestions={questions.some((q) => q.prompt.trim() !== "")}
+        onApply={(qs, mode) =>
+          setQuestions((prev) => {
+            const mapped = qs.map((q) => ({
+              id: newId(),
+              kind: q.kind,
+              prompt: q.prompt,
+              options: q.options.length ? [...q.options] : ["", "", "", ""],
+              correct_index: q.correct_index ?? 0,
+              correct_bool: q.correct_bool ?? true,
+              model_answer: q.model_answer,
+              points: Number(q.points),
+            }));
+            return mode === "append" ? [...prev, ...mapped] : mapped;
+          })
+        }
+      />
 
       <div className="exam-builder-head">
         <span className="pill pill-free">

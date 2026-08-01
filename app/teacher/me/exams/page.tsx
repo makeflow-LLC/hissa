@@ -11,6 +11,7 @@ import {
   getMyGroups,
 } from "@/lib/data/queries";
 import ExamWindow from "@/components/ExamWindow";
+import DuplicateExamButton from "@/components/DuplicateExamButton";
 
 export const dynamic = "force-dynamic";
 
@@ -114,6 +115,8 @@ export default async function TeacherExamsPage() {
                   >
                     📊 النتائج
                   </Link>
+                  {/* أسرع طريق إلى اختبار جديد: اختبارٌ سابق نجح */}
+                  <DuplicateExamButton examId={e.id} title={e.title} />
                 </div>
               </div>
             </li>
