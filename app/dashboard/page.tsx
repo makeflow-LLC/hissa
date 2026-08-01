@@ -163,6 +163,11 @@ export default async function StudentDashboard() {
                       </Link>
                     ) : (
                       <>
+                        {/*
+                          الحالة لا الدرجة: اللوحة تُفتح أمام من يمرّ بالشاشة —
+                          أخٌ أو زميل — والدرجة تخصّ صاحبها. تُقرأ داخل صفحة
+                          الاختبار مع الإجابات التي أنتجتها.
+                        */}
                         <span
                           className={
                             a.status === "graded" ? "pill pill-live" : "pill pill-draft"
@@ -172,11 +177,8 @@ export default async function StudentDashboard() {
                             ? "✓ صُحِّح"
                             : "⏳ بانتظار تصحيح معلّمك"}
                         </span>
-                        <span className="attempt-score">
-                          {a.auto_score + a.manual_score} من {a.max_score}
-                        </span>
                         <Link href={`/exam/${e.id}`} className="btn btn-outline btn-sm">
-                          عرض إجاباتي
+                          نتيجتي وإجاباتي
                         </Link>
                       </>
                     )}

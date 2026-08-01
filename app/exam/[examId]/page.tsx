@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import PageHeader from "@/components/PageHeader";
 import ExamTaker from "@/components/ExamTaker";
 import ExamWindow from "@/components/ExamWindow";
+import ExamCountdown from "@/components/ExamCountdown";
 import ConnectionNotice from "@/components/ConnectionNotice";
 import {
   getCurrentUser,
@@ -109,6 +110,10 @@ export default async function ExamPage({
               );
             })}
           </ol>
+        </section>
+      ) : state === "before" && exam.opens_at ? (
+        <section className="dashboard-section">
+          <ExamCountdown opensAt={exam.opens_at} />
         </section>
       ) : state !== "open" ? (
         <p className="drafts-empty">

@@ -1305,85 +1305,6 @@ export async function getMyParentReports(): Promise<
   }
 }
 
-/** نتائج اختبارات دروس المعلّم الحالي، مجمّعة لكل درس */
-export interface LessonQuizStats {
-  lessonId: string;
-  lessonTitle: string;
-  attempts: number;
-  avgPct: number;
-  rows: { studentName: string; score: number; total: number; created_at: string }[];
-}
-
-export async function getMyQuizStats(): Promise<LessonQuizStats[]> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return [];
-
-  const { data: teacher } = await supabase
-    .from("teachers")
-    .select("id")
-    .eq("owner_id", user.id)
-    .maybeSingle();
-  if (!teacher) return [];
-
-  const { data: lessons } = await supabase
-    .from("lessons")
-    .select("id, title")
-    .eq("teacher_id", teacher.id);
-  const lessonRows = (lessons ?? []) as { id: string; title: string }[];
-  if (lessonRows.length === 0) return [];
-
-  const { data: attempts } = await supabase
-    .from("quiz_attempts")
-    .select("lesson_id, student_id, score, total, created_at")
-    .in(
-      "lesson_id",
-      lessonRows.map((l) => l.id)
-    )
-    .order("created_at", { ascending: false });
-  const attemptRows = (attempts ?? []) as {
-    lesson_id: string;
-    student_id: string;
-    score: number;
-    total: number;
-    created_at: string;
-  }[];
-  if (attemptRows.length === 0) return [];
-
-  const { data: names } = await supabase
-    .from("profiles")
-    .select("id, full_name")
-    .in("id", [...new Set(attemptRows.map((a) => a.student_id))]);
-  const nameById = new Map((names ?? []).map((n) => [n.id, n.full_name as string]));
-
-  return lessonRows
-    .map((l) => {
-      const rows = attemptRows.filter((a) => a.lesson_id === l.id);
-      const avgPct = rows.length
-        ? Math.round(
-            (rows.reduce((n, a) => n + (a.total ? a.score / a.total : 0), 0) /
-              rows.length) *
-              100
-          )
-        : 0;
-      return {
-        lessonId: l.id,
-        lessonTitle: l.title,
-        attempts: rows.length,
-        avgPct,
-        rows: rows.map((a) => ({
-          studentName: nameById.get(a.student_id) ?? "طالب",
-          score: a.score,
-          total: a.total,
-          created_at: a.created_at,
-        })),
-      };
-    })
-    .filter((s) => s.attempts > 0);
-}
-
 /** خيوط محادثة المعلّم مع كل طالب (أسئلة الطلاب وردوده) */
 export interface StudentThread {
   studentId: string;
@@ -1449,6 +1370,230 @@ export async function getMyThreads(): Promise<StudentThread[]> {
     .sort((a, b) => b.unansweredCount - a.unansweredCount);
 }
 
+
+/* ==================== ملفّ الطالب عند معلّمه ==================== */
+
+/** كل ما يعرفه المعلّم عن طالب واحد، مجموعاً في صفحة واحدة */
+export interface StudentDetail {
+  profile: StudentProfile;
+  followedAt: string;
+  completedLessons: number;
+  totalLessons: number;
+  progressPct: number;
+  /** الدروس التي أنهاها، بأسمائها */
+  doneLessons: { id: string; title: string }[];
+  groups: { id: string; name: string }[];
+  grants: { id: string; lesson_id: string | null; session_id: string | null }[];
+  /** نتائجه في اختبارات هذا المعلّم */
+  exams: {
+    attemptId: string;
+    examId: string;
+    title: string;
+    status: "in_progress" | "submitted" | "graded";
+    score: number;
+    maxScore: number;
+    pct: number;
+    submitted_at: string | null;
+  }[];
+  /** نتائجه في اختبارات الدروس القصيرة */
+  quizzes: { lessonId: string; lessonTitle: string; score: number; total: number }[];
+  cards: ReportCard[];
+  parentReports: ParentReport[];
+  messages: { id: string; body: string; created_at: string; sender: string }[];
+}
+
+/**
+ * ملفّ طالب واحد كما يراه معلّمه.
+ *
+ * صفحة مستقلّة بدل حشو كل هذا في بطاقةٍ داخل قائمة الطلاب: القائمة صارت
+ * قائمةً يُمسحها المعلّم بعينه، والتفصيل يُفتح عند الحاجة إليه.
+ *
+ * كل استعلام مقيّد بـ `teacher_id` أو بمعرّف الطالب: تمرير معرّف طالب لا
+ * ينضمّ إلى هذا المعلّم يعيد `null` قبل قراءة أي شيء آخر.
+ */
+export async function getStudentForTeacher(
+  studentId: string
+): Promise<StudentDetail | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return null;
+
+  // لا يُفتح ملفّ إلا لطالب قَبِله هذا المعلّم فعلاً
+  const { data: follow } = await supabase
+    .from("follows")
+    .select("created_at")
+    .eq("teacher_id", teacher.id)
+    .eq("student_id", studentId)
+    .eq("status", "approved")
+    .maybeSingle();
+  if (!follow) return null;
+
+  const [
+    profileRes,
+    lessonsRes,
+    groupsRes,
+    grantsRes,
+    cardsRes,
+    reportsRes,
+    msgRes,
+    examRes,
+  ] = await Promise.all([
+    supabase.from("profiles").select(STUDENT_PROFILE_COLS).eq("id", studentId).maybeSingle(),
+    supabase
+      .from("lessons")
+      .select("id, title")
+      .eq("teacher_id", teacher.id)
+      .eq("status", "published"),
+    supabase
+      .from("student_groups")
+      .select("id, name, student_group_members(student_id)")
+      .eq("teacher_id", teacher.id),
+    supabase
+      .from("student_grants")
+      .select("id, lesson_id, session_id")
+      .eq("teacher_id", teacher.id)
+      .eq("student_id", studentId),
+    supabase
+      .from("report_cards")
+      .select("*")
+      .eq("teacher_id", teacher.id)
+      .eq("student_id", studentId)
+      .order("issued_at", { ascending: false }),
+    supabase
+      .from("parent_reports")
+      .select("*")
+      .eq("teacher_id", teacher.id)
+      .eq("student_id", studentId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("teacher_messages")
+      .select("id, body, created_at, sender")
+      .eq("teacher_id", teacher.id)
+      .eq("student_id", studentId)
+      .order("created_at", { ascending: true })
+      .limit(50),
+    supabase
+      .from("exams")
+      .select("id, title, exam_attempts(id, student_id, status, auto_score, manual_score, max_score, submitted_at)")
+      .eq("teacher_id", teacher.id)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  const lessons = (lessonsRes.data ?? []) as { id: string; title: string }[];
+  const lessonIds = lessons.map((l) => l.id);
+  const titleOf = new Map(lessons.map((l) => [l.id, l.title]));
+
+  const [progressRes, quizRes] = await Promise.all([
+    lessonIds.length
+      ? supabase
+          .from("lesson_progress")
+          .select("lesson_id")
+          .eq("student_id", studentId)
+          .in("lesson_id", lessonIds)
+      : Promise.resolve({ data: [] }),
+    lessonIds.length
+      ? supabase
+          .from("quiz_attempts")
+          .select("lesson_id, score, total")
+          .eq("student_id", studentId)
+          .in("lesson_id", lessonIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const done = ((progressRes.data ?? []) as { lesson_id: string }[]).map(
+    (p) => p.lesson_id
+  );
+  const totalLessons = lessonIds.length;
+
+  const profile =
+    (profileRes.data as StudentProfile | null) ??
+    ({
+      id: studentId,
+      full_name: "طالب",
+      avatar_url: null,
+      grade: "",
+      school: "",
+      city: "",
+      age: null,
+      phone: null,
+      whatsapp: null,
+      guardian_phone: null,
+      profile_done: false,
+    } as StudentProfile);
+
+  const exams = ((examRes.data ?? []) as {
+    id: string;
+    title: string;
+    exam_attempts:
+      | {
+          id: string;
+          student_id: string;
+          status: "in_progress" | "submitted" | "graded";
+          auto_score: number;
+          manual_score: number;
+          max_score: number;
+          submitted_at: string | null;
+        }[]
+      | null;
+  }[])
+    .map((e) => {
+      const a = (e.exam_attempts ?? []).find((x) => x.student_id === studentId);
+      if (!a) return null;
+      const score = Number(a.auto_score) + Number(a.manual_score);
+      const max = Number(a.max_score);
+      return {
+        attemptId: a.id,
+        examId: e.id,
+        title: e.title,
+        status: a.status,
+        score,
+        maxScore: max,
+        pct: max > 0 ? Math.round((score / max) * 100) : 0,
+        submitted_at: a.submitted_at,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+
+  return {
+    profile,
+    followedAt: (follow as { created_at: string }).created_at,
+    completedLessons: done.length,
+    totalLessons,
+    progressPct: totalLessons ? Math.round((done.length / totalLessons) * 100) : 0,
+    doneLessons: done.map((id) => ({ id, title: titleOf.get(id) ?? "درس" })),
+    groups: ((groupsRes.data ?? []) as {
+      id: string;
+      name: string;
+      student_group_members: { student_id: string }[] | null;
+    }[])
+      .filter((g) => (g.student_group_members ?? []).some((m) => m.student_id === studentId))
+      .map((g) => ({ id: g.id, name: g.name })),
+    grants: (grantsRes.data ?? []) as StudentDetail["grants"],
+    exams,
+    quizzes: ((quizRes.data ?? []) as {
+      lesson_id: string;
+      score: number;
+      total: number;
+    }[]).map((q) => ({
+      lessonId: q.lesson_id,
+      lessonTitle: titleOf.get(q.lesson_id) ?? "درس",
+      score: Number(q.score),
+      total: Number(q.total),
+    })),
+    cards: (cardsRes.data ?? []) as ReportCard[],
+    parentReports: (reportsRes.data ?? []) as ParentReport[],
+    messages: (msgRes.data ?? []) as StudentDetail["messages"],
+  };
+}
 
 /* ==================== لوحة المجموعة ==================== */
 
