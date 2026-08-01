@@ -5,6 +5,7 @@ import { getCurrentUser, getMyTeacher } from "@/lib/data/queries";
 import ShareProfile from "@/components/ShareProfile";
 import Hint from "@/components/Hint";
 import Stars from "@/components/Stars";
+import AvailabilityToggle from "@/components/AvailabilityToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,17 @@ export default async function TeacherMePage() {
           <Link href={`/teacher/${teacher.slug}`} className="btn btn-outline">
             👁 معاينة صفحتي كما يراها الطالب
           </Link>
+          <Link href="/help?role=teacher" className="btn btn-outline">
+            ❓ دليل الاستخدام
+          </Link>
         </div>
+      </section>
+
+      <section className="dashboard-section">
+        <AvailabilityToggle
+          status={teacher.availability}
+          note={teacher.availability_note}
+        />
       </section>
 
       {!teacher.is_published && (

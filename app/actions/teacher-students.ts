@@ -44,7 +44,14 @@ async function followsMe(
 }
 
 /**
- * إرسال رسالة إلى طالب بعينه أو إلى كل المتابعين (studentId فارغ).
+ * إرسال رسالة. لها ثلاث وجهات، والفارق بينها حقلان لا جدولان:
+ *
+ * | الحقول | الوجهة |
+ * |---|---|
+ * | `studentId` | خاصّة بطالب واحد |
+ * | `groupId` | تعميم لأعضاء مجموعة بعينها |
+ * | لا هذا ولا ذاك | تعميم لكل المتابعين |
+ *
  * الرسالة نص صِرف — تُعرض على لوحة الطالب، فنزيل أي وسوم HTML.
  */
 export async function sendMessage(
@@ -56,23 +63,45 @@ export async function sendMessage(
 
   const body = stripTags(String(formData.get("body") ?? "")).slice(0, 1000);
   const studentId = String(formData.get("studentId") ?? "").trim() || null;
+  const groupId = String(formData.get("groupId") ?? "").trim() || null;
   if (!body) return { ok: false, message: "اكتب نص الرسالة." };
 
   if (studentId && !(await followsMe(supabase, teacher.id, studentId))) {
     return { ok: false, message: "هذا الطالب لا يتابعك." };
   }
 
+  // المجموعة يجب أن تكون من مجموعات هذا المعلّم — السياسة تفرضها أيضاً
+  let groupName = "";
+  if (groupId) {
+    const { data: group } = await supabase
+      .from("student_groups")
+      .select("name")
+      .eq("id", groupId)
+      .eq("teacher_id", teacher.id)
+      .maybeSingle();
+    if (!group) return { ok: false, message: "هذه المجموعة ليست لك." };
+    groupName = (group as { name: string }).name;
+  }
+
   const { error } = await supabase.from("teacher_messages").insert({
     teacher_id: teacher.id,
-    student_id: studentId,
+    // رسالة المجموعة تعميم، فلا تحمل طالباً بعينه
+    student_id: groupId ? null : studentId,
+    group_id: groupId,
     body,
   });
   if (error) return { ok: false, message: "تعذّر إرسال الرسالة — حاول مجدداً." };
 
   revalidatePath("/teacher/me/students");
+  revalidatePath("/dashboard");
+  if (groupId) revalidatePath(`/teacher/me/groups/${groupId}`);
   return {
     ok: true,
-    message: studentId ? "أُرسلت الرسالة." : "أُرسلت الرسالة لكل متابعيك.",
+    message: groupId
+      ? `أُرسلت إلى أعضاء «${groupName}».`
+      : studentId
+        ? "أُرسلت الرسالة."
+        : "أُرسلت الرسالة لكل متابعيك.",
   };
 }
 
@@ -134,6 +163,91 @@ export async function grantAccess(
 
   revalidatePath("/teacher/me/students");
   return { ok: true, message: "مُنح الطالب الوصول." };
+}
+
+/**
+ * منح كل أعضاء مجموعة وصولاً إلى درس خاص (أو سحبه عنهم).
+ *
+ * «درس خاص للمجموعة» ليس نوعاً جديداً من الدروس: هو درس `is_restricted`
+ * تُمنَح المجموعةُ كلُّها وصولاً إليه دفعةً واحدة، فيعمل بنفس ما تفرضه
+ * سياسة `lessons` أصلاً — لا مسار صلاحيات ثانياً يُخطئ أحدهما الآخر.
+ */
+export async function setGroupLessonAccess(
+  groupId: string,
+  lessonId: string,
+  grant: boolean
+): Promise<StudentsActionState> {
+  const { supabase, teacher } = await requireMyTeacher();
+  if (!teacher) return { ok: false, message: "سجّل الدخول كمعلّم أولاً." };
+
+  const [{ data: group }, { data: lesson }] = await Promise.all([
+    supabase
+      .from("student_groups")
+      .select("id")
+      .eq("id", groupId)
+      .eq("teacher_id", teacher.id)
+      .maybeSingle(),
+    supabase
+      .from("lessons")
+      .select("id")
+      .eq("id", lessonId)
+      .eq("teacher_id", teacher.id)
+      .maybeSingle(),
+  ]);
+  if (!group) return { ok: false, message: "هذه المجموعة ليست لك." };
+  if (!lesson) return { ok: false, message: "هذا الدرس ليس لك." };
+
+  const { data: members } = await supabase
+    .from("student_group_members")
+    .select("student_id")
+    .eq("group_id", groupId);
+  const ids = ((members ?? []) as { student_id: string }[]).map((m) => m.student_id);
+  if (ids.length === 0) return { ok: false, message: "لا أعضاء في هذه المجموعة." };
+
+  if (grant) {
+    /**
+     * الفهرس الفريد على `student_grants` مبنيّ على تعبير `coalesce`، فلا
+     * يقبل `onConflict` بأسماء أعمدة. نقرأ الموجود ونُدرج الناقص فقط.
+     */
+    const { data: existing } = await supabase
+      .from("student_grants")
+      .select("student_id")
+      .eq("teacher_id", teacher.id)
+      .eq("lesson_id", lessonId)
+      .in("student_id", ids);
+    const have = new Set(
+      ((existing ?? []) as { student_id: string }[]).map((g) => g.student_id)
+    );
+    const missing = ids.filter((id) => !have.has(id));
+
+    if (missing.length > 0) {
+      const { error } = await supabase.from("student_grants").insert(
+        missing.map((student_id) => ({
+          teacher_id: teacher.id,
+          student_id,
+          lesson_id: lessonId,
+        }))
+      );
+      if (error) return { ok: false, message: "تعذّر منح المجموعة الوصول." };
+    }
+  } else {
+    const { error } = await supabase
+      .from("student_grants")
+      .delete()
+      .eq("teacher_id", teacher.id)
+      .eq("lesson_id", lessonId)
+      .in("student_id", ids);
+    if (error) return { ok: false, message: "تعذّر سحب الوصول." };
+  }
+
+  revalidatePath(`/teacher/me/groups/${groupId}`);
+  revalidatePath("/teacher/me/students");
+  return {
+    ok: true,
+    message: grant
+      ? `مُنح ${ids.length} طالباً الوصول إلى الدرس.`
+      : "سُحب وصول المجموعة إلى الدرس.",
+  };
 }
 
 /** سحب منحة وصول */

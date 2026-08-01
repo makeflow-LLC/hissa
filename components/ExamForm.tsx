@@ -27,10 +27,13 @@ function toLocalInput(iso: string | null): string {
 export default function ExamForm({
   exam,
   groups,
+  defaultGroupId,
 }: {
   /** موجود عند التعديل، غائب عند الإنشاء */
   exam?: Exam;
   groups: StudentGroup[];
+  /** مجموعة مختارة سلفاً حين يأتي المعلّم من لوحتها */
+  defaultGroupId?: string;
 }) {
   const router = useRouter();
   const [state, action, pending] = useActionState(saveExam, initial);
@@ -93,7 +96,15 @@ export default function ExamForm({
           طلاب هذه المجموعة وحدهم يرون الاختبار ويقدّمونه. غيرهم لا يعلم بوجوده
           أصلاً.
         </Hint>
-        <select name="groupId" defaultValue={exam?.group_id ?? ""} required>
+        <select
+          name="groupId"
+          defaultValue={
+            exam?.group_id ??
+            (groups.some((g) => g.id === defaultGroupId) ? defaultGroupId : "") ??
+            ""
+          }
+          required
+        >
           <option value="" disabled>
             — اختر مجموعة —
           </option>

@@ -4679,3 +4679,351 @@ body {
     flex: 0 0 auto;
   }
 }
+
+/* ===== الشرح خلف أيقونة ===== */
+
+/*
+ * الشرح كان يُعرض دائماً فامتلأت اللوحتان بفقرات تُقرأ مرّةً ثم تزاحم.
+ * صار زرّاً صغيراً: من يعرف الخيار لا يراه، ومن لا يعرفه يجده في مكانه.
+ */
+.hint-wrap {
+  margin-bottom: 10px;
+}
+.hint-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  padding: 4px 0;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.hint-btn:hover,
+.hint-btn-open {
+  color: var(--primary);
+}
+.hint-icon,
+.infotip-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.hint-btn:hover .hint-icon,
+.hint-btn-open .hint-icon {
+  background: var(--primary);
+  color: #fff;
+}
+.hint-wrap .hint {
+  margin-top: 6px;
+}
+
+/* النسخة السطرية: بجانب عنوان حقل لا تحته */
+.infotip-btn {
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  margin-inline-start: 6px;
+  vertical-align: middle;
+}
+.infotip-btn-open {
+  background: var(--primary);
+  color: #fff;
+}
+.infotip-body {
+  display: block;
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: var(--primary-soft);
+  border-radius: 10px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 400;
+  line-height: 1.7;
+  max-width: 72ch;
+}
+
+/* ===== حالة المعلّم ===== */
+
+.availability-box {
+  display: grid;
+  gap: 10px;
+}
+.availability-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.avail-chip {
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  padding: 8px 14px;
+  min-height: 42px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.avail-chip-on {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+.availability-line {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+.avail-available { color: var(--success); }
+.avail-busy { color: #b45309; }
+.avail-offline { color: var(--text-muted); }
+
+/* ===== لوحة المجموعة ===== */
+
+.group-goal {
+  background: var(--primary-soft);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 1rem;
+  overflow-wrap: anywhere;
+}
+.whatsapp-group-btn {
+  margin-bottom: 1.25rem;
+}
+.group-info-link {
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+}
+.group-info-link:hover .group-name {
+  color: var(--primary);
+}
+
+.member-list {
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+.member-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1rem;
+  display: grid;
+  gap: 10px;
+}
+.member-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.member-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.member-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-weight: 800;
+}
+.member-id {
+  display: grid;
+  min-width: 0;
+}
+.member-name {
+  overflow-wrap: anywhere;
+}
+.member-stats {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.member-stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+.member-bar {
+  flex: 1 1 90px;
+  min-width: 60px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.member-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+}
+.member-msg {
+  display: grid;
+  gap: 8px;
+}
+.member-add {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+}
+.member-add select {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.group-broadcast {
+  display: grid;
+  gap: 12px;
+}
+.message-del {
+  margin-inline-start: auto;
+}
+.message-actions {
+  margin-top: 8px;
+}
+
+.access-list {
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+.access-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 0.8rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.access-title {
+  flex: 1 1 180px;
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.group-details-form {
+  display: grid;
+  gap: 1rem;
+}
+.group-details-form .form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.group-details-form .form-row > .form-field {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+/* ===== دليل الاستخدام ===== */
+
+.help-list {
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+.help-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.help-q {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0.9rem 1rem;
+  font: inherit;
+  font-weight: 700;
+  text-align: start;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+}
+.help-q:hover,
+.help-q-open {
+  background: var(--primary-soft);
+}
+.help-caret {
+  flex-shrink: 0;
+  font-size: 1.3rem;
+  color: var(--primary);
+  line-height: 1;
+}
+.help-a {
+  padding: 0 1rem 1rem;
+  color: var(--text-muted);
+  line-height: 1.9;
+  display: grid;
+  gap: 10px;
+}
+.help-a p { overflow-wrap: anywhere; }
+.help-a strong { color: var(--text); }
+.help-bullets,
+.help-steps {
+  padding-inline-start: 1.3rem;
+  display: grid;
+  gap: 8px;
+}
+.help-steps { counter-reset: step; }
+
+@media (max-width: 720px) {
+  .availability-options {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .access-row,
+  .member-head {
+    align-items: flex-start;
+  }
+  .access-row .card-actions,
+  .member-card .card-actions {
+    width: 100%;
+  }
+  .access-row .btn,
+  .member-card .card-actions .btn,
+  .group-info-link + .form-row .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .group-details-form .form-row {
+    flex-direction: column;
+  }
+  .group-details-form .form-row > .form-field {
+    flex: 0 0 auto;
+  }
+}

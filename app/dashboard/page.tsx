@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import AskTeacherForm from "@/components/AskTeacherForm";
 import ExamWindow from "@/components/ExamWindow";
+import MessageActions from "@/components/MessageActions";
 import LiveNotifier from "@/components/LiveNotifier";
 import RequestReportCard from "@/components/RequestReportCard";
 import Hint from "@/components/Hint";
@@ -77,6 +78,9 @@ export default async function StudentDashboard() {
           </Link>
           <Link href="/" className="btn btn-outline">
             🔎 معلّمون جدد
+          </Link>
+          <Link href="/help?role=student" className="btn btn-outline">
+            ❓ دليل الاستخدام
           </Link>
         </div>
       </section>
@@ -260,7 +264,8 @@ export default async function StudentDashboard() {
           <h2 className="section-title">✉️ مراسلاتك مع معلّميك</h2>
           <Hint>
             اسأل معلّمك عمّا لم يتّضح لك في درس. تصلك إشارة صوتية فور وصول ردّه
-            وأنت على هذه الصفحة.
+            وأنت على هذه الصفحة. زرّ «إزالة» يخفي الرسالة من قائمتك أنت وحدك —
+            التعميم يبقى عند بقية زملائك.
           </Hint>
           <ul className="messages-list">
             {messages.map((m) => (
@@ -284,11 +289,23 @@ export default async function StudentDashboard() {
                       month: "long",
                     })}
                   </span>
-                  {m.student_id === null && (
-                    <span className="pill pill-free">📢 لكل الطلاب</span>
-                  )}
+                  {m.student_id === null &&
+                    (m.group_id ? (
+                      <span className="pill pill-free">
+                        👥 لمجموعة {m.groupName}
+                      </span>
+                    ) : (
+                      <span className="pill pill-free">📢 لكل الطلاب</span>
+                    ))}
                 </div>
                 <p className="message-body">{m.body}</p>
+                <MessageActions
+                  messageId={m.id}
+                  teacherId={m.teacher_id}
+                  teacherSlug={m.teacherSlug}
+                  teacherName={m.teacherName}
+                  canReply={m.sender === "teacher"}
+                />
               </li>
             ))}
           </ul>

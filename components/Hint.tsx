@@ -1,14 +1,47 @@
+"use client";
+
+import { useId, useState } from "react";
+
 /**
- * سطر تعريفي قصير تحت عنوان القسم أو فوق الخيار.
+ * شرحٌ مطويّ خلف أيقونة.
  *
- * اللوحتان تعرضان خيارات كثيرة لا يشرح اسمُها وحده لماذا هي موجودة —
- * «منح صلاحية»، «مجموعة»، «بطاقة تقييم». جملة واحدة تحت كل عنوان أرخص
- * من دليل استخدام لا يقرؤه أحد.
+ * كان الشرح يُعرض دائماً تحت كل عنوان، فامتلأت اللوحتان بفقرات يقرؤها
+ * المستخدم مرّةً ثم تظلّ تزاحم ما جاء يفعله. صار سطراً واحداً يضغطه من
+ * أراد: من يعرف الخيار لا يراه أصلاً، ومن لا يعرفه يجده في مكانه.
+ *
+ * لا نستخدم `title=` ولا تلميحاً يظهر بالمرور: الجوّال لا مرور فيه،
+ * وجمهور المنصة أكثره على الجوّال.
  */
-export default function Hint({ children }: { children: React.ReactNode }) {
+export default function Hint({
+  children,
+  label = "ما هذا؟",
+}: {
+  children: React.ReactNode;
+  /** نصّ الزرّ — غيّره حين يكون السؤال أدقّ من «ما هذا؟» */
+  label?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+
   return (
-    <p className="hint">
-      <span aria-hidden="true">💡</span> {children}
-    </p>
+    <div className="hint-wrap">
+      <button
+        type="button"
+        className={`hint-btn ${open ? "hint-btn-open" : ""}`}
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="hint-icon" aria-hidden="true">
+          ؟
+        </span>
+        {label}
+      </button>
+      {open && (
+        <p className="hint" id={id}>
+          {children}
+        </p>
+      )}
+    </div>
   );
 }

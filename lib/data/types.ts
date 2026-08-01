@@ -34,7 +34,13 @@ export interface TeacherRow {
   experience_years: number;
   /** شروط الانضمام التي يكتبها المعلّم، تُعرض للطالب قبل إرسال طلبه */
   join_instructions: string;
+  /** حالة توفّر المعلّم للردّ — يضبطها بنفسه */
+  availability: Availability;
+  availability_note: string;
 }
+
+/** متاح للردّ · مشغول الآن · خارج الخدمة */
+export type Availability = "available" | "busy" | "offline";
 
 /** ملف المعلّم الحالي (المسجّل بحسابه) — لصفحات إدارة بروفايله */
 export interface MyTeacher extends TeacherRow {
@@ -225,6 +231,52 @@ export interface StudentGroup {
   description: string;
   position: number;
   memberCount: number;
+  /** رابط دعوة مجموعة واتساب — لأعضاء المجموعة وحدهم */
+  whatsapp_link: string;
+  /** هدف الصفّ هذا الفصل */
+  goal: string;
+  /** موعد اللقاء كما يكتبه المعلّم نصّاً */
+  schedule: string;
+}
+
+/** عضو في مجموعة كما يظهر على لوحة المجموعة */
+export interface GroupMember {
+  studentId: string;
+  name: string;
+  grade: string;
+  avatarUrl: string | null;
+  /** تقدّمه في منهج هذا المعلّم */
+  completedLessons: number;
+  totalLessons: number;
+  progressPct: number;
+  /** متوسّط اختبارات هذه المجموعة (null إن لم يقدّم شيئاً) */
+  examAvg: number | null;
+  examsTaken: number;
+  /** آخر بطاقة تقييم صدرت له */
+  lastCardTitle: string | null;
+  /** رسائل منه لم يُردّ عليها بعد */
+  awaitingReply: boolean;
+}
+
+/** كل ما تعرضه صفحة المجموعة */
+export interface GroupHub {
+  group: StudentGroup;
+  members: GroupMember[];
+  /** طلاب منضمّون خارج هذه المجموعة — لإضافتهم */
+  candidates: { studentId: string; name: string; grade: string }[];
+  /** تعاميم أُرسلت إلى هذه المجموعة */
+  announcements: { id: string; body: string; created_at: string }[];
+  /** اختبارات موجّهة إلى هذه المجموعة */
+  exams: {
+    id: string;
+    title: string;
+    status: "draft" | "published";
+    submittedCount: number;
+    needsGrading: number;
+  }[];
+  /** دروس المعلّم المعلَّمة «خاصة» — لمنحها للمجموعة دفعةً واحدة */
+  restrictedLessons: { id: string; title: string; grantedCount: number }[];
+  totalLessons: number;
 }
 
 /** بطاقة تقييم تصدر في نهاية وحدة أو فصل */
@@ -268,6 +320,8 @@ export interface TeacherMessage {
   id: string;
   teacher_id: string;
   student_id: string | null;
+  /** مضبوط = تعميم لهذه المجموعة وحدها */
+  group_id: string | null;
   body: string;
   created_at: string;
   /** من كتبها — الخيط الواحد يحمل رسائل الطرفين */

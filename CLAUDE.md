@@ -75,6 +75,7 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0014_follow_vs_join.sql` | `following` status separating follow from join; review requires an approved join |
 | `0015_report_card_requests_and_realtime.sql` | `report_card_requests` + realtime publication for messages, follows and cards |
 | `0016_exams.sql` | group-targeted `exams`, `exam_questions`, `exam_attempts`, `exam_answers`, `get_exam_paper()` + server-side grading functions |
+| `0017_group_hub_messaging_availability.sql` | group `whatsapp_link`/`goal`/`schedule`, `teacher_messages.group_id`, `message_dismissals`, `teachers.availability` |
 
 ### Removed: live sessions
 
@@ -120,6 +121,38 @@ Subjects are compared through `normalize_ar()` (SQL) — diacritics, tatweel, al
 `student_groups` + `student_group_members` let a teacher sort students into groups (a student may be in several). `report_cards` are end-of-unit or end-of-term evaluations: four 0–5 ratings (understanding, participation, homework, behaviour), an optional score, strengths, improvements and a note. Students read their own cards on `/dashboard`.
 
 Both are teacher-owned and student-readable, and both refuse to reference a student who is not `approved`. The two group policies once referenced each other and sent RLS into infinite recursion; `is_group_member()` (`security definer`) breaks the cycle on one side, the same way `has_grant()` does in `0008`.
+
+### The group hub (`/teacher/me/groups/[groupId]`)
+
+A group used to be a label pinned on a student and nothing more. `0017` turns it into a class with its own page: members with their lesson progress, their average across **this group's** exams, their latest report card, and an "awaiting your reply" flag when the last message in the thread came from them; a broadcast that reaches only its members; a WhatsApp invite link; a goal and a meeting time; the group's exams; and bulk access to restricted lessons.
+
+Three things exist only through a group, and this page is where they meet: an **exam** targets exactly one group, the teacher's **WhatsApp number** is shown only to members, and a **restricted lesson** can be granted to the whole group in one click.
+
+`getGroupHub()` is one batched query rather than several page-level calls — the route is `force-dynamic`, so each call would be another round trip on every visit. It resolves the group by `id` **and** `teacher_id`, so passing a stranger's group id opens nothing.
+
+**"A private lesson for the group" is not a new kind of lesson.** `setGroupLessonAccess` writes one `student_grants` row per member of an `is_restricted` lesson, so it rides the same policy the lesson table already enforces — no second permissions path to disagree with the first. It inserts only the missing rows: the unique index on `student_grants` is built on `coalesce(...)` expressions, which PostgREST's `onConflict` cannot name.
+
+### Three message destinations, two columns
+
+`teacher_messages` distinguishes them by which columns are set, not by separate tables:
+
+| Columns set | Destination |
+|---|---|
+| `student_id` | one student — a two-way thread |
+| `group_id` | that group's members only |
+| neither | every follower |
+
+A student may **remove** a message from their own list. Deleting the row is only correct for a message the student wrote; a broadcast is a single row read by twenty students, so deleting it would erase it for the whole class. `dismissMessage` therefore deletes their own message but writes a `message_dismissals` row for anyone else's, and `getMyMessages` filters those out in JS. Students can also reply to any teacher message inline (`MessageActions` → `askTeacher`).
+
+### The teacher's availability
+
+`teachers.availability` is `available` | `busy` | `offline`, plus a free-text `availability_note`, set by the teacher from their hub and rendered on their public profile. It is **manual, never derived from last-seen**: "online 3 minutes ago" reports when someone opened a page, not when they intend to reply, and it exposes a teacher's habits to people who have no business knowing them.
+
+### Help: `/help`, and hints behind an icon
+
+`/help` is a two-tab Q&A (student / teacher) with collapsed answers; the tab opens on the reader's own role via `getAccountRole()`, and `?role=` overrides it. It is public and in the sitemap.
+
+`Hint` no longer prints its paragraph unconditionally — it renders a small "؟ ما هذا؟" button that expands on click, and `InfoTip` is the inline variant that sits beside a field label. Every existing `<Hint>` became collapsible with no call-site change. Neither uses `title=` or hover: this audience is overwhelmingly on phones, where there is no hover.
 
 ### Live notifications
 
@@ -247,6 +280,8 @@ Security is verified with SQL that switches `role` and `request.jwt.claims` to i
 | `app/teacher/me/lessons/new` · `lessons/[lessonId]` | create/edit a recorded lesson (`LessonForm`) |
 | `app/dashboard/profile/page.tsx` | student fills their own data (`StudentProfileForm`) |
 | `app/teacher/me/students/page.tsx` | teacher's followers: profiles, progress, messages, access grants |
+| `app/teacher/me/groups/[groupId]/page.tsx` | one group as a class: members + progress + exam averages, group broadcast, WhatsApp link, group exams, bulk lesson access |
+| `app/help/page.tsx` | Arabic usage guide, two tabs (student / teacher), public and indexed |
 | `app/teacher/me/exams/page.tsx` | teacher's exam list, with a "بانتظار تصحيحك" count per exam |
 | `app/teacher/me/exams/new` · `exams/[examId]` | create exam metadata (`ExamForm`) → write questions (`ExamBuilder`) + publish (`ExamPublishBar`) |
 | `app/teacher/me/exams/[examId]/grade/page.tsx` | results + manual grading of text answers (`GradingBoard`) |
@@ -269,7 +304,7 @@ Both roles sign in through `/login`; `?role=teacher` only switches the copy and 
 
 - `saveLesson` replaces `quiz_questions` wholesale (delete + insert), enforces **one** `is_free_preview` lesson per teacher by clearing the flag on the teacher's other lessons, and sanitizes every section's HTML (see "Rich lesson content").
 - `app/actions/exams.ts` holds both sides of the exam: `saveExam` / `saveExamQuestions` / `setExamStatus` / `deleteExam` for the teacher, `startExam` / `submitExam` for the student, and `gradeAnswer` for manual marks. Every teacher action re-resolves the caller's own `teachers` row and scopes the write by it; `gradeAnswer` clamps the mark to the question's own `points` before writing.
-- `app/actions/teacher-students.ts` covers the teacher↔student side: `sendMessage` (one student or broadcast), `grantAccess` / `revokeAccess`, `saveParentReport` / `deleteParentReport`. Every one re-checks that the target actually follows this teacher.
+- `app/actions/teacher-students.ts` covers the teacher↔student side: `sendMessage` (one student, one group, or all followers), `grantAccess` / `revokeAccess`, `setGroupLessonAccess` (a whole group at once), `saveParentReport` / `deleteParentReport`. Every one re-checks that the target actually follows this teacher, and that the group is this teacher's own.
 - `status` is `draft` | `published`; public queries filter `status = 'published'`, so drafts never reach students.
 - `VideoPlayer` embeds YouTube links (`youtube-nocookie`, watch/youtu.be/embed/shorts forms) and falls back to a `<video>` element for direct MP4 URLs.
 
@@ -288,7 +323,7 @@ Two pieces carry navigation, and both exist because a back link at the top of a 
 
 ### Client vs server components
 
-Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`, `RichTextEditor`, `ExamForm`, `ExamBuilder`, `ExamPublishBar`, `ExamTaker`, `GradingBoard`, `ExamWindow`.
+Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`, `RichTextEditor`, `ExamForm`, `ExamBuilder`, `ExamPublishBar`, `ExamTaker`, `GradingBoard`, `ExamWindow`, `Hint`, `InfoTip`, `HelpTabs`, `AvailabilityToggle`, `GroupDetailsForm`, `GroupMembersPanel`, `GroupBroadcast`, `GroupLessonAccess`, `MessageActions`.
 
 `ShareProfile` (`components/ShareProfile.tsx`) on `/teacher/me`: the teacher's public profile URL (`window.location.origin + /teacher/<slug>`, so it's correct on any domain), a scannable QR code generated client-side with the `qrcode` package (downloadable PNG), a copy button, and WhatsApp/Telegram share links.
 

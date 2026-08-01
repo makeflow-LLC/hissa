@@ -294,3 +294,43 @@ export async function cancelReportCardRequest(
   revalidatePath("/dashboard");
   return { ok: true, message: "سُحب الطلب." };
 }
+
+/**
+ * إخفاء رسالة انتهى منها الطالب.
+ *
+ * رسالته هو تُحذف فعلاً، أمّا رسالة المعلّم — وقد تكون تعميماً يقرؤه
+ * عشرون طالباً — فتُسجَّل في `message_dismissals` باسمه وحده. حذفها من
+ * الجدول كان يمحوها عن زملائه كلّهم.
+ */
+export async function dismissMessage(messageId: string): Promise<ActionResult> {
+  const { supabase, user, deny } = await requireStudent();
+  if (deny || !user) return deny ?? NEED_LOGIN;
+
+  const { data: msg } = await supabase
+    .from("teacher_messages")
+    .select("id, sender, student_id")
+    .eq("id", messageId)
+    .maybeSingle();
+  if (!msg) return { ok: false, message: "الرسالة غير موجودة." };
+
+  const row = msg as { id: string; sender: string; student_id: string | null };
+
+  if (row.sender === "student" && row.student_id === user.id) {
+    const { error } = await supabase
+      .from("teacher_messages")
+      .delete()
+      .eq("id", messageId);
+    if (error) return { ok: false, message: "تعذّر حذف الرسالة." };
+  } else {
+    const { error } = await supabase
+      .from("message_dismissals")
+      .insert({ message_id: messageId, student_id: user.id });
+    // 23505 = مخفيّة أصلاً، وهذا ليس خطأ
+    if (error && error.code !== "23505") {
+      return { ok: false, message: "تعذّر إخفاء الرسالة." };
+    }
+  }
+
+  revalidatePath("/dashboard");
+  return { ok: true, message: "أُزيلت من قائمتك." };
+}

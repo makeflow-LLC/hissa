@@ -7,6 +7,7 @@ import ReviewSection from "@/components/ReviewSection";
 import JoinTeacherPanel from "@/components/JoinTeacherPanel";
 import ConnectionNotice from "@/components/ConnectionNotice";
 import Stars from "@/components/Stars";
+import { AVAILABILITY } from "@/lib/availability";
 
 export const dynamic = "force-dynamic";
 
@@ -157,6 +158,13 @@ export default async function TeacherProfilePage({
             )}
           </div>
         )}
+
+        {/* حالة المعلّم: الطالب يعرف متى يتوقّع ردّاً قبل أن يرسل */}
+        <p className={`availability-line ${AVAILABILITY[teacher.availability].className}`}>
+          {AVAILABILITY[teacher.availability].icon}{" "}
+          {AVAILABILITY[teacher.availability].label}
+          {teacher.availability_note && <> — {teacher.availability_note}</>}
+        </p>
 
         <p className="profile-bio">{teacher.bio}</p>
 

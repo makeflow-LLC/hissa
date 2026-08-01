@@ -9,7 +9,12 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { title: "اختبار جديد | منصة حصة" };
 
-export default async function NewExamPage() {
+export default async function NewExamPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ group?: string }>;
+}) {
+  const { group } = await searchParams;
   const user = await getCurrentUser();
   if (!user) redirect("/login?role=teacher&next=/teacher/me/exams/new");
 
@@ -33,7 +38,8 @@ export default async function NewExamPage() {
         subtitle="اكتب بيانات الاختبار أوّلاً، ثم تُفتح لك صفحة كتابة الأسئلة."
       />
       <section className="dashboard-section">
-        <ExamForm groups={groups} />
+        {/* المجموعة تأتي مختارةً حين يبدأ المعلّم من لوحة مجموعته */}
+        <ExamForm groups={groups} defaultGroupId={group} />
       </section>
     </main>
   );

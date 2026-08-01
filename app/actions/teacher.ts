@@ -190,3 +190,43 @@ export async function toggleTeacherPublished(published: boolean): Promise<void> 
 export async function goToMyProfile(slug: string): Promise<never> {
   redirect(`/teacher/${slug}`);
 }
+
+/**
+ * حالة توفّر المعلّم للردّ.
+ *
+ * الطالب يرسل سؤاله ثم لا يدري أينتظر دقيقة أم يوماً. سطر يكتبه المعلّم
+ * مرّةً («أعود بعد المغرب») أرحم من صمتٍ يُفسَّر إهمالاً.
+ */
+export async function setAvailability(
+  status: "available" | "busy" | "offline",
+  note = ""
+): Promise<{ ok: boolean; message?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "سجّل الدخول أولاً." };
+
+  if (!["available", "busy", "offline"].includes(status)) {
+    return { ok: false, message: "حالة غير معروفة." };
+  }
+
+  const { data: changed, error } = await supabase
+    .from("teachers")
+    .update({
+      availability: status,
+      availability_note: stripTags(note).trim().slice(0, 120),
+      availability_at: new Date().toISOString(),
+    })
+    .eq("owner_id", user.id)
+    .select("slug");
+
+  if (error) return { ok: false, message: "تعذّر حفظ الحالة." };
+  if (!changed || changed.length === 0) {
+    return { ok: false, message: "لا بروفايل معلّم على هذا الحساب." };
+  }
+
+  revalidatePath("/teacher/me");
+  revalidatePath(`/teacher/${(changed[0] as { slug: string }).slug}`);
+  return { ok: true, message: "حُدّثت حالتك." };
+}
