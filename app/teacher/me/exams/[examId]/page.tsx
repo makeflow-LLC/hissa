@@ -13,6 +13,7 @@ import {
   getMyExam,
   getMyGroups,
   getExamAttempts,
+  getMyExamTemplates,
 } from "@/lib/data/queries";
 
 export const dynamic = "force-dynamic";
@@ -35,11 +36,13 @@ export default async function EditExamPage({
   let data;
   let groups;
   let attempts;
+  let templates;
   try {
-    [data, groups, attempts] = await Promise.all([
+    [data, groups, attempts, templates] = await Promise.all([
       getMyExam(examId),
       getMyGroups(),
       getExamAttempts(examId),
+      getMyExamTemplates(),
     ]);
   } catch {
     return <ConnectionNotice />;
@@ -90,6 +93,7 @@ export default async function EditExamPage({
           examId={exam.id}
           initialQuestions={questions}
           locked={attempts.length > 0}
+          myTemplates={templates}
         />
       </section>
     </main>

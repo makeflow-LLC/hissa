@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { normalizeSubject } from "@/lib/arabic";
+import type { ExamTemplate } from "@/lib/examTemplates";
 import type {
   FollowStatus,
   JoinRequest,
@@ -1737,6 +1738,42 @@ export async function getMyExams(): Promise<ExamSummary[]> {
       needsGrading: attempts.filter((a) => a.status === "submitted").length,
     };
   });
+}
+
+/** قوالب المعلّم المحفوظة — بنيةُ اختبارٍ يعيد استعمالها */
+export async function getMyExamTemplates(): Promise<ExamTemplate[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return [];
+
+  const { data } = await supabase
+    .from("exam_templates")
+    .select("id, name, description, questions")
+    .eq("teacher_id", teacher.id)
+    .order("created_at", { ascending: false });
+
+  return ((data ?? []) as {
+    id: string;
+    name: string;
+    description: string | null;
+    questions: unknown;
+  }[]).map((t) => ({
+    id: t.id,
+    name: t.name,
+    description: t.description ?? "",
+    questions: Array.isArray(t.questions)
+      ? (t.questions as ExamTemplate["questions"])
+      : [],
+  }));
 }
 
 /** اختبار واحد للمعلّم مع أسئلته الكاملة (بالإجابات الصحيحة) */

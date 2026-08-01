@@ -3926,10 +3926,30 @@ body {
    * كان flex-basis: 100% مع white-space: nowrap يجعل أدنى عرض للزر هو
    * عرض نصّه كاملاً، فيتجاوز الشاشة بدل أن يلتفّ.
    */
-  .join-actions .btn,
-  .dashboard-header-actions .btn {
+  .join-actions .btn {
     flex: 1 1 140px;
     min-width: 0;
+  }
+
+  /**
+   * أزرار رأس اللوحة شبكةٌ لا صفّ مرن.
+   *
+   * `flex: 1 1 140px` مع `min-width: 0` تعني أن خمسة أزرار تقتسم ٣٦٠px
+   * فيصير نصيب الواحد ٧٢px، ومع `white-space: normal` ينزل نصّه كلمةً
+   * في كل سطر وتتفاوت ارتفاعاتها. عمودان متساويان يعطيان كل زرّ نصف
+   * العرض، وخلايا الصف الواحد في الشبكة تتساوى ارتفاعاً تلقائياً.
+   */
+  .dashboard-header-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .dashboard-header-actions .btn {
+    width: 100%;
+    min-width: 0;
+  }
+  .dashboard-header-secondary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   /* نصّ الزر الطويل يلتفّ سطرين بدل أن يمدّ الزر خارج الشاشة */
@@ -5025,5 +5045,89 @@ body {
   }
   .group-details-form .form-row > .form-field {
     flex: 0 0 auto;
+  }
+}
+
+/* صفّ الأزرار الثانوية تحت رأس اللوحة: أصغر وأخفت من الأساسية */
+.dashboard-header-secondary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+  width: 100%;
+}
+.dashboard-header-secondary .btn {
+  width: 100%;
+  min-width: 0;
+}
+
+/*
+ * الزرّ في صفّ مرن لا ينكمش تحت مقاسه الطبيعي.
+ *
+ * مع `white-space: normal` يصير أدنى عرضٍ للزرّ هو عرض أطول كلمة فيه،
+ * فينهار «معاينة صفحتي كما يراها الطالب» إلى عمود من خمس كلمات. الصفّ
+ * الملتفّ يريد العكس: يبقى الزرّ بعرضه وينزل سطراً جديداً عند الضيق.
+ */
+.card-actions .btn,
+.dashboard-header-actions .btn,
+.dashboard-header-secondary .btn {
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
+/* ===== قوالب الاختبار ===== */
+
+.template-picker {
+  display: grid;
+  gap: 10px;
+  padding: 0.9rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+.template-save {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.template-save .search-input {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.template-list {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+.template-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.template-info {
+  display: grid;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.template-name {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .template-row {
+    align-items: stretch;
+  }
+  .template-row .card-actions,
+  .template-picker > .card-actions {
+    width: 100%;
+  }
+  .template-row .card-actions .btn {
+    flex: 1 1 auto;
   }
 }

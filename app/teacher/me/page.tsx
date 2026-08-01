@@ -40,6 +40,11 @@ export default async function TeacherMePage() {
             </p>
           </div>
         </div>
+        {/*
+          صفّان لا صفّ واحد: خمسة أزرار في سطر واحد على الجوال تتقاسم
+          العرض بالتساوي، فينكمش كلٌّ منها إلى عرض أطول كلمة فيه ويصير
+          نصّه عموداً — وهو ما جعل اللوحة متعبة للعين.
+        */}
         <div className="dashboard-header-actions">
           <Link href="/teacher/me/students" className="btn btn-primary">
             👥 طلابي
@@ -47,14 +52,19 @@ export default async function TeacherMePage() {
           <Link href="/teacher/me/exams" className="btn btn-primary">
             📝 الاختبارات
           </Link>
-          <Link href="/teacher/onboarding" className="btn btn-outline">
-            ✏️ تعديل بياناتي
+        </div>
+        <div className="dashboard-header-secondary">
+          <Link href="/teacher/me/content" className="btn btn-outline btn-sm">
+            🎬 المحتوى
           </Link>
-          <Link href={`/teacher/${teacher.slug}`} className="btn btn-outline">
-            👁 معاينة صفحتي كما يراها الطالب
+          <Link href="/teacher/onboarding" className="btn btn-outline btn-sm">
+            ✏️ بياناتي
           </Link>
-          <Link href="/help?role=teacher" className="btn btn-outline">
-            ❓ دليل الاستخدام
+          <Link href={`/teacher/${teacher.slug}`} className="btn btn-outline btn-sm">
+            👁 معاينة صفحتي
+          </Link>
+          <Link href="/help?role=teacher" className="btn btn-outline btn-sm">
+            ❓ الدليل
           </Link>
         </div>
       </section>

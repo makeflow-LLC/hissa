@@ -76,6 +76,7 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0015_report_card_requests_and_realtime.sql` | `report_card_requests` + realtime publication for messages, follows and cards |
 | `0016_exams.sql` | group-targeted `exams`, `exam_questions`, `exam_attempts`, `exam_answers`, `get_exam_paper()` + server-side grading functions |
 | `0017_group_hub_messaging_availability.sql` | group `whatsapp_link`/`goal`/`schedule`, `teacher_messages.group_id`, `message_dismissals`, `teachers.availability` |
+| `0018_exam_templates.sql` | `exam_templates` — a teacher's reusable exam structure, stored as `jsonb` |
 
 ### Removed: live sessions
 
@@ -175,6 +176,11 @@ A teacher writes an exam, points it at **one group**, and only that group's memb
 **The correct answers are never sent to the student.** RLS filters rows, not columns, and column privileges distinguish `anon` from `authenticated` — not student from teacher, since both are `authenticated`. So `exam_questions` grants the student nothing at all; the only way in is the `security definer` function `get_exam_paper(exam_id)`, which returns the questions with `correct_index`, `correct_bool` and `model_answer` stripped, and only when `can_take_exam()` or `owns_exam()` holds. **Do not add a student SELECT policy on `exam_questions`** — one would hand every student a perfect score through the REST API.
 
 **Grading runs in the database**, not the browser: `grade_exam_attempt(attempt, payload)` reads the correct answers itself, so the client only ever posts its choices. It refuses an attempt that is not the caller's own or is no longer `in_progress`, which is what stops re-submitting for a better mark. An attempt lands in `submitted` when any text question exists (waiting on the teacher) and `graded` otherwise; `recalc_attempt_score` re-totals after each manual mark and flips to `graded` once nothing is pending. Verified by role-switching SQL: a non-member sees zero exams/questions/paper rows and cannot insert an attempt; a member reads 3 paper questions but 0 rows from `exam_questions`; and a student updating their own `awarded` or `manual_score` changes 0 rows.
+
+**Templates and duplication.** Three routes to a new exam, cheapest first: **built-in templates** (`lib/examTemplates.ts` — 5 structures: quick MCQ, true/false, mixed unit, essay, end-of-term), the teacher's **saved templates** (`exam_templates`, RLS owner-only), and **duplicating** an existing exam. Two decisions:
+
+- **A template is structure, not content** — question count, kinds and marks, with prompts left empty. Subject and stage vary too much for a canned question to be anything but naive; what actually costs the teacher time is setting kind and marks per question. `parseTemplateQuestions` is therefore laxer than `parseQuestions` in exactly one way: it does not require a prompt.
+- **Templates apply in the editor, never straight to the database**, so a teacher who picks the wrong one loses nothing. `duplicateExam` is the opposite — a real row — and it always lands as a **draft** even when the source is published, because a copy reaching students before the teacher reviews it is worse than none.
 
 **Questions lock once anyone starts.** `saveExamQuestions` replaces the set wholesale, so editing after answers exist would silently re-grade them against different questions; `ExamBuilder` renders read-only instead and asks the teacher to create a new exam.
 
@@ -323,7 +329,7 @@ Two pieces carry navigation, and both exist because a back link at the top of a 
 
 ### Client vs server components
 
-Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`, `RichTextEditor`, `ExamForm`, `ExamBuilder`, `ExamPublishBar`, `ExamTaker`, `GradingBoard`, `ExamWindow`, `Hint`, `InfoTip`, `HelpTabs`, `AvailabilityToggle`, `GroupDetailsForm`, `GroupMembersPanel`, `GroupBroadcast`, `GroupLessonAccess`, `MessageActions`.
+Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`, `RichTextEditor`, `ExamForm`, `ExamBuilder`, `ExamPublishBar`, `ExamTaker`, `GradingBoard`, `ExamWindow`, `Hint`, `InfoTip`, `HelpTabs`, `AvailabilityToggle`, `GroupDetailsForm`, `GroupMembersPanel`, `GroupBroadcast`, `GroupLessonAccess`, `MessageActions`, `TemplatePicker`, `DuplicateExamButton`.
 
 `ShareProfile` (`components/ShareProfile.tsx`) on `/teacher/me`: the teacher's public profile URL (`window.location.origin + /teacher/<slug>`, so it's correct on any domain), a scannable QR code generated client-side with the `qrcode` package (downloadable PNG), a copy button, and WhatsApp/Telegram share links.
 
