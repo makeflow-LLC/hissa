@@ -15,6 +15,8 @@ import type {
   TeacherMessage,
   AttemptForGrading,
   CardRequest,
+  GroupHub,
+  GroupMember,
   Exam,
   ExamAnswer,
   ExamPaperQuestion,
@@ -35,7 +37,7 @@ const LESSON_META_COLS =
   "id, unit_id, title, description, duration, emoji, gradient, position, is_free_preview";
 
 const TEACHER_COLS =
-  "id, slug, name, subject, stages, bio, initials, gradient, avatar_url, whatsapp, rating, rating_count, qualification, experience_years, join_instructions";
+  "id, slug, name, subject, stages, bio, initials, gradient, avatar_url, whatsapp, rating, rating_count, qualification, experience_years, join_instructions, availability, availability_note";
 
 /**
  * المستخدم الحالي (null للزائر).
@@ -792,7 +794,11 @@ export async function getMyStudentProfile(): Promise<StudentProfile | null> {
 
 /** الرسائل الواردة للطالب الحالي مع اسم المعلّم المرسِل */
 export async function getMyMessages(): Promise<
-  (TeacherMessage & { teacherName: string; teacherSlug: string })[]
+  (TeacherMessage & {
+    teacherName: string;
+    teacherSlug: string;
+    groupName: string;
+  })[]
 > {
   try {
     const supabase = await createClient();
@@ -800,28 +806,53 @@ export async function getMyMessages(): Promise<
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return [];
-    const { data } = await supabase
-      .from("teacher_messages")
-      .select("id, teacher_id, student_id, body, created_at, sender, teachers(name, slug)")
-      .order("created_at", { ascending: false })
-      .limit(30);
+    const [{ data }, { data: hidden }] = await Promise.all([
+      supabase
+        .from("teacher_messages")
+        .select(
+          "id, teacher_id, student_id, group_id, body, created_at, sender, teachers(name, slug), student_groups(name)"
+        )
+        .order("created_at", { ascending: false })
+        .limit(60),
+      supabase
+        .from("message_dismissals")
+        .select("message_id")
+        .eq("student_id", user.id),
+    ]);
 
-    return (data ?? []).map((m) => {
-      const row = m as Record<string, unknown> & {
-        teachers: { name: string; slug: string } | { name: string; slug: string }[];
-      };
-      const t = Array.isArray(row.teachers) ? row.teachers[0] : row.teachers;
-      return {
-        id: String(row.id),
-        teacher_id: String(row.teacher_id),
-        student_id: (row.student_id as string | null) ?? null,
-        body: String(row.body ?? ""),
-        created_at: String(row.created_at),
-        sender: row.sender === "student" ? ("student" as const) : ("teacher" as const),
-        teacherName: t?.name ?? "معلّم",
-        teacherSlug: t?.slug ?? "",
-      };
-    });
+    /**
+     * ما أخفاه الطالب يُرشَّح هنا لا في قاعدة البيانات: صفّ التعميم واحد
+     * يقرؤه كل أعضاء المجموعة، فحذفه فعلياً يمحوه عن الجميع.
+     */
+    const dismissed = new Set(
+      ((hidden ?? []) as { message_id: string }[]).map((d) => d.message_id)
+    );
+
+    return (data ?? [])
+      .filter((m) => !dismissed.has(String((m as { id: string }).id)))
+      .slice(0, 30)
+      .map((m) => {
+        const row = m as Record<string, unknown> & {
+          teachers: { name: string; slug: string } | { name: string; slug: string }[];
+          student_groups: { name: string } | { name: string }[] | null;
+        };
+        const t = Array.isArray(row.teachers) ? row.teachers[0] : row.teachers;
+        const g = Array.isArray(row.student_groups)
+          ? row.student_groups[0]
+          : row.student_groups;
+        return {
+          id: String(row.id),
+          teacher_id: String(row.teacher_id),
+          student_id: (row.student_id as string | null) ?? null,
+          group_id: (row.group_id as string | null) ?? null,
+          body: String(row.body ?? ""),
+          created_at: String(row.created_at),
+          sender: row.sender === "student" ? ("student" as const) : ("teacher" as const),
+          teacherName: t?.name ?? "معلّم",
+          teacherSlug: t?.slug ?? "",
+          groupName: g?.name ?? "",
+        };
+      });
   } catch {
     return [];
   }
@@ -1020,23 +1051,41 @@ export async function getMyGroups(): Promise<StudentGroup[]> {
 
   const { data } = await supabase
     .from("student_groups")
-    .select("id, name, description, position, student_group_members(student_id)")
+    .select(
+      "id, name, description, position, whatsapp_link, goal, schedule, student_group_members(student_id)"
+    )
     .eq("teacher_id", teacher.id)
     .order("position");
 
-  return ((data ?? []) as {
-    id: string;
-    name: string;
-    description: string;
-    position: number;
+  return ((data ?? []) as (GroupRow & {
     student_group_members: { student_id: string }[] | null;
-  }[]).map((g) => ({
+  })[]).map((g) => ({
+    ...toGroup(g),
+    memberCount: (g.student_group_members ?? []).length,
+  }));
+}
+
+interface GroupRow {
+  id: string;
+  name: string;
+  description: string | null;
+  position: number | null;
+  whatsapp_link: string | null;
+  goal: string | null;
+  schedule: string | null;
+}
+
+function toGroup(g: GroupRow): StudentGroup {
+  return {
     id: g.id,
     name: g.name,
     description: g.description ?? "",
     position: g.position ?? 0,
-    memberCount: (g.student_group_members ?? []).length,
-  }));
+    memberCount: 0,
+    whatsapp_link: g.whatsapp_link ?? "",
+    goal: g.goal ?? "",
+    schedule: g.schedule ?? "",
+  };
 }
 
 /** بطاقات التقييم التي أصدرها المعلّم الحالي */
@@ -1399,6 +1448,254 @@ export async function getMyThreads(): Promise<StudentThread[]> {
     .sort((a, b) => b.unansweredCount - a.unansweredCount);
 }
 
+
+/* ==================== لوحة المجموعة ==================== */
+
+/**
+ * كل ما تعرضه صفحة مجموعة واحدة: أعضاؤها وتقدّمهم وعلاماتهم، وتعاميمها،
+ * واختباراتها، ودروسها الخاصة، ومن يمكن ضمّه إليها.
+ *
+ * استعلام واحد مجمّع بدل استدعاءات متفرّقة من الصفحة: الصفحة `force-dynamic`
+ * فكل استدعاء رحلة شبكة إضافية على كل زيارة.
+ */
+export async function getGroupHub(groupId: string): Promise<GroupHub | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return null;
+
+  // المجموعة مقيّدة بمعلّمها: تمرير معرّف مجموعة غريبة لا يفتح شيئاً
+  const { data: groupRow } = await supabase
+    .from("student_groups")
+    .select("id, name, description, position, whatsapp_link, goal, schedule")
+    .eq("id", groupId)
+    .eq("teacher_id", teacher.id)
+    .maybeSingle();
+  if (!groupRow) return null;
+
+  const [membersRes, followsRes, lessonsRes, msgRes, examRes] = await Promise.all([
+    supabase
+      .from("student_group_members")
+      .select("student_id")
+      .eq("group_id", groupId),
+    supabase
+      .from("follows")
+      .select("student_id")
+      .eq("teacher_id", teacher.id)
+      .eq("status", "approved"),
+    supabase
+      .from("lessons")
+      .select("id, title, is_restricted")
+      .eq("teacher_id", teacher.id)
+      .eq("status", "published"),
+    supabase
+      .from("teacher_messages")
+      .select("id, body, created_at")
+      .eq("group_id", groupId)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    supabase
+      .from("exams")
+      .select("id, title, status, exam_attempts(status)")
+      .eq("group_id", groupId)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  const memberIds = ((membersRes.data ?? []) as { student_id: string }[]).map(
+    (m) => m.student_id
+  );
+  const approvedIds = new Set(
+    ((followsRes.data ?? []) as { student_id: string }[]).map((f) => f.student_id)
+  );
+  const lessons = (lessonsRes.data ?? []) as {
+    id: string;
+    title: string;
+    is_restricted: boolean;
+  }[];
+  const publishedIds = lessons.map((l) => l.id);
+  const restricted = lessons.filter((l) => l.is_restricted);
+
+  /** كل من انضمّ ولم يدخل هذه المجموعة بعد */
+  const candidateIds = [...approvedIds].filter((id) => !memberIds.includes(id));
+
+  const allIds = [...new Set([...memberIds, ...candidateIds])];
+  const [profilesRes, progressRes, cardsRes, threadRes, attemptRes, grantRes] =
+    await Promise.all([
+      allIds.length
+        ? supabase.from("profiles").select("id, full_name, grade, avatar_url").in("id", allIds)
+        : Promise.resolve({ data: [] }),
+      memberIds.length && publishedIds.length
+        ? supabase
+            .from("lesson_progress")
+            .select("student_id")
+            .in("student_id", memberIds)
+            .in("lesson_id", publishedIds)
+        : Promise.resolve({ data: [] }),
+      memberIds.length
+        ? supabase
+            .from("report_cards")
+            .select("student_id, title, issued_at")
+            .eq("teacher_id", teacher.id)
+            .in("student_id", memberIds)
+            .order("issued_at", { ascending: false })
+        : Promise.resolve({ data: [] }),
+      memberIds.length
+        ? supabase
+            .from("teacher_messages")
+            .select("student_id, sender, created_at")
+            .eq("teacher_id", teacher.id)
+            .in("student_id", memberIds)
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [] }),
+      memberIds.length
+        ? supabase
+            .from("exam_attempts")
+            .select("student_id, auto_score, manual_score, max_score, exam_id, status")
+            .in("student_id", memberIds)
+        : Promise.resolve({ data: [] }),
+      restricted.length
+        ? supabase
+            .from("student_grants")
+            .select("student_id, lesson_id")
+            .eq("teacher_id", teacher.id)
+        : Promise.resolve({ data: [] }),
+    ]);
+
+  const profiles = new Map(
+    ((profilesRes.data ?? []) as {
+      id: string;
+      full_name: string;
+      grade: string | null;
+      avatar_url: string | null;
+    }[]).map((p) => [p.id, p])
+  );
+
+  const doneCount = new Map<string, number>();
+  for (const p of (progressRes.data ?? []) as { student_id: string }[]) {
+    doneCount.set(p.student_id, (doneCount.get(p.student_id) ?? 0) + 1);
+  }
+
+  const lastCard = new Map<string, string>();
+  for (const c of (cardsRes.data ?? []) as { student_id: string; title: string }[]) {
+    if (!lastCard.has(c.student_id)) lastCard.set(c.student_id, c.title);
+  }
+
+  /** آخر رسالة في كل خيط: إن كانت من الطالب فهي تنتظر ردّاً */
+  const lastSender = new Map<string, string>();
+  for (const m of (threadRes.data ?? []) as {
+    student_id: string | null;
+    sender: string;
+  }[]) {
+    if (m.student_id && !lastSender.has(m.student_id)) {
+      lastSender.set(m.student_id, m.sender);
+    }
+  }
+
+  const groupExamIds = new Set(
+    ((examRes.data ?? []) as { id: string }[]).map((e) => e.id)
+  );
+  const examScores = new Map<string, { pct: number[]; taken: number }>();
+  for (const a of (attemptRes.data ?? []) as {
+    student_id: string;
+    auto_score: number;
+    manual_score: number;
+    max_score: number;
+    exam_id: string;
+    status: string;
+  }[]) {
+    // علامات هذه المجموعة وحدها، ولمحاولة سُلّمت فعلاً
+    if (!groupExamIds.has(a.exam_id) || a.status === "in_progress") continue;
+    const entry = examScores.get(a.student_id) ?? { pct: [], taken: 0 };
+    if (Number(a.max_score) > 0) {
+      entry.pct.push(
+        ((Number(a.auto_score) + Number(a.manual_score)) / Number(a.max_score)) * 100
+      );
+    }
+    entry.taken += 1;
+    examScores.set(a.student_id, entry);
+  }
+
+  const grantedPerLesson = new Map<string, Set<string>>();
+  for (const g of (grantRes.data ?? []) as {
+    student_id: string;
+    lesson_id: string | null;
+  }[]) {
+    if (!g.lesson_id) continue;
+    const set = grantedPerLesson.get(g.lesson_id) ?? new Set<string>();
+    set.add(g.student_id);
+    grantedPerLesson.set(g.lesson_id, set);
+  }
+
+  const totalLessons = publishedIds.length;
+
+  const members: GroupMember[] = memberIds.map((id) => {
+    const p = profiles.get(id);
+    const done = doneCount.get(id) ?? 0;
+    const scores = examScores.get(id);
+    return {
+      studentId: id,
+      name: p?.full_name || "طالب",
+      grade: p?.grade ?? "",
+      avatarUrl: p?.avatar_url ?? null,
+      completedLessons: done,
+      totalLessons,
+      progressPct: totalLessons ? Math.round((done / totalLessons) * 100) : 0,
+      examAvg:
+        scores && scores.pct.length
+          ? Math.round(
+              (scores.pct.reduce((n, x) => n + x, 0) / scores.pct.length) * 10
+            ) / 10
+          : null,
+      examsTaken: scores?.taken ?? 0,
+      lastCardTitle: lastCard.get(id) ?? null,
+      awaitingReply: lastSender.get(id) === "student",
+    };
+  });
+  members.sort((a, b) => Number(b.awaitingReply) - Number(a.awaitingReply));
+
+  return {
+    group: { ...toGroup(groupRow as GroupRow), memberCount: memberIds.length },
+    members,
+    candidates: candidateIds.map((id) => ({
+      studentId: id,
+      name: profiles.get(id)?.full_name || "طالب",
+      grade: profiles.get(id)?.grade ?? "",
+    })),
+    announcements: (msgRes.data ?? []) as GroupHub["announcements"],
+    exams: ((examRes.data ?? []) as {
+      id: string;
+      title: string;
+      status: "draft" | "published";
+      exam_attempts: { status: string }[] | null;
+    }[]).map((e) => {
+      const attempts = e.exam_attempts ?? [];
+      return {
+        id: e.id,
+        title: e.title,
+        status: e.status,
+        submittedCount: attempts.filter((a) => a.status !== "in_progress").length,
+        needsGrading: attempts.filter((a) => a.status === "submitted").length,
+      };
+    }),
+    restrictedLessons: restricted.map((l) => {
+      const granted = grantedPerLesson.get(l.id);
+      return {
+        id: l.id,
+        title: l.title,
+        grantedCount: memberIds.filter((m) => granted?.has(m)).length,
+      };
+    }),
+    totalLessons,
+  };
+}
 
 /* ==================== الاختبارات ==================== */
 

@@ -11,6 +11,18 @@ interface Toast {
 }
 
 /**
+ * نصّ الإشعار بحسب وجهة الرسالة.
+ *
+ * RLS هي المرشِّح: ما وصل الطالب أصلاً هو ما يجوز له قراءته، فيكفي هنا
+ * تسميته باسمه — خاصّة، أو تعميم لمجموعته، أو تعميم عام.
+ */
+function messageLabel(studentId: string | null, groupId: string | null): string {
+  if (studentId) return "رسالة جديدة من معلّمك";
+  if (groupId) return "تعميم جديد لمجموعتك";
+  return "إعلان جديد من معلّمك";
+}
+
+/**
  * نغمة تنبيه قصيرة تُولَّد برمجياً.
  *
  * لا نشحن ملف صوت: نغمتان قصيرتان عبر Web Audio أخفّ من أي mp3 وتعملان
@@ -125,18 +137,23 @@ export default function LiveNotifier({
       if (document.visibilityState === "hidden") return;
       const { data } = await supabase
         .from("teacher_messages")
-        .select("created_at, sender, student_id")
+        .select("created_at, sender, student_id, group_id")
         .order("created_at", { ascending: false })
         .limit(1);
       const row = (data ?? [])[0] as
-        | { created_at: string; sender: string; student_id: string | null }
+        | {
+            created_at: string;
+            sender: string;
+            student_id: string | null;
+            group_id: string | null;
+          }
         | undefined;
       if (!row || row.created_at <= lastSeen.current) return;
       lastSeen.current = row.created_at;
       if (role === "teacher" && row.sender === "student") {
         notify("✉️", "رسالة جديدة من طالب");
       } else if (role === "student" && row.sender === "teacher") {
-        notify("✉️", row.student_id ? "رسالة جديدة من معلّمك" : "إعلان جديد من معلّمك");
+        notify("✉️", messageLabel(row.student_id, row.group_id));
       }
     }, 20000);
   }, [role, notify]);
@@ -158,14 +175,12 @@ export default function LiveNotifier({
           const row = payload.new as {
             sender?: string;
             student_id?: string | null;
+            group_id?: string | null;
           };
           if (role === "teacher") {
             if (row.sender === "student") notify("✉️", "رسالة جديدة من طالب");
           } else if (row.sender === "teacher") {
-            notify(
-              "✉️",
-              row.student_id ? "رسالة جديدة من معلّمك" : "إعلان جديد من معلّمك"
-            );
+            notify("✉️", messageLabel(row.student_id ?? null, row.group_id ?? null));
           }
         }
       )

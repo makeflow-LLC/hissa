@@ -110,6 +110,57 @@ export async function renameGroup(
   return { ok: true, message: "حُفظت المجموعة." };
 }
 
+/**
+ * بيانات المجموعة كصفّ دراسي: هدفها، وموعد لقائها، ورابط مجموعتها على
+ * واتساب.
+ *
+ * الرابط يُتحقّق من شكله لا من صحّته: عنوان لا يبدأ بـ https قد ينتهي
+ * برابط نسبيّ داخل المنصة نفسها إن لُصق خطأً.
+ */
+export async function saveGroupDetails(
+  _prev: GroupsActionState,
+  formData: FormData
+): Promise<GroupsActionState> {
+  const { supabase, teacher } = await requireMyTeacher();
+  if (!teacher) return NOT_TEACHER;
+
+  const groupId = String(formData.get("groupId") ?? "").trim();
+  if (!groupId) return { ok: false, message: "المجموعة غير محدّدة." };
+
+  const name = stripTags(String(formData.get("name") ?? "")).trim().slice(0, 80);
+  if (!name) return { ok: false, message: "اكتب اسم المجموعة." };
+
+  const link = String(formData.get("whatsappLink") ?? "").trim().slice(0, 300);
+  if (link && !/^https:\/\/(chat\.whatsapp\.com|wa\.me)\//i.test(link)) {
+    return {
+      ok: false,
+      message: "رابط الواتساب يبدأ بـ https://chat.whatsapp.com/ — انسخه من «دعوة عبر رابط».",
+    };
+  }
+
+  const { data: changed, error } = await supabase
+    .from("student_groups")
+    .update({
+      name,
+      description: stripTags(String(formData.get("description") ?? "")).trim().slice(0, 300),
+      goal: stripTags(String(formData.get("goal") ?? "")).trim().slice(0, 300),
+      schedule: stripTags(String(formData.get("schedule") ?? "")).trim().slice(0, 120),
+      whatsapp_link: link,
+    })
+    .eq("id", groupId)
+    .eq("teacher_id", teacher.id)
+    .select("id");
+
+  if (error) return { ok: false, message: "تعذّر حفظ بيانات المجموعة." };
+  if (!changed || changed.length === 0) {
+    return { ok: false, message: "هذه المجموعة ليست لك — حدّث الصفحة." };
+  }
+
+  refresh();
+  revalidatePath(`/teacher/me/groups/${groupId}`);
+  return { ok: true, message: "حُفظت بيانات المجموعة." };
+}
+
 export async function deleteGroup(
   _prev: GroupsActionState,
   formData: FormData

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import Link from "next/link";
 import {
   createGroup,
   renameGroup,
@@ -82,20 +83,28 @@ function GroupRow({ group }: { group: StudentGroup }) {
 
   return (
     <li className="group-row">
-      <div className="group-info">
+      {/* اسم المجموعة هو المدخل إلى لوحتها — لا زرّ إضافي بجانبه */}
+      <Link href={`/teacher/me/groups/${group.id}`} className="group-info group-info-link">
         <strong className="group-name">{group.name}</strong>
         <span className="group-meta">
           {group.memberCount} طالباً
+          {group.schedule && <> · 🕒 {group.schedule}</>}
           {group.description && <> · {group.description}</>}
         </span>
-      </div>
+      </Link>
       <div className="form-row">
+        <Link
+          href={`/teacher/me/groups/${group.id}`}
+          className="btn btn-primary btn-sm"
+        >
+          لوحة المجموعة ←
+        </Link>
         <button
           type="button"
           className="btn btn-outline btn-sm"
           onClick={() => setEditing(true)}
         >
-          تعديل
+          تعديل سريع
         </button>
         <form action={deleteAction}>
           <input type="hidden" name="groupId" value={group.id} />

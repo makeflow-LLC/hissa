@@ -86,6 +86,10 @@ export default function RootLayout({
             دروس مسجّلة مع أفضل المعلّمين — مجانية تماماً للطالب.
           </p>
           <nav className="footer-links">
+            <Link href="/help" className="footer-link">
+              ❓ دليل الاستخدام
+            </Link>
+            <span className="footer-sep">·</span>
             <Link href="/privacy" className="footer-link">
               سياسة الخصوصية
             </Link>
