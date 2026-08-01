@@ -94,10 +94,6 @@ export default function GroupMembersPanel({
                 )}
               </div>
 
-              {/*
-                التقدّم وحده هنا. الدرجات تخصّ الطالب، ومكانها ملفّه لا
-                لوحةٌ تُفتح أمام كل من يمرّ بالشاشة.
-              */}
               <div className="member-stats">
                 <span className="member-stat">
                   📘 {m.completedLessons} من {m.totalLessons} درساً
@@ -106,7 +102,13 @@ export default function GroupMembersPanel({
                   </span>
                 </span>
                 <span className="member-stat">
-                  📝 {m.examsTaken > 0 ? `قدّم ${m.examsTaken} اختباراً` : "لم يقدّم اختباراً بعد"}
+                  📝{" "}
+                  {m.examAvg === null
+                    ? "لم يقدّم اختباراً بعد"
+                    : `معدّل اختباراته ${m.examAvg}% (${m.examsTaken} اختباراً)`}
+                </span>
+                <span className="member-stat">
+                  🏅 {m.lastCardTitle ?? "لا بطاقة تقييم بعد"}
                 </span>
               </div>
 

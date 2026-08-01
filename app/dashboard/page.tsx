@@ -164,10 +164,13 @@ export default async function StudentDashboard() {
                     ) : (
                       <>
                         {/*
-                          الحالة لا الدرجة: اللوحة تُفتح أمام من يمرّ بالشاشة —
-                          أخٌ أو زميل — والدرجة تخصّ صاحبها. تُقرأ داخل صفحة
-                          الاختبار مع الإجابات التي أنتجتها.
+                          النتيجة أوّلاً وبخطٍّ ظاهر: الطالب يفتح لوحته ليعرف
+                          كم أخذ، فعرضُ الحالة وحدها يجعله يفتح صفحة الاختبار
+                          ليقرأ رقماً واحداً.
                         */}
+                        <span className="exam-result">
+                          نتيجتك {a.auto_score + a.manual_score} من {a.max_score}
+                        </span>
                         <span
                           className={
                             a.status === "graded" ? "pill pill-live" : "pill pill-draft"
@@ -175,10 +178,10 @@ export default async function StudentDashboard() {
                         >
                           {a.status === "graded"
                             ? "✓ صُحِّح"
-                            : "⏳ بانتظار تصحيح معلّمك"}
+                            : "⏳ درجة مبدئية — بانتظار تصحيح معلّمك"}
                         </span>
                         <Link href={`/exam/${e.id}`} className="btn btn-outline btn-sm">
-                          نتيجتي وإجاباتي
+                          إجاباتي
                         </Link>
                       </>
                     )}
