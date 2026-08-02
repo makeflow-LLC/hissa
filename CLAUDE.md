@@ -285,6 +285,10 @@ Gemini 3.1 Pro is a reasoning model: reasoning tokens count against `max_tokens`
 
 **The tools read the editor, not the database.** `loadLessonContext` takes an optional `draft` (`{html, title}`) that the form supplies from its live state, so a teacher can summarize or format text they just typed and have not saved. Requiring a save first meant saving the very text you know needs fixing. `lessonId` is optional too, so the tools work on a brand-new lesson that has no row yet; the saved sections are only a fallback when the editor is empty.
 
+**Failures name their cause.** `chat()` used to collapse every status except 402/429 into "تعذّر الاتصال… حاول مجدداً", so a teacher retried ten times against an expired key or a model that cannot read files — failures retrying never fixes. It now maps 401/403, 404, 413 and 402/429 to distinct Arabic sentences, appends the provider's own message, and `console.error`s the status server-side. The upstream text is safe to show: these tools live behind a teacher account and the message never contains the key. It also reads the response as text before parsing, since a gateway can answer 502 with HTML and `res.json()` would throw the reason away.
+
+**The lesson pages carry `export const maxDuration = 60`.** A model call takes 10–20 seconds, more for a multi-page PDF, and Vercel's default function limit is shorter — the process was killed before the model answered, which no in-app error handling can explain. `TIMEOUT_MS` is 55s, deliberately under that limit, so the abort comes from us with a readable sentence rather than from the platform with none.
+
 The whole feature is optional: with no `OPENROUTER_API_KEY` set, `isAiConfigured()` returns false and the buttons simply do not render.
 
 ### Rich lesson content (the `sections` column)

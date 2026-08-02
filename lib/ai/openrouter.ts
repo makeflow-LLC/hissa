@@ -12,7 +12,12 @@ const DEFAULT_MODEL = "google/gemini-3.1-pro-preview";
 
 /** النموذج استدلالي: رموز التفكير تُخصم من السقف، فنترك مساحة سخيّة */
 const DEFAULT_MAX_TOKENS = 8000;
-const TIMEOUT_MS = 90_000;
+/**
+ * أقصر من مهلة الدالّة على المستضيف (٦٠ ثانية) عمداً: لو تجاوزناها
+ * قُتلت العملية من الخارج فيرى المعلّم عطلاً بلا رسالة، أمّا الإلغاء
+ * من عندنا فيردّ جملةً عربية تقول ما حدث.
+ */
+const TIMEOUT_MS = 55_000;
 
 export interface AiResult {
   ok: boolean;
@@ -100,22 +105,52 @@ export async function chat({
       }),
     });
 
-    const data = (await res.json()) as {
+    /**
+     * الردّ ليس JSON دائماً: بوّابة وسيطة قد تردّ صفحة HTML عند 502 أو
+     * عند تجاوز حجم الجسم. قراءة النصّ أولاً تمنع استثناءً يبتلع السبب.
+     */
+    const raw = await res.text();
+    let data: {
       choices?: { message?: { content?: string }; finish_reason?: string }[];
       usage?: { total_tokens?: number; cost?: number };
       error?: { message?: string; code?: number };
     };
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = {};
+    }
 
     if (!res.ok || data.error) {
       const code = data.error?.code ?? res.status;
+      const upstream = (data.error?.message ?? raw.slice(0, 200)).trim();
+
+      /**
+       * **سبب العطل يُقال، لا يُخفى.**
+       * كانت كل الأخطاء عدا 402 و429 تُختصر في «تعذّر الاتصال… حاول
+       * مجدداً»، فيعيد المعلّم المحاولة عشر مرّات والسبب مفتاحٌ منتهٍ أو
+       * نموذجٌ لا يقرأ الملفات — وهي أعطال لا تُصلحها إعادةُ المحاولة.
+       * والرسالة تخصّ المعلّم وحده (الأدوات كلّها خلف حساب معلّم) ولا
+       * تحمل المفتاح ولا أي سرّ.
+       */
+      console.error("[openrouter]", res.status, code, upstream);
+
+      const hint =
+        code === 402
+          ? "رصيد الذكاء الاصطناعي نفد — اشحن حساب OpenRouter."
+          : code === 429
+            ? "الخدمة مزدحمة الآن. أعد المحاولة بعد قليل."
+            : code === 401 || code === 403
+              ? "مفتاح OpenRouter غير صالح أو غير مصرّح — راجع إعداد الخادم."
+              : code === 404
+                ? "النموذج المحدّد غير متاح، أو لا يقرأ الملفات المرفقة."
+                : code === 413
+                  ? "الملفّ أكبر ممّا تقبله الخدمة — جرّب ملفاً أصغر."
+                  : "تعذّر الاتصال بخدمة الذكاء الاصطناعي.";
+
       return {
         ok: false,
-        message:
-          code === 402
-            ? "رصيد الذكاء الاصطناعي نفد — راجع حساب المزوّد."
-            : code === 429
-              ? "الخدمة مزدحمة الآن. أعد المحاولة بعد قليل."
-              : "تعذّر الاتصال بخدمة الذكاء الاصطناعي. حاول مجدداً.",
+        message: upstream ? `${hint} (${code}: ${upstream.slice(0, 160)})` : hint,
       };
     }
 
@@ -136,11 +171,13 @@ export async function chat({
     };
   } catch (e) {
     const aborted = e instanceof Error && e.name === "AbortError";
+    const why = e instanceof Error ? e.message : String(e);
+    console.error("[openrouter] fetch failed:", why);
     return {
       ok: false,
       message: aborted
-        ? "استغرقت العملية وقتاً طويلاً — جرّب محتوى أقصر."
-        : "تعذّر الاتصال بخدمة الذكاء الاصطناعي.",
+        ? "استغرقت العملية وقتاً طويلاً — جرّب ملفاً أقلّ صفحات."
+        : `تعذّر الوصول إلى خدمة الذكاء الاصطناعي (${why.slice(0, 120)})`,
     };
   } finally {
     clearTimeout(timer);

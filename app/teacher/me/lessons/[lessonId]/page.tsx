@@ -12,6 +12,15 @@ import { isAiConfigured } from "@/lib/ai/openrouter";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * أدوات الذكاء الاصطناعي تُستدعى من هذه الصفحة، ونداء النموذج يستغرق
+ * ١٠–٢٠ ثانية عادةً — وأكثر مع ملفّ PDF من عدّة صفحات. والمهلة
+ * الافتراضية للدالّة على Vercel أقصر من ذلك، فتُقتل العملية قبل أن يردّ
+ * النموذج ويرى المعلّم عطلاً لا سبب له. المهلة هنا تشمل إجراءات
+ * الخادم المستدعاة من الصفحة.
+ */
+export const maxDuration = 60;
+
 export const metadata: Metadata = { title: "تعديل درس | منصة حصة" };
 
 export default async function EditLessonPage({
