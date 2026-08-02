@@ -1,8 +1,7 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import { aiFormat, aiQuiz, aiSummarize, aiSummarizePdf } from "@/app/actions/ai";
-import { createClient } from "@/lib/supabase/client";
+import { useState, useTransition } from "react";
+import { aiFormat, aiQuiz, aiSummarize } from "@/app/actions/ai";
 
 export interface AiQuizQuestion {
   prompt: string;
@@ -11,20 +10,6 @@ export interface AiQuizQuestion {
 }
 
 type Mode = "summary" | "quiz" | null;
-
-/** حدّ الحاوية نفسها — نرفضه هنا كي لا ينتظر المعلّم رفعاً سيفشل */
-const MAX_PDF_BYTES = 20 * 1024 * 1024;
-
-interface PickedPdf {
-  name: string;
-  path: string;
-  size: string;
-}
-
-function humanSize(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} ك.ب`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} م.ب`;
-}
 
 /**
  * مساعد الذكاء الاصطناعي داخل نموذج الدرس.
@@ -54,9 +39,6 @@ export default function AiAssistPanel({
   const [busy, startBusy] = useTransition();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
-  const [pdf, setPdf] = useState<PickedPdf | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   if (!enabled) {
     return (
@@ -69,57 +51,6 @@ export default function AiAssistPanel({
     );
   }
 
-  /**
-   * رفع الملفّ إلى مجلد المعلّم في الحاوية — نفس مسار المرفقات وسياستها.
-   * لا يصل الإجراءَ الخادميّ إلا **مسارُه**، فجسم الطلب يبقى صغيراً مهما
-   * كبر الملفّ.
-   */
-  async function pickPdf(file: File | undefined) {
-    if (!file) return;
-    setMsg(null);
-    if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") {
-      setMsg({ ok: false, text: "اختر ملفّ PDF." });
-      return;
-    }
-    if (file.size > MAX_PDF_BYTES) {
-      setMsg({ ok: false, text: "الملفّ أكبر من ٢٠ ميجابايت." });
-      return;
-    }
-    setUploading(true);
-    try {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("انتهت الجلسة — سجّل الدخول مجدداً.");
-
-      const path = `${user.id}/${crypto.randomUUID()}.pdf`;
-      const { error } = await supabase.storage
-        .from("lesson-media")
-        .upload(path, file, { contentType: "application/pdf" });
-      if (error) throw new Error(error.message);
-
-      setPdf({ name: file.name, path, size: humanSize(file.size) });
-    } catch (e) {
-      setMsg({
-        ok: false,
-        text: e instanceof Error ? e.message : "تعذّر رفع الملفّ.",
-      });
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  }
-
-  /** حذف النسخة المؤقّتة — الملفّ خدم غرضه ولا داعي لبقائه في الحاوية */
-  async function dropPdf(path: string) {
-    try {
-      await createClient().storage.from("lesson-media").remove([path]);
-    } catch {
-      // فشل الحذف لا يعني فشل التلخيص، فلا نزعج المعلّم به
-    }
-  }
-
   function run(kind: "summary" | "quiz") {
     setMsg(null);
     startBusy(async () => {
@@ -127,15 +58,8 @@ export default function AiAssistPanel({
       const draft = getDraft();
       const res =
         kind === "summary"
-          ? pdf
-            ? await aiSummarizePdf(lessonId, pdf.path, note, draft)
-            : await aiSummarize(lessonId, note, draft)
+          ? await aiSummarize(lessonId, note, draft)
           : await aiQuiz(lessonId, count, note, draft);
-
-      if (pdf) {
-        await dropPdf(pdf.path);
-        setPdf(null);
-      }
 
       if (!res.ok) {
         setMsg({ ok: false, text: res.message ?? "تعذّر التنفيذ." });
@@ -145,12 +69,7 @@ export default function AiAssistPanel({
 
       if (kind === "summary" && res.html) {
         onSummary(res.html);
-        setMsg({
-          ok: true,
-          text: res.pages
-            ? `قرأ النموذج ${res.pages} صفحة وأضاف الملخّص كقسم جديد — راجعه وعدّله.`
-            : "أُضيف الملخّص كقسم جديد — راجعه وعدّله.",
-        });
+        setMsg({ ok: true, text: "أُضيف الملخّص كقسم جديد — راجعه وعدّله." });
       } else if (kind === "quiz" && res.quiz) {
         onQuiz(res.quiz);
         setMsg({
@@ -198,54 +117,6 @@ export default function AiAssistPanel({
 
       {mode && (
         <div className="ai-form">
-          {/*
-            مصدر التلخيص: ما في المحرّر، أو ملفّ PDF للدرس.
-            المعلّم كثيراً ما يملك الدرس ملفّاً جاهزاً ولا يريد نسخه في
-            المحرّر أولاً لمجرّد أن يُلخَّص.
-          */}
-          {mode === "summary" && (
-            <div className="form-field">
-              <span className="form-label">
-                📄 لخّص من ملفّ PDF (اختياري)
-              </span>
-              {pdf ? (
-                <div className="ai-pdf-picked">
-                  <span aria-hidden="true">📕</span>
-                  <span className="ai-pdf-name">{pdf.name}</span>
-                  <span className="group-meta">{pdf.size}</span>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    disabled={busy}
-                    onClick={() => {
-                      dropPdf(pdf.path);
-                      setPdf(null);
-                    }}
-                  >
-                    إزالة
-                  </button>
-                </div>
-              ) : (
-                <label className="upload-box attach-upload">
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="application/pdf,.pdf"
-                    className="upload-input"
-                    disabled={uploading || busy}
-                    onChange={(e) => pickPdf(e.target.files?.[0])}
-                  />
-                  {uploading ? "⏳ جارٍ الرفع…" : "📄 ارفع ملفّ الدرس (PDF)"}
-                </label>
-              )}
-              <span className="form-hint">
-                يقرأ النموذج صفحات الملفّ بنفسه — حتى المصوَّرة ضوئياً —
-                ثم يلخّصه. وإن تركته فارغاً لُخِّص ما في المحرّر. حتى ٣٠
-                صفحة، ويُحذف الملفّ بعد التلخيص.
-              </span>
-            </div>
-          )}
-
           {mode === "quiz" && (
             <label className="form-field">
               <span className="form-label">عدد الأسئلة</span>
@@ -286,13 +157,9 @@ export default function AiAssistPanel({
             type="button"
             className="btn btn-primary btn-sm"
             onClick={() => run(mode)}
-            disabled={busy || uploading}
+            disabled={busy}
           >
-            {busy
-              ? "⏳ جارٍ التوليد… (قد يستغرق نصف دقيقة)"
-              : mode === "summary" && pdf
-                ? "✨ لخّص من الملفّ"
-                : "✨ ولّد الآن"}
+            {busy ? "⏳ جارٍ التوليد… (قد يستغرق نصف دقيقة)" : "✨ ولّد الآن"}
           </button>
         </div>
       )}
