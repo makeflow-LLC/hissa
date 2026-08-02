@@ -3834,24 +3834,6 @@ input[type="radio"]:focus-visible {
 }
 .ai-panel-off { opacity: 0.75; }
 
-/* الملفّ المرفوع للتلخيص: اسمه وحجمه وزرّ إزالته في سطر واحد */
-.ai-pdf-picked {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 8px 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-}
-.ai-pdf-name {
-  font-weight: 700;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  flex: 1 1 140px;
-}
-
 .ai-panel-head {
   display: flex;
   align-items: center;

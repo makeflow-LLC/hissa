@@ -31,30 +31,14 @@ export function isAiConfigured(): boolean {
   return Boolean(process.env.OPENROUTER_API_KEY);
 }
 
-/**
- * ملفّ PDF يُرسَل إلى النموذج نفسه ليقرأ صفحاته.
- *
- * لا يُستعمل إلا حين يعجز الاستخراج النصّي — أي مع الملفّ الممسوح ضوئياً.
- * محرّك `native` يعني أن النموذج يعالج الصفحات بنفسه وتُحاسَب رموزها
- * كمُدخَل، وهو أغلى من النصّ بكثير؛ ولذلك يبقى الطريق الأول هو الافتراضي
- * والسقف الشهري يحدّ الخسارة في كل الأحوال.
- */
-export interface PdfPart {
-  filename: string;
-  /** محتوى الملفّ بترميز base64، بلا بادئة data: */
-  base64: string;
-}
-
 export async function chat({
   system,
   user,
-  pdf,
   maxTokens = DEFAULT_MAX_TOKENS,
   temperature = 0.4,
 }: {
   system: string;
   user: string;
-  pdf?: PdfPart;
   maxTokens?: number;
   temperature?: number;
 }): Promise<AiResult> {
@@ -83,25 +67,8 @@ export async function chat({
         temperature,
         messages: [
           { role: "system", content: system },
-          {
-            role: "user",
-            content: pdf
-              ? [
-                  { type: "text", text: user },
-                  {
-                    type: "file",
-                    file: {
-                      filename: pdf.filename,
-                      file_data: `data:application/pdf;base64,${pdf.base64}`,
-                    },
-                  },
-                ]
-              : user,
-          },
+          { role: "user", content: user },
         ],
-        ...(pdf
-          ? { plugins: [{ id: "file-parser", pdf: { engine: "native" } }] }
-          : {}),
       }),
     });
 
