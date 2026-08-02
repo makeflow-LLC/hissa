@@ -79,6 +79,7 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0018_exam_templates.sql` | `exam_templates` — a teacher's reusable exam structure, stored as `jsonb` |
 | `0019_exam_target_points.sql` | `exams.target_points` — the teacher's intended total, compared against the questions' sum |
 | `0020_activities.sql` | `activities` / `activity_plays` / `activity_templates` — Wordwall-style games over one shared item list |
+| `0021_more_activity_kinds.sql` | four more game kinds (10 total), `activities.show_leaderboard` + `activity_leaderboard()` |
 
 ### Removed: live sessions
 
@@ -200,17 +201,29 @@ A teacher writes an exam, points it at **one group**, and only that group's memb
 
 **A total the teacher declares, checked against the questions.** `exams.target_points` is optional; when set, `ExamBuilder` compares it to the live sum on every keystroke and `setExamStatus` refuses to publish on a mismatch — with the numbers in the message and a "publish anyway" button, since the teacher may have changed their mind about the total. It is never used for grading: `grade_exam_attempt` always sums `exam_questions` itself. `⚖️ وزّع بالتساوي` divides the target across the questions, putting the remainder on the last one so the sum lands exactly.
 
-### Interactive activities: one content set, six games
+### Interactive activities: one content set, ten games
 
-`activities` is the Wordwall idea: the teacher enters **pairs** once — `items` is `[{a, b}]` — and `kind` decides how they are played. Switching the kind never touches the content, which is the whole point; the meaning of `a` and `b` is what differs (`lib/activityKinds.ts` carries the label, minimum item count and explanation per kind).
+`activities` is the Wordwall idea: the teacher enters **pairs** once — `items` is `[{a, b}]` — and `kind` decides how they are played. Switching the kind never touches the content, which is the whole point; the meaning of `a` and `b` is what differs (`lib/activityKinds.ts` carries the label, per-column headings, minimum item count, whether it is scored, an example row, and the explanation per kind).
 
-Six kinds: `match` · `flashcards` · `quiz` · `anagram` · `sort` · `wheel`. Each is one file under `components/games/`, and `ActivityPlayer` is the shell that dispatches and records. A game's only outlet is `onFinish(score, total)` — it knows nothing about the database, so a seventh kind is one file plus one line.
+Ten kinds: `match` · `flashcards` · `quiz` · `anagram` · `sort` · `memory` · `truefalse` · `balloons` · `speed` · `wheel`. Each is one file under `components/games/`, and `ActivityPlayer` is the shell that dispatches and records. A game's only outlet is `onFinish(score, total)` — it knows nothing about the database, so an eleventh kind is one file, one line in the dispatch, one entry in `KINDS`, and one widened `check` constraint. `readKind()` in `app/actions/activities.ts` derives from `KINDS`, so a new kind cannot be silently rejected by the server action.
 
 **An activity is practice, not assessment — and the design says so out loud.** Unlike `exams`, the answers are *sent to the browser*: a match-up cannot be played without the student seeing both sides, so hiding them is impossible rather than merely inconvenient. The score is therefore computed client-side and stored for encouragement only; it never enters a real average, the UI tells the student that, and `recordPlay` clamps the numbers. Anything needing a protected mark belongs in `exams`.
 
-Two smaller decisions: `group_id` is **nullable** (null = every approved student, unlike exams which always target one group) because practice loses nothing by being wider; and `quiz` builds its wrong answers from other items' `b`, so the teacher writes one question and one answer per row and no distractors.
+Two smaller decisions: `group_id` is **nullable** (null = every approved student, unlike exams which always target one group) because practice loses nothing by being wider; and `quiz`, `balloons` and `speed` all build their wrong answers from other items' `b`, so the teacher writes one question and one answer per row and no distractors ever.
 
 Templates mirror the exam ones exactly — built-in structures, `activity_templates` for the teacher's own, and `duplicateActivity` which always lands as a draft.
+
+**Scoring is per-game and deliberately forgiving**, because the point is repetition rather than ranking:
+
+- `memory` grants **`n` free misses** (one per pair). A memory game starts in necessary ignorance — the only way to learn what a card hides is to turn it — so charging for the first pass made a flawless player finish on half marks and read as unfair. Beyond that, one point per two extra misses.
+- `speed` scores **correct out of what was shown**, not out of the item list: someone who answered 12 of 14 in sixty seconds beat someone who answered 6 of 6 slowly, and dividing by the item count would have tied them. Its streak counter is for encouragement and never multiplies the score. Because the total varies per play, the leaderboard must take best *and* total from **one row** — see below.
+- `truefalse` writes its own false statements by pairing one item's `a` with another's `b`, so the teacher never types a wrong answer.
+
+**The leaderboard is opt-out per activity.** `activities.show_leaderboard` (default true) gates `activity_leaderboard(a_id, top)`, a `security definer` function returning each student's best result. It has to be `security definer`: the `activity_plays` policy correctly limits a student to their own plays, and opening the table for a ranking would be the wrong trade. The function refuses unless `can_play_activity()` or `owns_activity()` holds *and* the teacher left the board on. Competition drives repetition and repetition is the practice — but a struggling student seeing their name last every time is a reason to leave, so the switch is the teacher's.
+
+It selects with `distinct on (student_id)` ordered by ratio, **not `max(score)` with `max(total)`**: those two aggregates come from different rows, so a student who scored 9/10 and later 4/30 in `speed` was shown "9 من 30" — a result that never happened.
+
+**`/teacher/me/activities/guide` explains the feature by letting the teacher play it.** Six steps, then `ActivityDemo` — a chip row over `ActivityPlayer` in `preview` mode with sample content from `lib/activityDemos.ts`. Prose cannot convey what a game feels like, and no teacher will build a whole activity just to see a kind they have not tried. The demo content is deliberately **general knowledge**, not one subject, so a maths teacher does not read the games as "for Arabic".
 
 ### The teacher's WhatsApp is not public
 
@@ -318,8 +331,9 @@ Security is verified with SQL that switches `role` and `request.jwt.claims` to i
 | `app/teacher/me/exams/[examId]/grade/page.tsx` | results + manual grading of text answers (`GradingBoard`) |
 | `app/exam/[examId]/page.tsx` | student takes the exam (`ExamTaker`), or reviews their answers and score once submitted |
 | `app/teacher/me/activities/page.tsx` | interactive activities list, with duplicate and delete |
-| `app/teacher/me/activities/new` · `activities/[activityId]` | build an activity (`ActivityBuilder`), preview it as a student sees it, publish, and read who played |
-| `app/activity/[activityId]/page.tsx` | student plays the activity (`ActivityPlayer`) |
+| `app/teacher/me/activities/new` · `activities/[activityId]` | build an activity (`ActivityBuilder`), preview it as a student sees it, publish, and read who played + the leaderboard |
+| `app/teacher/me/activities/guide/page.tsx` | how to build an activity: six steps plus a playable demo of all ten games (`ActivityDemo`) |
+| `app/activity/[activityId]/page.tsx` | student plays the activity (`ActivityPlayer`) and sees the leaderboard when the teacher left it on |
 | `app/privacy/page.tsx` · `app/terms/page.tsx` | Arabic legal pages, linked from the footer |
 
 **Teacher accounts** (Supabase Auth, same Google/magic-link as students — there is no separate teacher login): a user is a teacher iff they own a `teachers` row (`owner_id = auth.uid()`). `saveTeacherProfile` (`app/actions/teacher.ts`) creates/updates that row — name, subject, stages, qualification, `experience_years`, bio, whatsapp, avatar (resized data URL in `avatar_url`), auto-generated unique slug (reserved words blocked). `teachers` columns `qualification`, `experience_years`, `is_published` (directory shows published only; RLS: public read = published-or-owner, plus owner INSERT). `getMyTeacher()` / `isCurrentUserTeacher()` drive the navbar and teacher pages.
@@ -357,7 +371,7 @@ Two pieces carry navigation, and both exist because a back link at the top of a 
 
 ### Client vs server components
 
-Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`, `RichTextEditor`, `ExamForm`, `ExamBuilder`, `ExamPublishBar`, `ExamTaker`, `GradingBoard`, `ExamWindow`, `ExamCountdown`, `ActivityBuilder`, `ActivityPlayer`, `ActivityPublishBar`, `ActivityRowActions`, the six `components/games/*`, `Hint`, `InfoTip`, `HelpTabs`, `AvailabilityToggle`, `GroupDetailsForm`, `GroupMembersPanel`, `GroupBroadcast`, `GroupLessonAccess`, `MessageActions`, `TemplatePicker`, `DuplicateExamButton`.
+Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`, `RichTextEditor`, `ExamForm`, `ExamBuilder`, `ExamPublishBar`, `ExamTaker`, `GradingBoard`, `ExamWindow`, `ExamCountdown`, `ActivityBuilder`, `ActivityPlayer`, `ActivityDemo`, `ActivityPublishBar`, `ActivityRowActions`, the ten `components/games/*` (+ `useGameSound`), `Hint`, `InfoTip`, `HelpTabs`, `AvailabilityToggle`, `GroupDetailsForm`, `GroupMembersPanel`, `GroupBroadcast`, `GroupLessonAccess`, `MessageActions`, `TemplatePicker`, `DuplicateExamButton`.
 
 `ShareProfile` (`components/ShareProfile.tsx`) on `/teacher/me`: the teacher's public profile URL (`window.location.origin + /teacher/<slug>`, so it's correct on any domain), a scannable QR code generated client-side with the `qrcode` package (downloadable PNG), a copy button, and WhatsApp/Telegram share links.
 
@@ -385,4 +399,7 @@ Enforcement is in the `lessons` / `live_sessions` SELECT policies via the `secur
 - Arabic-Indic numerals (٩٠ دقيقة) appear inside data strings; UI-computed numbers render as Latin digits.
 - **PWA**: `public/manifest.webmanifest`, generated icons (`icon-*.png`, `apple-touch-icon.png`), and `public/sw.js`, registered by `components/ServiceWorker.tsx`. `components/InstallApp.tsx` shows an install button on Android/Chrome via `beforeinstallprompt`, and an "add to home screen" hint on iOS Safari (which has no such event); it hides itself when already installed or dismissed. **The service worker never caches HTML** — pages depend on auth state, so a cached page could show one account's data to another on a shared device. Only `/_next/static/` and other user-data-free assets are cached, plus `offline.html`.
 - Styling lives entirely in `app/globals.css` (plain CSS + custom properties, no Tailwind/CSS modules). Mobile breakpoint is 720px.
+- **Form controls are styled on the element, not by class.** `input` / `select` / `textarea` get their border, 12px radius, focus ring and disabled state from element selectors near `.form-label`; `select` additionally gets `appearance: none` and a hand-drawn chevron pinned to the **inline end** (left, since the app is RTL). Write `<input>` and `<select>` bare — **do not add a styling class**, and do not reintroduce per-form copies. Before this, more than a hundred fields carried no class at all and rendered with the browser's default chrome next to carefully styled buttons, which is what made screens look half-designed. Element rules are weaker than any class, so `.search-input` / `.filter-select` / `.rte-select` still win where they set something; each of those had to gain a `padding-inline-end` because their `padding` shorthand erases the room reserved for the arrow — a new compact select needs the same.
+- **Width and the 44px minimum apply only to `.form-field > input|select|textarea`.** A standalone control in a toolbar or search bar sizes to its content; forcing `width: 100%` globally would make it eat its row.
+- **`.form-row` serves both button rows and field rows**, so only `.form-row > .form-field` grows (`flex: 1 1 220px`). On mobile it stacks via `flex-basis: 100%`, never `flex-direction: column` — in a column `flex-basis` becomes *height*, which is what opened tall blank gaps between fields (the same trap as `.exam-kind` and `.exam-card-main`).
 - Placeholder media is CSS-only (gradients + initials/emoji). Lesson videos are Google's public sample MP4s; attachments point at three real PDFs in `public/files/`.

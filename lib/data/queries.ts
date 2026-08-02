@@ -2369,7 +2369,7 @@ export async function getMyStudentActivities(): Promise<StudentActivity[]> {
     const [{ data }, { data: plays }] = await Promise.all([
       supabase
         .from("activities")
-        .select("id, title, instructions, kind, items, teachers(name)")
+        .select("id, title, instructions, kind, items, show_leaderboard, teachers(name)")
         .eq("status", "published")
         .order("created_at", { ascending: false }),
       supabase
@@ -2402,6 +2402,7 @@ export async function getMyStudentActivities(): Promise<StudentActivity[]> {
       instructions: string;
       kind: ActivityKind;
       items: unknown;
+      show_leaderboard: boolean;
       teachers: { name: string } | { name: string }[] | null;
     }[]).map((a) => {
       const t = Array.isArray(a.teachers) ? a.teachers[0] : a.teachers;
@@ -2413,6 +2414,7 @@ export async function getMyStudentActivities(): Promise<StudentActivity[]> {
         kind: a.kind,
         items: Array.isArray(a.items) ? (a.items as ActivityItem[]) : [],
         teacherName: t?.name ?? "معلّم",
+        showLeaderboard: a.show_leaderboard !== false,
         bestScore: b ? b.score : null,
         bestTotal: b ? b.total : null,
         plays: b?.plays ?? 0,
@@ -2433,7 +2435,7 @@ export async function getActivityToPlay(id: string): Promise<StudentActivity | n
 
   const { data } = await supabase
     .from("activities")
-    .select("id, title, instructions, kind, items, teachers(name)")
+    .select("id, title, instructions, kind, items, show_leaderboard, teachers(name)")
     .eq("id", id)
     .eq("status", "published")
     .maybeSingle();
@@ -2445,6 +2447,7 @@ export async function getActivityToPlay(id: string): Promise<StudentActivity | n
     instructions: string;
     kind: ActivityKind;
     items: unknown;
+    show_leaderboard: boolean;
     teachers: { name: string } | { name: string }[] | null;
   };
   const t = Array.isArray(row.teachers) ? row.teachers[0] : row.teachers;
@@ -2470,6 +2473,7 @@ export async function getActivityToPlay(id: string): Promise<StudentActivity | n
     kind: row.kind,
     items: Array.isArray(row.items) ? (row.items as ActivityItem[]) : [],
     teacherName: t?.name ?? "معلّم",
+    showLeaderboard: row.show_leaderboard !== false,
     bestScore: top?.score ?? null,
     bestTotal: top?.total ?? null,
     plays: list.length,
@@ -2508,4 +2512,47 @@ export async function getMyActivityTemplates(): Promise<ActivityTemplate[]> {
     kind: t.kind,
     items: Array.isArray(t.items) ? (t.items as ActivityItem[]) : [],
   }));
+}
+
+/** صفّ في لوحة صدارة نشاط */
+export interface LeaderRow {
+  studentId: string;
+  name: string;
+  best: number;
+  total: number;
+  plays: number;
+}
+
+/**
+ * لوحة صدارة نشاط — أفضل نتيجة لكل طالب.
+ *
+ * عبر دالّة `security definer`: سياسة `activity_plays` تقصر الطالب على
+ * لعباته هو، ولا نريد فتح الجدول كلّه لقراءة مباشرة لمجرّد عرض ترتيب.
+ */
+export async function getActivityLeaderboard(
+  activityId: string,
+  top = 10
+): Promise<LeaderRow[]> {
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.rpc("activity_leaderboard", {
+      a_id: activityId,
+      top,
+    });
+    return ((data ?? []) as {
+      student_id: string;
+      name: string;
+      best: number;
+      total: number;
+      plays: number;
+    }[]).map((r) => ({
+      studentId: r.student_id,
+      name: r.name,
+      best: Number(r.best),
+      total: Number(r.total),
+      plays: Number(r.plays),
+    }));
+  } catch {
+    return [];
+  }
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { scramble, shuffle, type GameProps } from "@/components/games/shared";
+import { useGameSound } from "@/components/games/useGameSound";
 
 /**
  * رتّب الحروف: تُعرض حروف الكلمة مبعثرة ويبنيها الطالب بالضغط.
@@ -10,6 +11,7 @@ import { scramble, shuffle, type GameProps } from "@/components/games/shared";
  * كالهمزة تُكتب بأشكال مختلفة فيُرفض جوابٌ صحيح.
  */
 export default function AnagramGame({ items, onFinish }: GameProps) {
+  const play = useGameSound();
   const order = useMemo(() => shuffle(items.map((_, i) => i)), [items]);
   const [step, setStep] = useState(0);
   const [score, setScore] = useState(0);
@@ -39,6 +41,7 @@ export default function AnagramGame({ items, onFinish }: GameProps) {
     const ok = next.map((j) => letters[j]).join("") === target;
     setState(ok ? "right" : "wrong");
     if (ok) setScore((s) => s + 1);
+    play(ok ? "right" : "wrong");
 
     setTimeout(() => {
       if (step + 1 >= order.length) {

@@ -6,6 +6,7 @@ import Hint from "@/components/Hint";
 import ActivityBuilder from "@/components/ActivityBuilder";
 import ActivityPublishBar from "@/components/ActivityPublishBar";
 import ActivityPlayer from "@/components/ActivityPlayer";
+import ActivityLeaderboard from "@/components/ActivityLeaderboard";
 import ConnectionNotice from "@/components/ConnectionNotice";
 import { kindSpec } from "@/lib/activityKinds";
 import {
@@ -16,6 +17,7 @@ import {
   getMyTeacherContent,
   getMyActivityTemplates,
   getActivityPlays,
+  getActivityLeaderboard,
 } from "@/lib/data/queries";
 
 export const dynamic = "force-dynamic";
@@ -35,14 +37,15 @@ export default async function EditActivityPage({
   const teacher = await getMyTeacher();
   if (!teacher) redirect("/teacher/onboarding");
 
-  let activity, groups, content, templates, plays;
+  let activity, groups, content, templates, plays, leaders;
   try {
-    [activity, groups, content, templates, plays] = await Promise.all([
+    [activity, groups, content, templates, plays, leaders] = await Promise.all([
       getMyActivity(activityId),
       getMyGroups(),
       getMyTeacherContent(),
       getMyActivityTemplates(),
       getActivityPlays(activityId),
+      getActivityLeaderboard(activityId),
     ]);
   } catch {
     return <ConnectionNotice />;
@@ -84,6 +87,7 @@ export default async function EditActivityPage({
               kind: activity.kind,
               items: activity.items,
               teacherName: teacher.name,
+              showLeaderboard: activity.show_leaderboard,
               bestScore: null,
               bestTotal: null,
               plays: 0,
@@ -101,6 +105,17 @@ export default async function EditActivityPage({
           myTemplates={templates}
         />
       </section>
+
+      {activity.show_leaderboard && (
+        <section className="dashboard-section">
+          <h2 className="section-title">🏆 لوحة الصدارة كما يراها طلابك</h2>
+          <Hint>
+            تعرض أفضل نتيجة لكل طالب لا آخرها، فالإعادة لا تُنقص أحداً. إن
+            رأيت المنافسة تُثبّط بعض طلابك فأطفئها من نموذج التعديل.
+          </Hint>
+          <ActivityLeaderboard rows={leaders} />
+        </section>
+      )}
 
       <section className="dashboard-section">
         <h2 className="section-title">🎯 من لعبه</h2>

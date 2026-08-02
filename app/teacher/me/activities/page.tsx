@@ -5,7 +5,7 @@ import PageHeader from "@/components/PageHeader";
 import Hint from "@/components/Hint";
 import ConnectionNotice from "@/components/ConnectionNotice";
 import ActivityRowActions from "@/components/ActivityRowActions";
-import { kindSpec } from "@/lib/activityKinds";
+import { KINDS, kindSpec } from "@/lib/activityKinds";
 import {
   getCurrentUser,
   getMyTeacher,
@@ -37,19 +37,27 @@ export default async function ActivitiesPage() {
         backLabel="لوحة المعلّم"
         emoji="🎮"
         title="الأنشطة التفاعلية"
-        subtitle="ألعاب قصيرة يتدرّب بها طلابك — محتوى واحد يُلعب بستّ طرق."
+        subtitle={`ألعاب قصيرة يتدرّب بها طلابك — محتوى واحد يُلعب بـ${KINDS.length} طرق.`}
         actions={
-          <Link href="/teacher/me/activities/new" className="btn btn-primary">
-            ➕ نشاط جديد
-          </Link>
+          <>
+            <Link href="/teacher/me/activities/new" className="btn btn-primary">
+              ➕ نشاط جديد
+            </Link>
+            <Link href="/teacher/me/activities/guide" className="btn btn-outline">
+              📘 كيف أُنشئ نشاطاً؟
+            </Link>
+          </>
         }
       />
 
       <Hint>
         تكتب الأزواج مرّةً — كلمة ومعناها، سؤالاً وجوابه، عنصراً وفئته — ثم
-        تختار كيف تُلعب: مطابقةً، أو بطاقات، أو اختياراً سريعاً، أو ترتيب
-        حروف، أو تصنيفاً، أو عجلة. تبديل اللعبة لا يُعيد إدخال المحتوى.
-        والنشاط تدريبٌ لا امتحان، فنتيجته تشجيع ولا تدخل في العلامات الرسمية.
+        تختار كيف تُلعب: مطابقةً، أو بطاقات، أو ذاكرةً، أو اختياراً سريعاً، أو
+        صحّ وخطأ، أو بالونات، أو تحدّي سرعة، أو ترتيب حروف، أو تصنيفاً، أو
+        عجلة. تبديل اللعبة لا يُعيد إدخال المحتوى. والنشاط تدريبٌ لا امتحان،
+        فنتيجته تشجيع ولا تدخل في العلامات الرسمية.{" "}
+        <Link href="/teacher/me/activities/guide">صفحة الشرح</Link> تعرض كل
+        لعبة لتجرّبها بنفسك.
       </Hint>
 
       {activities.length === 0 ? (

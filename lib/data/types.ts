@@ -437,6 +437,8 @@ export interface Activity {
   instructions: string;
   kind: ActivityKind;
   items: ActivityItem[];
+  /** يرى الطلاب ترتيب أفضل النتائج؟ يقرّره المعلّم */
+  show_leaderboard: boolean;
   status: "draft" | "published";
   created_at: string;
 }
@@ -457,6 +459,7 @@ export interface StudentActivity {
   kind: ActivityKind;
   items: ActivityItem[];
   teacherName: string;
+  showLeaderboard: boolean;
   /** أفضل نتيجة سجّلها الطالب (null إن لم يلعب أو كانت اللعبة بلا درجة) */
   bestScore: number | null;
   bestTotal: number | null;

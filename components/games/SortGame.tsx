@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { shuffle, type GameProps } from "@/components/games/shared";
+import { useGameSound } from "@/components/games/useGameSound";
 
 /**
  * صنّف في مجموعات: عنصرٌ واحد في كل مرّة، والفئات أزرارٌ تحته.
@@ -10,6 +11,7 @@ import { shuffle, type GameProps } from "@/components/games/shared";
  * عريضة وسحباً بالفأرة، وكلاهما غير متاح هنا.
  */
 export default function SortGame({ items, onFinish }: GameProps) {
+  const play = useGameSound();
   const cats = useMemo(
     () => shuffle([...new Set(items.map((i) => i.b))]),
     [items]
@@ -27,6 +29,7 @@ export default function SortGame({ items, onFinish }: GameProps) {
     setChosen(cat);
     const right = cat === it.b;
     if (right) setScore((s) => s + 1);
+    play(right ? "right" : "wrong");
 
     setTimeout(() => {
       if (step + 1 >= order.length) {

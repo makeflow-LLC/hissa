@@ -10,6 +10,10 @@ import FlashcardsGame from "@/components/games/FlashcardsGame";
 import AnagramGame from "@/components/games/AnagramGame";
 import SortGame from "@/components/games/SortGame";
 import WheelGame from "@/components/games/WheelGame";
+import MemoryGame from "@/components/games/MemoryGame";
+import TrueFalseGame from "@/components/games/TrueFalseGame";
+import BalloonsGame from "@/components/games/BalloonsGame";
+import SpeedGame from "@/components/games/SpeedGame";
 import type { StudentActivity } from "@/lib/data/types";
 
 /**
@@ -71,6 +75,13 @@ export default function ActivityPlayer({
           <div className="activity-result">
             {result.total > 0 ? (
               <>
+                {result.score === result.total && (
+                  <div className="confetti" aria-hidden="true">
+                    {Array.from({ length: 14 }, (_, i) => (
+                      <span key={i} className={`confetti-bit confetti-${i % 5}`} />
+                    ))}
+                  </div>
+                )}
                 <p className="exam-score">
                   {result.score} من {result.total}
                 </p>
@@ -120,6 +131,10 @@ export default function ActivityPlayer({
       {activity.kind === "anagram" && <AnagramGame key={round} {...props} />}
       {activity.kind === "sort" && <SortGame key={round} {...props} />}
       {activity.kind === "wheel" && <WheelGame key={round} {...props} />}
+      {activity.kind === "memory" && <MemoryGame key={round} {...props} />}
+      {activity.kind === "truefalse" && <TrueFalseGame key={round} {...props} />}
+      {activity.kind === "balloons" && <BalloonsGame key={round} {...props} />}
+      {activity.kind === "speed" && <SpeedGame key={round} {...props} />}
 
       <div className="card-actions">
         <button

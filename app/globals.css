@@ -34,6 +34,21 @@ body {
   line-height: 1.7;
   display: flex;
   flex-direction: column;
+  /* سفاري على iOS يكبّر النصّ من تلقائه عند تدوير الجهاز */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* مربّع أندرويد الرمادي عند اللمس يسبق ردّ فعل الزرّ ويبدو عطلاً */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* الانتقال إلى مرساةٍ لا يقفز بالصفحة — ومن يكره الحركة لا تتحرّك عنده */
+html {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 .container {
@@ -325,7 +340,8 @@ body {
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  /* نفس استدارة بقيّة الحقول: ١٢ لا ١٠، فلا يختلف شريط البحث عن النماذج */
+  border-radius: 12px;
   padding: 0.65rem 1rem;
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -340,6 +356,8 @@ body {
 .filter-select {
   cursor: pointer;
   min-width: 9.5rem;
+  /* الاختصار `padding` أعلاه يمحو ما تركه الأساس للسهم، فنعيده */
+  padding-inline-end: 2.4rem;
 }
 
 .empty-state {
@@ -506,8 +524,21 @@ body {
   background: var(--primary-dark);
 }
 
-.btn:active {
+.btn:active:not(:disabled) {
   transform: scale(0.97);
+}
+
+/**
+ * الزرّ المعطَّل يجب أن يُرى معطَّلاً.
+ *
+ * لم يكن للمنصة تنسيقٌ لهذه الحالة أصلاً، فزرّ «…جارٍ الحفظ» يبدو قابلاً
+ * للضغط تماماً كما كان — فيضغطه المستخدم مرّتين ويظنّ أن شيئاً لم يحدث.
+ */
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .btn-outline {
@@ -1207,12 +1238,184 @@ body {
 .form-field {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.45rem;
 }
 
 .form-label {
   font-weight: 700;
   font-size: 0.9rem;
+}
+
+/* ===== حقول الإدخال: شكل واحد لكل المنصة =====
+ *
+ * القواعد هنا **على العناصر نفسها لا على أصناف**، وهذا مقصود: في المنصة
+ * أكثر من مئة حقل لم يحمل واحدٌ منها صنفاً، فكانت تُعرض بمظهر المتصفّح
+ * الافتراضي — إطارٌ أسود رفيع وسهمٌ من التسعينيات وارتفاعٌ يختلف بين
+ * جهاز وآخر — بجوار أزرارٍ منسّقة بعناية. النتيجة شاشةٌ تبدو نصفَ
+ * مصمَّمة. ولأنها قواعد عناصر (أضعف من أي صنف) فكل تنسيق خاصّ قائم
+ * — `.search-input` و`.rte-select` وغيرهما — يظلّ فوقها كما هو.
+ */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+select,
+textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.6rem 0.9rem;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+/**
+ * الاتّساع والارتفاع داخل `.form-field` فقط.
+ *
+ * الحقل المستقلّ في شريط أدوات أو صفّ بحث يقيس نفسه بمحتواه، ولو فرضنا
+ * عليه `width: 100%` لالتهم صفّه. أمّا حقل النموذج فيجب أن يملأ سطره
+ * وأن يبلغ ٤٤ بكسل — مقاس ما يُضغط بالإبهام دون تصويب، وجمهورنا على
+ * الجوال.
+ */
+.form-field > input,
+.form-field > select,
+.form-field > textarea {
+  width: 100%;
+}
+.form-field > input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.form-field > select,
+.form-field > textarea {
+  min-height: 44px;
+}
+
+textarea {
+  min-height: 6rem;
+  line-height: 1.8;
+  resize: vertical;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):hover:not(:disabled),
+select:hover:not(:disabled),
+textarea:hover:not(:disabled) {
+  border-color: #cbd5e1;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+select:focus,
+textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #94a3b8;
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background: #f1f5f9;
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+/**
+ * سهم القائمة المنسدلة مرسومٌ بأنفسنا.
+ *
+ * سهم المتصفّح الافتراضي هو أظهر ما يفضح أن الحقل غير منسَّق: شكله يختلف
+ * بين كروم وسفاري وفَيَرفُكس وأندرويد، فتبدو نفس الصفحة أربع صفحات.
+ * وموضعه هنا في **آخر السطر** — يسار الحقل، لأن المنصة كلّها RTL.
+ */
+select:not([multiple]):not([size]) {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  padding-inline-end: 2.4rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9' fill='none'%3E%3Cpath d='M1 1.5L7 7.5L13 1.5' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 0.95rem center;
+  background-size: 13px 9px;
+}
+/* حارسٌ لو ظهر جزءٌ بالاتجاه الآخر يوماً */
+[dir="ltr"] select:not([multiple]):not([size]) {
+  background-position: right 0.95rem center;
+}
+
+/* الاختيار والتأشير: لون المنصة، وحجمٌ يُضغط بالإبهام */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--primary);
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/**
+ * حقل الملف: الزر وحده هو ما يراه المستخدم، فيُنسَّق كزرّ المنصة بدل
+ * زرّ النظام الرمادي الذي لا يشبه شيئاً في الصفحة.
+ */
+input[type="file"] {
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  max-width: 100%;
+}
+input[type="file"]::file-selector-button {
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.88rem;
+  margin-inline-end: 0.75rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+input[type="file"]::file-selector-button:hover {
+  background: #e0e7ff;
+}
+
+/* أيقونة التقويم الباهتة تختفي على خلفية بيضاء؛ لونُ المنصة يجعلها زراً */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  opacity: 0.55;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background: var(--primary-soft);
+}
+
+/**
+ * حلقة تركيز موحّدة لكل ما يُنقر.
+ *
+ * `:focus-visible` لا `:focus`: الحلقة تظهر لمن يتنقّل بلوحة المفاتيح
+ * ولا تومض في وجه من يضغط بإصبعه — وهي شرطُ إمكانية الوصول لا زينة.
+ */
+.btn:focus-visible,
+a:focus-visible,
+summary:focus-visible,
+[role="tab"]:focus-visible,
+[role="radio"]:focus-visible,
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* تحديد النصّ بلون المنصة بدل أزرق النظام */
+::selection {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
 }
 
 .form-error {
@@ -2889,11 +3092,16 @@ body {
   overflow: hidden;
 }
 
+/* قوائم شريط الأدوات مضغوطة عمداً: الشريط سطرٌ واحد فوق المحرّر */
 .rte-select {
-  padding: 5px 8px;
+  padding: 5px 26px 5px 8px;
+  padding-inline: 8px 26px;
+  min-height: 32px;
+  width: auto;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--surface);
+  background-color: var(--surface);
+  background-position: left 7px center;
   color: var(--text);
   font-family: inherit;
   font-size: 0.85rem;
@@ -3714,7 +3922,8 @@ body {
 .scales-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .scale-field { display: flex; flex-direction: column; gap: 4px; }
 .scale-field select {
-  padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; font: inherit;
+  padding-inline: 10px 2.1rem; padding-block: 8px;
+  border: 1px solid var(--border); border-radius: 10px; font: inherit;
 }
 .report-card-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .report-card-row {
@@ -3768,6 +3977,30 @@ body {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+/**
+ * حقلٌ في صفّ يتمدّد ليملأ نصيبه.
+ *
+ * `.form-row` يخدم غرضين: صفَّ أزرار وصفَّ حقول. الأزرار تقيس نفسها
+ * بنصّها وهذا صحيح، أمّا الحقل فكان يفعل الشيء نفسه — فتظهر قائمةٌ
+ * منسدلة بعرض كلمتين وسط سطر فارغ، وهو ما بدا «غير متناسق». القاعدة
+ * على `.form-field` وحده فلا تمسّ صفوف الأزرار.
+ */
+.form-row > .form-field {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+/**
+ * على الجوال حقلٌ لكل سطر — بـ `flex-basis: 100%` لا بقلب الاتجاه إلى
+ * عمود: في العمود يصير `flex-basis` **ارتفاعاً**، فيتمدّد كل حقل إلى
+ * ٢٢٠ بكسل وتنفتح بينهما فجوة بيضاء بلا سبب.
+ */
+@media (max-width: 720px) {
+  .form-row > .form-field {
+    flex-basis: 100%;
+  }
 }
 
 /* داخل بطاقة الطالب: كل الأوامر صغيرة، فلا يعلو زر على جاره */
@@ -4396,14 +4629,10 @@ body {
   display: grid;
   gap: 1rem;
 }
+/* التمدّد والانهيار على الجوال في `.form-row` العامّ الآن */
 .exam-form .form-row {
-  display: flex;
-  flex-wrap: wrap;
   gap: 12px;
-}
-.exam-form .form-row > .form-field {
-  flex: 1 1 180px;
-  min-width: 0;
+  align-items: flex-start;
 }
 
 /* بناء الأسئلة */
@@ -4676,12 +4905,6 @@ body {
 .exam-form > * {
   min-width: 0;
 }
-@media (max-width: 720px) {
-  .exam-form .form-row {
-    flex-direction: column;
-  }
-}
-
 /* رأس السؤال: رقمه وزر حذفه في سطر مستقلّ */
 .exam-question-head {
   display: flex;
@@ -4964,13 +5187,8 @@ body {
   gap: 1rem;
 }
 .group-details-form .form-row {
-  display: flex;
-  flex-wrap: wrap;
   gap: 12px;
-}
-.group-details-form .form-row > .form-field {
-  flex: 1 1 200px;
-  min-width: 0;
+  align-items: flex-start;
 }
 
 /* ===== دليل الاستخدام ===== */
@@ -5046,12 +5264,6 @@ body {
   .group-info-link + .form-row .btn {
     flex: 1 1 auto;
     justify-content: center;
-  }
-  .group-details-form .form-row {
-    flex-direction: column;
-  }
-  .group-details-form .form-row > .form-field {
-    flex: 0 0 auto;
   }
 }
 
@@ -5627,9 +5839,368 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* ===== ذاكرة البطاقات ===== */
+
+/* `auto-fit` بدل عدد أعمدة ثابت: ١٦ بطاقة على جوال ضيّق تصير أربعة أعمدة
+   وعلى شاشة أوسع ستّة، بلا استعلام وسائط لكل مقاس */
+.memory-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+.memory-card {
+  min-height: 78px;
+  padding: 6px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #fff;
+  background: var(--primary);
+  border: 1px solid var(--primary-dark);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.memory-card:not(.memory-open) .memory-face {
+  font-size: 1.5rem;
+}
+.memory-open {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--primary);
+}
+.memory-found {
+  background: var(--success-soft);
+  color: var(--success);
+  border-color: var(--success);
+  cursor: default;
+}
+.memory-face {
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+/* ===== صح أو خطأ ===== */
+
+.tf-statement {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.8;
+}
+.tf-a,
+.tf-b {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.tf-eq {
+  color: var(--primary);
+  font-size: 1.4rem;
+}
+.tf-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* ===== فرقعة البالونات ===== */
+
+.balloon-sky {
+  position: relative;
+  width: 100%;
+  height: 280px;
+  overflow: hidden;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #dbeafe 0%, #f0f9ff 100%);
+}
+/* الصعود حركة CSS لا مؤقّت جافاسكربت: يرسمها المتصفّح على بطاقة الرسوميات
+   فتبقى ناعمة على الأجهزة الضعيفة، وهي أجهزة جمهورنا */
+.balloon {
+  position: absolute;
+  /* قريبةٌ من الحافّة عمداً: لو بدأت من عمقٍ بعيد لمرّ ثلث زمن الجولة
+     والسماء خالية، فيظنّ الطالب أن شيئاً لم يبدأ */
+  bottom: -78px;
+  width: 22%;
+  min-width: 66px;
+  padding: 18px 6px 22px;
+  display: grid;
+  place-items: center;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #fff;
+  border: none;
+  border-radius: 50% 50% 46% 46% / 42% 42% 58% 58%;
+  cursor: pointer;
+  animation-name: balloon-rise;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+  transition: opacity 0.25s, filter 0.25s;
+}
+/* تتجمّد البالونة عند إعلان النتيجة بدل أن تكمل صعودها وتختفي */
+.balloon:disabled {
+  animation-play-state: paused;
+}
+.balloon-text {
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.35);
+}
+.balloon-0 { inset-inline-start: 2%; background: #ef4444; }
+.balloon-1 { inset-inline-start: 27%; background: #3b82f6; }
+.balloon-2 { inset-inline-start: 52%; background: #f59e0b; }
+.balloon-3 { inset-inline-start: 76%; background: #10b981; }
+.balloon-pop {
+  opacity: 0.2;
+  filter: brightness(1.5) saturate(0.4);
+}
+.balloon-bad {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+.balloon-reveal {
+  outline: 3px solid var(--success);
+  outline-offset: 2px;
+}
+@keyframes balloon-rise {
+  from { transform: translateY(0); }
+  to { transform: translateY(-430px); }
+}
+
+/* ===== تحدّي السرعة ===== */
+
+.speed-bar {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.speed-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  transition: width 1s linear;
+}
+.speed-bar > span.speed-low {
+  background: #dc2626;
+}
+
+/* ===== احتفال الدرجة الكاملة ===== */
+
+.activity-result {
+  position: relative;
+}
+.confetti {
+  position: absolute;
+  inset-inline: 0;
+  top: -20px;
+  height: 200px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.confetti-bit {
+  position: absolute;
+  top: -16px;
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  animation: confetti-fall 1.7s ease-in forwards;
+}
+.confetti-0 { background: #ef4444; }
+.confetti-1 { background: #3b82f6; }
+.confetti-2 { background: #f59e0b; }
+.confetti-3 { background: #10b981; }
+.confetti-4 { background: #a855f7; }
+.confetti-bit:nth-child(1)  { inset-inline-start: 4%;  animation-delay: 0ms; }
+.confetti-bit:nth-child(2)  { inset-inline-start: 11%; animation-delay: 90ms; }
+.confetti-bit:nth-child(3)  { inset-inline-start: 19%; animation-delay: 40ms; }
+.confetti-bit:nth-child(4)  { inset-inline-start: 26%; animation-delay: 160ms; }
+.confetti-bit:nth-child(5)  { inset-inline-start: 34%; animation-delay: 20ms; }
+.confetti-bit:nth-child(6)  { inset-inline-start: 41%; animation-delay: 210ms; }
+.confetti-bit:nth-child(7)  { inset-inline-start: 49%; animation-delay: 70ms; }
+.confetti-bit:nth-child(8)  { inset-inline-start: 56%; animation-delay: 130ms; }
+.confetti-bit:nth-child(9)  { inset-inline-start: 64%; animation-delay: 30ms; }
+.confetti-bit:nth-child(10) { inset-inline-start: 71%; animation-delay: 190ms; }
+.confetti-bit:nth-child(11) { inset-inline-start: 79%; animation-delay: 60ms; }
+.confetti-bit:nth-child(12) { inset-inline-start: 86%; animation-delay: 150ms; }
+.confetti-bit:nth-child(13) { inset-inline-start: 92%; animation-delay: 10ms; }
+.confetti-bit:nth-child(14) { inset-inline-start: 97%; animation-delay: 110ms; }
+@keyframes confetti-fall {
+  from { transform: translateY(0) rotate(0deg); opacity: 1; }
+  to { transform: translateY(190px) rotate(420deg); opacity: 0; }
+}
+
+/* ===== لوحة الصدارة ===== */
+
+.leaderboard {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+.leader-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 0.7rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.leader-row > .group-meta {
+  grid-column: 2 / -1;
+}
+.leader-rank {
+  font-size: 1.15rem;
+  font-weight: 800;
+  min-width: 1.7rem;
+  text-align: center;
+}
+.leader-name {
+  font-weight: 700;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.leader-score {
+  font-weight: 800;
+  color: var(--primary-dark);
+  white-space: nowrap;
+}
+.leader-me {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.leaderboard-toggle {
+  align-items: flex-start;
+}
+
+/* ===== صفحة شرح الأنشطة ===== */
+
+.guide-steps {
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+.guide-step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.guide-num {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 800;
+}
+.guide-step-title {
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+.guide-step-text {
+  color: var(--text-muted);
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.demo-shell {
+  display: grid;
+  gap: 14px;
+}
+.demo-body {
+  display: grid;
+  gap: 12px;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+.demo-about {
+  line-height: 1.9;
+}
+.demo-facts {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.demo-facts li {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 0.6rem 0.7rem;
+  background: var(--primary-soft);
+  border-radius: 10px;
+}
+.demo-facts strong {
+  overflow-wrap: anywhere;
+}
+.demo-example {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-weight: 700;
+}
+/* المثلّث الافتراضي يختفي متى صار العرض غير `list-item`، فنرسم بديله */
+summary.help-q {
+  list-style: none;
+}
+summary.help-q::-webkit-details-marker {
+  display: none;
+}
+summary.help-q::after {
+  content: "＋";
+  flex-shrink: 0;
+  font-size: 1.2rem;
+  color: var(--primary);
+}
+details[open] > summary.help-q::after {
+  content: "－";
+}
+
+/* من يكره الحركة لا تصعد عنده بالونة ولا يتساقط قصاص ورق */
+@media (prefers-reduced-motion: reduce) {
+  .balloon {
+    animation: none;
+    bottom: 28px;
+  }
+  .confetti {
+    display: none;
+  }
+}
+
 @media (max-width: 720px) {
   .kind-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .balloon-sky {
+    height: 240px;
+  }
+  .balloon {
+    font-size: 0.78rem;
+    padding: 14px 4px 18px;
+  }
+  .tf-statement {
+    font-size: 1.05rem;
   }
   .items-table th:nth-child(1),
   .items-table td:nth-child(1) {

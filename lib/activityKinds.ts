@@ -12,7 +12,11 @@ export type ActivityKind =
   | "quiz"
   | "anagram"
   | "sort"
-  | "wheel";
+  | "wheel"
+  | "memory"
+  | "truefalse"
+  | "balloons"
+  | "speed";
 
 export interface ActivityItem {
   a: string;
@@ -111,6 +115,62 @@ export const KINDS: KindSpec[] = [
     exampleB: "حيوان مفترس",
   },
   {
+    value: "memory",
+    label: "ذاكرة البطاقات",
+    icon: "🧠",
+    about:
+      "بطاقات مقلوبة يفتح الطالب اثنتين ليجد الزوج المتطابق. تدريبٌ على الربط والتركيز معاً.",
+    labelA: "الطرف الأول",
+    labelB: "ما يقابله",
+    needsB: true,
+    min: 3,
+    scored: true,
+    exampleA: "H₂O",
+    exampleB: "الماء",
+  },
+  {
+    value: "truefalse",
+    label: "صح أو خطأ",
+    icon: "⚖️",
+    about:
+      "تُعرض جملة «س = ص» وقد تكون صحيحة أو مركّبة من زوجين مختلفين — والمنصة تركّبها بنفسها من أزواجك.",
+    labelA: "الطرف الأول",
+    labelB: "ما يقابله",
+    needsB: true,
+    min: 4,
+    scored: true,
+    exampleA: "عاصمة الأردن",
+    exampleB: "عمّان",
+  },
+  {
+    value: "balloons",
+    label: "فرقعة البالونات",
+    icon: "🎈",
+    about:
+      "بالونات تصعد تحمل إجابات، يفرقع الطالب الصحيحة قبل أن تفلت. لعبة سريعة تناسب المراجعة الحماسية.",
+    labelA: "السؤال",
+    labelB: "الإجابة الصحيحة",
+    needsB: true,
+    min: 4,
+    scored: true,
+    exampleA: "٧ × ٨",
+    exampleB: "٥٦",
+  },
+  {
+    value: "speed",
+    label: "تحدّي السرعة",
+    icon: "⏱️",
+    about:
+      "ستّون ثانية: كم إجابة صحيحة تجمع؟ مع سلسلة تتضاعف كلّما تتابع صوابك. الأسئلة تدور فلا تنتهي.",
+    labelA: "السؤال",
+    labelB: "الإجابة الصحيحة",
+    needsB: true,
+    min: 4,
+    scored: true,
+    exampleA: "جمع «قلم»",
+    exampleB: "أقلام",
+  },
+  {
     value: "wheel",
     label: "عجلة عشوائية",
     icon: "🎡",
@@ -189,6 +249,10 @@ export function activityProblem(
   }
   if (kind === "anagram" && clean.some((i) => i.a.replace(/\s/g, "").length < 3)) {
     return "كل كلمة في «رتّب الحروف» يجب أن تكون ٣ حروف فأكثر.";
+  }
+  // الذاكرة تعرض ضِعف العدد بطاقاتٍ على الشاشة، فتكتظّ بعد ثمانية أزواج
+  if (kind === "memory" && clean.length > 8) {
+    return "«ذاكرة البطاقات» تقبل ٨ أزواج كحدّ أقصى ليتّسع لها الجوال — عندك " + clean.length + ".";
   }
   return "";
 }
