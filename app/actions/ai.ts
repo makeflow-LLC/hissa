@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { chat, extractJson, isAiConfigured } from "@/lib/ai/openrouter";
+import { MAX_PDF_PAGES, pdfPageCount } from "@/lib/ai/pdf";
 import {
   formatSystem,
   quizSystem,
@@ -22,6 +23,8 @@ export interface AiActionState {
   html?: string;
   quiz?: { prompt: string; options: string[]; correct_index: number }[];
   remaining?: number;
+  /** عدد صفحات الملفّ الذي قرأه النموذج */
+  pages?: number;
 }
 
 interface LessonContext {
@@ -209,6 +212,113 @@ export async function aiSummarize(
   };
 }
 
+/* ---------------------- التلخيص من ملفّ PDF ---------------------- */
+
+/** حدّ حجم الملفّ — نفس حدّ حاوية المرفقات */
+const MAX_PDF_BYTES = 20 * 1024 * 1024;
+
+/**
+ * تلخيص درسٍ من ملفّ PDF رفعه المعلّم.
+ *
+ * **الملفّ يُرسَل إلى النموذج كما هو** ولا يُستخرج نصّه؛ السبب في
+ * `lib/ai/pdf.ts`: استخراج النصّ العربي من PDF يخرج مشوّهاً ترتيباً
+ * وشكلاً، فالملخّص المبنيّ عليه ملخّصٌ لنصٍّ مشوّه. والنموذج يقرأ حتى
+ * الملفّ الممسوح ضوئياً — وهو الشائع في مادّتنا المدرسية.
+ *
+ * ويصل هذا الإجراءَ **مسارُ الملفّ لا محتواه**: المتصفّح يرفعه إلى حاوية
+ * `lesson-media` داخل مجلد المعلّم — نفس مسار المرفقات وسياستها — لأن
+ * تمرير عدّة ميجابايت عبر Server Action يتجاوز حدّ جسم الطلب ويفشل على
+ * شبكةٍ ضعيفة، وهي شبكات جمهورنا.
+ *
+ * والمسار يُتحقّق منه هنا لا في المتصفّح: أول جزء منه يجب أن يكون معرّف
+ * المستخدم نفسه، وإلا قرأ معلّمٌ ملفّ معلّم آخر بتمرير مساره — والحاوية
+ * عامّة القراءة.
+ */
+export async function aiSummarizePdf(
+  lessonId: string,
+  pdfPath: string,
+  instructions: string,
+  draft?: { html?: string; title?: string }
+): Promise<AiActionState> {
+  if (!isAiConfigured()) {
+    return { ok: false, message: "ميزات الذكاء الاصطناعي غير مفعّلة." };
+  }
+
+  const { data, error } = await loadLessonContext(lessonId, draft);
+  if (!data) return { ok: false, message: error };
+
+  const {
+    data: { user },
+  } = await data.supabase.auth.getUser();
+  const path = String(pdfPath ?? "").trim();
+  if (!user || !path || path.split("/")[0] !== user.id) {
+    return { ok: false, message: "الملفّ غير معروف — أعد رفعه." };
+  }
+
+  const quota = await checkQuota(data.supabase, data.teacherId);
+  if (!quota.ok) return { ok: false, message: QUOTA_MESSAGE };
+
+  const { data: blob, error: dlErr } = await data.supabase.storage
+    .from("lesson-media")
+    .download(path);
+  if (dlErr || !blob) {
+    return { ok: false, message: "تعذّر قراءة الملفّ — أعد رفعه." };
+  }
+  if (blob.size > MAX_PDF_BYTES) {
+    return { ok: false, message: "الملفّ أكبر من ٢٠ ميجابايت." };
+  }
+
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+
+  // العدّ قبل الإنفاق: كتابٌ كامل يكلّف كثيراً ولا يُلخَّص في درس
+  let pages: number;
+  try {
+    pages = await pdfPageCount(bytes);
+  } catch {
+    return { ok: false, message: "تعذّرت قراءة الملفّ — تأكّد أنه PDF سليم." };
+  }
+  if (pages > MAX_PDF_PAGES) {
+    return {
+      ok: false,
+      message: `الملفّ ${pages} صفحة، والحدّ ${MAX_PDF_PAGES} — ارفع الدرس وحده لا الكتاب كاملاً.`,
+    };
+  }
+
+  const note = stripTags(instructions).slice(0, 500);
+  const res = await chat({
+    system: summarySystem(data.ctx),
+    user: [
+      `المرفق ملفّ درسٍ من ${pages} صفحة. اقرأه كاملاً.`,
+      note ? `توصيات المعلّم التي يجب الالتزام بها: ${note}` : "",
+      "اكتب ملخّص الدرس الآن بصيغة HTML فقط.",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    pdf: {
+      filename: "lesson.pdf",
+      base64: Buffer.from(bytes).toString("base64"),
+    },
+  });
+
+  if (!res.ok) return { ok: false, message: res.message };
+
+  await recordUsage(
+    data.supabase,
+    data.teacherId,
+    "summary",
+    res.tokens ?? 0,
+    res.cost ?? 0
+  );
+
+  // مخرجات النموذج مُدخَل غير موثوق كأي مُدخَل آخر — تُعقَّم قبل العرض
+  return {
+    ok: true,
+    html: sanitizeLessonHtml(res.text ?? ""),
+    remaining: quota.remaining - 1,
+    pages,
+  };
+}
+
 /* --------------------------- تحسين التنسيق --------------------------- */
 
 export async function aiFormat(
@@ -321,11 +431,13 @@ export async function aiQuiz(
       const options = Array.isArray(q.options)
         ? (q.options as unknown[]).map((o) => stripTags(String(o)).slice(0, 200))
         : [];
+      // لا نُسقِط الفهرس الغائب إلى صفر: سؤالٌ مفتاحه «الخيار الأول»
+      // لم يقصده أحد هو نفس الخلل الذي كان في محرّر الاختبارات
       const ci = Number(q.correct_index);
       return {
         prompt: stripTags(String(q.prompt ?? "")).slice(0, 400),
         options: options.filter(Boolean),
-        correct_index: Number.isInteger(ci) ? ci : 0,
+        correct_index: Number.isInteger(ci) ? ci : -1,
       };
     })
     .filter(
