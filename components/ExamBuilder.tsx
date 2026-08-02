@@ -17,8 +17,9 @@ interface QuestionUI {
   kind: QuestionKind;
   prompt: string;
   options: string[];
-  correct_index: number;
-  correct_bool: boolean;
+  /** `null` = لم يحدّد المعلّم الإجابة الصحيحة بعد — لا تُفترَض عنه */
+  correct_index: number | null;
+  correct_bool: boolean | null;
   model_answer: string;
   points: number;
 }
@@ -61,8 +62,8 @@ function blank(kind: QuestionKind): QuestionUI {
     kind,
     prompt: "",
     options: kind === "mcq" ? ["", "", "", ""] : [],
-    correct_index: 0,
-    correct_bool: true,
+    correct_index: null,
+    correct_bool: null,
     model_answer: "",
     points: 1,
   };
@@ -92,8 +93,8 @@ export default function ExamBuilder({
           kind: q.kind,
           prompt: q.prompt,
           options: q.options.length ? [...q.options] : ["", "", "", ""],
-          correct_index: q.correct_index ?? 0,
-          correct_bool: q.correct_bool ?? true,
+          correct_index: q.correct_index,
+          correct_bool: q.correct_bool,
           model_answer: q.model_answer,
           points: Number(q.points),
         }))
@@ -119,25 +120,59 @@ export default function ExamBuilder({
       else if (q.kind === "mcq") {
         const filled = q.options.filter((o) => o.trim()).length;
         if (filled < 2) out.push(`السؤال ${i + 1} يحتاج خيارين على الأقل`);
+        else if (q.correct_index === null)
+          out.push(`السؤال ${i + 1}: لم تحدّد الإجابة الصحيحة`);
         else if (!q.options[q.correct_index]?.trim())
           out.push(`السؤال ${i + 1}: الإجابة الصحيحة المختارة فارغة`);
+      } else if (q.kind === "truefalse" && q.correct_bool === null) {
+        out.push(`السؤال ${i + 1}: اختر «صح» أو «خطأ»`);
       }
     });
     return out;
   }, [questions]);
 
+  /**
+   * الخيارات الفارغة تُحذف عند الحفظ، **وفهرس الإجابة الصحيحة يُنقل معها**.
+   *
+   * كان الفهرس يُرسل كما هو بعد الحذف: خيارات «أ، (فارغ)، ج، د» والصحيح
+   * «ج» (فهرس ٢) تصير «أ، ج، د» فيشير الفهرس ٢ إلى «د» — فينتقل مفتاح
+   * الإجابة إلى خيارٍ آخر دون أن يلمس المعلّم شيئاً.
+   */
   const payload = useMemo(
     () =>
       JSON.stringify(
-        questions.map((q) => ({
-          kind: q.kind,
-          prompt: q.prompt.trim(),
-          options: q.kind === "mcq" ? q.options.map((o) => o.trim()).filter(Boolean) : [],
-          correct_index: q.kind === "mcq" ? q.correct_index : null,
-          correct_bool: q.kind === "truefalse" ? q.correct_bool : null,
-          model_answer: q.kind === "text" ? q.model_answer.trim() : "",
-          points: q.points,
-        }))
+        questions.map((q) => {
+          if (q.kind !== "mcq") {
+            return {
+              kind: q.kind,
+              prompt: q.prompt.trim(),
+              options: [],
+              correct_index: null,
+              correct_bool: q.kind === "truefalse" ? q.correct_bool : null,
+              model_answer: q.kind === "text" ? q.model_answer.trim() : "",
+              points: q.points,
+            };
+          }
+          const kept: number[] = [];
+          const options = q.options
+            .map((o, oi) => ({ text: o.trim(), oi }))
+            .filter((x) => {
+              if (!x.text) return false;
+              kept.push(x.oi);
+              return true;
+            })
+            .map((x) => x.text);
+          const moved = q.correct_index === null ? -1 : kept.indexOf(q.correct_index);
+          return {
+            kind: q.kind,
+            prompt: q.prompt.trim(),
+            options,
+            correct_index: moved >= 0 ? moved : null,
+            correct_bool: null,
+            model_answer: "",
+            points: q.points,
+          };
+        })
       ),
     [questions]
   );
@@ -226,7 +261,7 @@ export default function ExamBuilder({
       </div>
 
       {problems.length > 0 && (
-        <p className="form-hint exam-problems">
+        <p className="form-error exam-problems">
           ⚠ قبل الحفظ: {problems.join(" · ")}
         </p>
       )}
@@ -333,9 +368,19 @@ export default function ExamBuilder({
 
             {q.kind === "mcq" && (
               <div className="form-field">
-                <span className="form-label">الخيارات — اختر الإجابة الصحيحة</span>
+                <span className="form-label">
+                  الخيارات — اختر الإجابة الصحيحة
+                  {q.correct_index === null && (
+                    <span className="key-missing"> ⚠️ لم تُحدَّد بعد</span>
+                  )}
+                </span>
                 {q.options.map((opt, oi) => (
-                  <div key={oi} className="quiz-option-edit">
+                  <div
+                    key={oi}
+                    className={`quiz-option-edit ${
+                      q.correct_index === oi ? "quiz-option-key" : ""
+                    }`}
+                  >
                     <input
                       type="radio"
                       name={`correct-${q.id}`}
@@ -363,9 +408,18 @@ export default function ExamBuilder({
 
             {q.kind === "truefalse" && (
               <div className="form-field">
-                <span className="form-label">الإجابة الصحيحة</span>
+                <span className="form-label">
+                  الإجابة الصحيحة
+                  {q.correct_bool === null && (
+                    <span className="key-missing"> ⚠️ لم تُحدَّد بعد</span>
+                  )}
+                </span>
                 <div className="form-row">
-                  <label className="stage-option">
+                  <label
+                    className={`stage-option ${
+                      q.correct_bool === true ? "quiz-option-key" : ""
+                    }`}
+                  >
                     <input
                       type="radio"
                       name={`tf-${q.id}`}
@@ -374,7 +428,11 @@ export default function ExamBuilder({
                     />
                     صح
                   </label>
-                  <label className="stage-option">
+                  <label
+                    className={`stage-option ${
+                      q.correct_bool === false ? "quiz-option-key" : ""
+                    }`}
+                  >
                     <input
                       type="radio"
                       name={`tf-${q.id}`}
@@ -427,9 +485,21 @@ export default function ExamBuilder({
       </div>
 
       <div className="card-actions">
-        <button type="submit" className="btn btn-primary" disabled={pending}>
+        {/*
+          يُمنع الحفظ ما دام سؤالٌ ناقصاً، والسبب مكتوبٌ بجوار الزرّ لا في
+          أعلى نموذجٍ طويل: الخادم يرفضه على أي حال، ورحلةٌ ذهاباً وإياباً
+          لتُقرأ الرسالة ليست لطفاً بالمعلّم.
+        */}
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={pending || problems.length > 0}
+        >
           {pending ? "…جارٍ الحفظ" : "💾 حفظ الأسئلة"}
         </button>
+        {problems.length > 0 && (
+          <span className="form-error exam-problems">{problems[0]}</span>
+        )}
       </div>
 
       {state.message && (

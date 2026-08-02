@@ -20,12 +20,18 @@ export interface ExamTemplate {
   builtin?: boolean;
 }
 
+/**
+ * القالب هيكلٌ لا مفتاح إجابة، فالإجابة الصحيحة تبدأ **غير محدّدة**.
+ * كانت `correct_index: 0` و`correct_bool: true`، فيرث المعلّم مفتاحاً
+ * لم يضعه: خياراً أوّلَ صحيحاً وجملةً صحيحة — ثم يُنشر الاختبار بمفتاحٍ
+ * لا يعلم به أحد.
+ */
 function mcq(points: number, choices = 4): TemplateQuestion {
   return {
     kind: "mcq",
     prompt: "",
     options: Array.from({ length: choices }, () => ""),
-    correct_index: 0,
+    correct_index: null,
     correct_bool: null,
     model_answer: "",
     points,
@@ -38,7 +44,7 @@ function tf(points: number): TemplateQuestion {
     prompt: "",
     options: [],
     correct_index: null,
-    correct_bool: true,
+    correct_bool: null,
     model_answer: "",
     points,
   };

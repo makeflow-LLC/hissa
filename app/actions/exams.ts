@@ -155,25 +155,34 @@ function parseQuestions(raw: string): QuestionInput[] {
           : [];
 
         if (kind === "mcq") {
-          const ci = Number(o.correct_index ?? 0);
+          /**
+           * **لا افتراض للإجابة الصحيحة.** كان `Number(o.correct_index ?? 0)`
+           * يحوّل «لم يُختَر شيء» إلى الخيار الأول ويمرّره فحصُ الصلاحية —
+           * فيُنشر اختبارٌ مفتاحه لم يضعه أحد، ويحصل الطالب على العلامة
+           * الكاملة وهو مخطئ، ولا المعلّم ولا الطالب يعرف السبب. القيمة
+           * الغائبة تبقى `null` ويُرفض السؤال برسالة تسمّي رقمه.
+           */
+          const ci = o.correct_index;
+          const n = typeof ci === "number" ? ci : Number.NaN;
           return {
             kind,
             prompt,
             options,
-            // الفهرس خارج المدى يعني سؤالاً بلا إجابة صحيحة — نرفضه لاحقاً
-            correct_index: Number.isInteger(ci) && ci >= 0 && ci < options.length ? ci : null,
+            correct_index:
+              Number.isInteger(n) && n >= 0 && n < options.length ? n : null,
             correct_bool: null,
             model_answer: "",
             points,
           };
         }
         if (kind === "truefalse") {
+          // `=== true` وحده كان يجعل «لم يُختَر» تساوي «خطأ» بصمت
           return {
             kind,
             prompt,
             options: [],
             correct_index: null,
-            correct_bool: o.correct_bool === true,
+            correct_bool: typeof o.correct_bool === "boolean" ? o.correct_bool : null,
             model_answer: "",
             points,
           };
@@ -187,15 +196,33 @@ function parseQuestions(raw: string): QuestionInput[] {
           model_answer: stripTags(String(o.model_answer ?? "")).slice(0, 2000),
           points,
         };
-      })
-      .filter((q) => {
-        if (!q.prompt) return false;
-        if (q.kind === "mcq") return q.options.length >= 2 && q.correct_index !== null;
-        return true;
       });
   } catch {
     return [];
   }
+}
+
+/**
+ * ما يمنع حفظ الأسئلة، بجملة عربية تسمّي رقم السؤال — أو فارغ إن صحّت.
+ *
+ * كان الفلتر يحذف السؤال الناقص بصمت: يضغط المعلّم «حفظ» فتُقال له
+ * «حُفظ سؤالان» وهو كتب ثلاثة، ولا يعرف أيّها سقط ولا لماذا.
+ */
+function questionsProblem(qs: QuestionInput[]): string {
+  if (qs.length === 0) return "لم تكتب أي سؤال بعد.";
+  for (let i = 0; i < qs.length; i++) {
+    const q = qs[i];
+    const n = i + 1;
+    if (!q.prompt) return `السؤال ${n}: اكتب نصّ السؤال.`;
+    if (q.kind === "mcq") {
+      if (q.options.length < 2) return `السؤال ${n}: اكتب خيارين على الأقل.`;
+      if (q.correct_index === null)
+        return `السؤال ${n}: حدّد أي الخيارات هو الصحيح — لا يُفترض عنك.`;
+    }
+    if (q.kind === "truefalse" && q.correct_bool === null)
+      return `السؤال ${n}: اختر «صح» أو «خطأ» كإجابة صحيحة.`;
+  }
+  return "";
 }
 
 export async function saveExamQuestions(
@@ -217,13 +244,8 @@ export async function saveExamQuestions(
   if (!exam) return { ok: false, message: "هذا الاختبار ليس لك." };
 
   const questions = parseQuestions(String(formData.get("questions") ?? "[]"));
-  if (questions.length === 0) {
-    return {
-      ok: false,
-      message:
-        "لا يوجد سؤال صالح. تأكّد أن لكل سؤال نصّاً، وأن سؤال الاختيار من متعدّد له خياران على الأقل وإجابة صحيحة محدّدة.",
-    };
-  }
+  const problem = questionsProblem(questions);
+  if (problem) return { ok: false, message: problem };
 
   /**
    * تغيير الأسئلة بعد أن أجاب طلاب يفسد تصحيحهم، فنمنعه.
@@ -568,13 +590,19 @@ function parseTemplateQuestions(raw: unknown): QuestionInput[] {
       : [];
 
     if (kind === "mcq") {
-      const ci = Number(o.correct_index ?? 0);
+      /**
+       * القالب **هيكلٌ لا مفتاح إجابة**: يُطبَّق في المحرّر بخيارات فارغة،
+       * فلا معنى لأن يحمل «الخيار الأول صحيح». `null` تُلزم المعلّم بأن
+       * يختار بنفسه بدل أن يرث افتراضاً لا يعلم به.
+       */
+      const ci = o.correct_index;
       const max = Math.max(options.length, 1);
+      const n = typeof ci === "number" ? ci : Number.NaN;
       return {
         kind,
         prompt,
         options: options.length ? options : ["", "", "", ""],
-        correct_index: Number.isInteger(ci) && ci >= 0 && ci < max ? ci : 0,
+        correct_index: Number.isInteger(n) && n >= 0 && n < max ? n : null,
         correct_bool: null,
         model_answer: "",
         points,
@@ -586,7 +614,7 @@ function parseTemplateQuestions(raw: unknown): QuestionInput[] {
         prompt,
         options: [],
         correct_index: null,
-        correct_bool: o.correct_bool === true,
+        correct_bool: typeof o.correct_bool === "boolean" ? o.correct_bool : null,
         model_answer: "",
         points,
       };

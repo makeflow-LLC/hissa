@@ -83,8 +83,25 @@ export default async function ExamPage({
                   <p className="exam-paper-prompt">
                     <span className="exam-question-num">{i + 1}</span>
                     {q.prompt}{" "}
-                    <span className="group-meta">
-                      ({a ? Number(a.awarded) : 0} من {q.points})
+                    {/*
+                      العلامة ملوّنة لا رمادية: الطالب يريد أن يعرف بلمحة
+                      أين أخطأ. ولا نكشف الإجابة الصحيحة هنا — ورقة الأسئلة
+                      تصله مجرّدةً منها أصلاً.
+                    */}
+                    <span
+                      className={`answer-mark ${
+                        a && !a.graded
+                          ? "answer-mark-pending"
+                          : a && Number(a.awarded) >= Number(q.points)
+                            ? "answer-mark-full"
+                            : a && Number(a.awarded) > 0
+                              ? "answer-mark-part"
+                              : "answer-mark-zero"
+                      }`}
+                    >
+                      {a && !a.graded
+                        ? `بانتظار التصحيح · من ${q.points}`
+                        : `${a ? Number(a.awarded) : 0} من ${q.points}`}
                     </span>
                   </p>
                   <p className="attempt-text">

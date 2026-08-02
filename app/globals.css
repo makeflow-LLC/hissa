@@ -3023,6 +3023,58 @@ input[type="radio"]:focus-visible {
   flex: 1;
 }
 
+/* ===== مفتاح الإجابة: يُرى أو لا يوجد =====
+ *
+ * زرّ الاختيار وحده لا يكفي علامةً على «هذه هي الإجابة الصحيحة» في صفحة
+ * فيها عشرون حقلاً؛ فالخيار المختار يُظلَّل، والسؤال بلا مفتاح يحمل
+ * تحذيراً — لأن الصمت هنا هو ما أنتج اختباراً مفتاحه لم يضعه أحد.
+ */
+.quiz-option-key,
+.stage-option.quiz-option-key {
+  background: var(--success-soft);
+  border-radius: 10px;
+  outline: 1px solid var(--success);
+  outline-offset: 1px;
+}
+.quiz-option-key .search-input {
+  border-color: var(--success);
+}
+.key-missing {
+  color: #b45309;
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+/* ===== علامة السؤال في النتائج ===== */
+
+.answer-mark {
+  display: inline-block;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.answer-mark-full {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.answer-mark-part {
+  background: #fffbeb;
+  color: #b45309;
+}
+.answer-mark-zero {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+.answer-mark-pending {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+.attempt-fix {
+  margin-top: 6px;
+}
+
 @media (max-width: 720px) {
   .lesson-manage-row {
     flex-wrap: wrap;

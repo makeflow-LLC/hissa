@@ -26,6 +26,7 @@ export default function GradingBoard({
     attempts.find((a) => a.status === "submitted")?.id ?? null
   );
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [fixing, setFixing] = useState<Record<string, boolean>>({});
   const [err, setErr] = useState("");
 
   const byId = useMemo(
@@ -107,7 +108,30 @@ export default function GradingBoard({
                       <li key={q.id} className="attempt-answer">
                         <p className="attempt-prompt">
                           {q.prompt}{" "}
-                          <span className="group-meta">({q.points} علامة)</span>
+                          {/*
+                            علامة السؤال المكتسبة لا سعره فقط: «(٢ علامة)»
+                            وحدها لا تقول أصاب أم أخطأ ولا كم نال، فيظلّ
+                            المعلّم يجمع بعينه ليفهم من أين جاء المجموع.
+                          */}
+                          <span
+                            className={`answer-mark ${
+                              !ans
+                                ? "answer-mark-zero"
+                                : !ans.graded
+                                  ? "answer-mark-pending"
+                                  : Number(ans.awarded) >= Number(q.points)
+                                    ? "answer-mark-full"
+                                    : Number(ans.awarded) > 0
+                                      ? "answer-mark-part"
+                                      : "answer-mark-zero"
+                            }`}
+                          >
+                            {!ans
+                              ? `0 من ${q.points}`
+                              : !ans.graded
+                                ? `بانتظار تصحيحك · من ${q.points}`
+                                : `${Number(ans.awarded)} من ${q.points}`}
+                          </span>
                         </p>
 
                         {!ans ? (
@@ -150,7 +174,76 @@ export default function GradingBoard({
                               </span>
                             )}
                           </p>
-                        ) : (
+                        ) : null}
+
+                        {/*
+                          تصويب علامةٍ صحّحها الحاسوب.
+                          التصحيح الآلي لا يخطئ في الجمع، لكنه يصحّح على
+                          المفتاح المخزَّن — فإن كان المفتاح نفسه خاطئاً
+                          خرجت العلامة خاطئة وهي مطابقة للقاعدة. والأسئلة
+                          تُقفل بمجرّد أن يبدأ طالب، فلم يكن للمعلّم أي
+                          طريق لتصويب علامةٍ يعرف أنها خاطئة. مطويّ لأن
+                          الحالة الغالبة ألّا يُحتاج إليه.
+                        */}
+                        {ans && q.kind !== "text" && (
+                          <div className="attempt-fix">
+                            {!fixing[ans.id] ? (
+                              <button
+                                type="button"
+                                className="btn btn-outline btn-sm"
+                                onClick={() =>
+                                  setFixing((f) => ({ ...f, [ans.id]: true }))
+                                }
+                              >
+                                ✏️ صوّب العلامة
+                              </button>
+                            ) : (
+                              <div className="attempt-grade-row">
+                                <label className="form-label" htmlFor={`f-${ans.id}`}>
+                                  العلامة
+                                </label>
+                                <input
+                                  id={`f-${ans.id}`}
+                                  type="number"
+                                  min={0}
+                                  max={q.points}
+                                  step={0.25}
+                                  className="attempt-grade-input"
+                                  value={drafts[ans.id] ?? String(Number(ans.awarded))}
+                                  onChange={(e) =>
+                                    setDrafts((d) => ({ ...d, [ans.id]: e.target.value }))
+                                  }
+                                />
+                                <span className="group-meta">من {q.points}</span>
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-sm"
+                                  disabled={busy}
+                                  onClick={() => {
+                                    save(ans.id, Number(drafts[ans.id] ?? ans.awarded) || 0);
+                                    setFixing((f) => ({ ...f, [ans.id]: false }));
+                                  }}
+                                >
+                                  حفظ التصويب
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline btn-sm"
+                                  onClick={() =>
+                                    setFixing((f) => ({ ...f, [ans.id]: false }))
+                                  }
+                                >
+                                  إلغاء
+                                </button>
+                                <span className="form-hint">
+                                  استعملها إن كان مفتاح الإجابة نفسه خاطئاً.
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {ans && q.kind === "text" && (
                           <div className="attempt-text-block">
                             <p className="attempt-text">
                               {ans.text_answer || "— لم يجب —"}

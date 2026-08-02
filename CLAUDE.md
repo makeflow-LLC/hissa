@@ -80,6 +80,7 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0019_exam_target_points.sql` | `exams.target_points` — the teacher's intended total, compared against the questions' sum |
 | `0020_activities.sql` | `activities` / `activity_plays` / `activity_templates` — Wordwall-style games over one shared item list |
 | `0021_more_activity_kinds.sql` | four more game kinds (10 total), `activities.show_leaderboard` + `activity_leaderboard()` |
+| `0022_teacher_overrides_auto_mark.sql` | `recalc_attempt_score` rebuilds `auto_score` too, so a teacher can correct an auto-graded mark |
 
 ### Removed: live sessions
 
@@ -192,6 +193,14 @@ A teacher writes an exam, points it at **one group**, and only that group's memb
 
 - **A template is structure, not content** — question count, kinds and marks, with prompts left empty. Subject and stage vary too much for a canned question to be anything but naive; what actually costs the teacher time is setting kind and marks per question. `parseTemplateQuestions` is therefore laxer than `parseQuestions` in exactly one way: it does not require a prompt.
 - **Templates apply in the editor, never straight to the database**, so a teacher who picks the wrong one loses nothing. `duplicateExam` is the opposite — a real row — and it always lands as a **draft** even when the source is published, because a copy reaching students before the teacher reviews it is worse than none.
+
+**The answer key is never assumed.** `correct_index` and `correct_bool` start as `null` — in `ExamBuilder`, in `parseQuestions`, in `parseTemplateQuestions`, and in the built-in templates — and saving is refused until the teacher picks, with a message naming the question number. Both ends used to default silently (`Number(o.correct_index ?? 0)` and `o.correct_bool === true`), so an exam whose key was never chosen was published keyed to **the first option / «صح»**: the student answered wrongly, scored full marks, and neither side could see why. Do not reintroduce a default here — a wrong key is invisible, unlike a missing one.
+
+**Dropping an empty option must move the key with it.** `ExamBuilder` filters blank options out of the payload, and it now remaps `correct_index` through the surviving indices. Sending the raw index meant options `[أ, (فارغ), ج, د]` with «ج» ticked arrived as `[أ, ج, د]` with index 2 — pointing at «د». The teacher never touched the key and it still changed.
+
+**A teacher can override an auto-graded mark.** Auto-grading never miscounts, but it grades against the *stored* key — so a wrong key produces a wrong mark that is perfectly consistent with the rules, and questions lock the moment a student starts. `GradingBoard` therefore offers «صوّب العلامة» on `mcq`/`truefalse` answers too, and `0022` widens `recalc_attempt_score` to rebuild **both** `auto_score` and `manual_score` from `exam_answers`; before it, only `text` answers were summed, so overriding an MCQ changed the row and left the total untouched — worse than refusing the edit.
+
+**Every question shows the mark it earned**, on the teacher's board and the student's review alike (`.answer-mark`, coloured full / partial / zero / pending). The prompt used to carry only the question's price («٢ علامة»), which says nothing about whether it was right or where the total came from. The student's review still never reveals the correct answer — the paper reaches them stripped of it.
 
 **Questions lock once anyone starts.** `saveExamQuestions` replaces the set wholesale, so editing after answers exist would silently re-grade them against different questions; `ExamBuilder` renders read-only instead and asks the teacher to create a new exam.
 
