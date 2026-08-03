@@ -6029,6 +6029,108 @@ input[type="radio"]:focus-visible {
   to { transform: translateY(-430px); }
 }
 
+/* ===== هرم المعلومات ===== */
+
+/* الهرم مرسومٌ بعرض كل درجة لا بصورة: يتكيّف مع أي عدد درجات ومع أي مقاس */
+.pyramid {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  margin: 2px 0 6px;
+}
+.pyr-step {
+  min-height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--border);
+  color: var(--text-muted);
+  font-weight: 800;
+  font-size: 0.8rem;
+  transition: background 0.25s, color 0.25s, transform 0.25s;
+}
+.pyr-done {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.pyr-now {
+  background: var(--primary);
+  color: #fff;
+  transform: scale(1.04);
+  box-shadow: 0 2px 10px rgba(79, 70, 229, 0.35);
+}
+.pyr-lives {
+  letter-spacing: 2px;
+  white-space: nowrap;
+}
+.pyr-tag {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+.pyr-image {
+  display: grid;
+  place-items: center;
+  width: 100%;
+}
+.pyr-img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 240px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  object-fit: contain;
+}
+.pyr-scrambled {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: 6px;
+  color: var(--primary-dark);
+  overflow-wrap: anywhere;
+}
+.pyr-answer {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+}
+.pyr-answer input {
+  flex: 1 1 180px;
+  min-width: 0;
+  min-height: 46px;
+  text-align: center;
+  font-weight: 700;
+}
+
+/* عمود الصورة في محرّر النشاط */
+.item-img {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.item-img-thumb {
+  width: 46px;
+  height: 46px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.item-img-upload {
+  display: inline-flex;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  padding: 6px 10px;
+}
+
 /* ===== تحدّي السرعة ===== */
 
 .speed-bar {
@@ -6246,6 +6348,13 @@ details[open] > summary.help-q::after {
   }
   .balloon-sky {
     height: 240px;
+  }
+  .pyr-scrambled {
+    font-size: 1.3rem;
+    letter-spacing: 4px;
+  }
+  .pyr-img {
+    max-height: 180px;
   }
   .balloon {
     font-size: 0.78rem;

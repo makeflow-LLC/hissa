@@ -9,6 +9,8 @@ import {
   type ActivityActionState,
 } from "@/app/actions/activities";
 import InfoTip from "@/components/InfoTip";
+import { createClient } from "@/lib/supabase/client";
+import { shrinkImage } from "@/lib/image";
 import {
   BUILTIN_ACTIVITY_TEMPLATES,
   KINDS,
@@ -54,6 +56,9 @@ export default function ActivityBuilder({
   );
   const [openTpl, setOpenTpl] = useState(false);
   const [tplName, setTplName] = useState("");
+  /** رقم الصفّ الذي تُرفع صورته الآن — لتعطيل زرّه وحده لا الجدول كلّه */
+  const [imgBusy, setImgBusy] = useState<number | null>(null);
+  const [imgErr, setImgErr] = useState("");
 
   const spec = kindSpec(kind);
   const payload = useMemo(() => JSON.stringify(items), [items]);
@@ -71,6 +76,44 @@ export default function ActivityBuilder({
 
   function patch(i: number, next: Partial<ActivityItem>) {
     setItems((prev) => prev.map((it, j) => (j === i ? { ...it, ...next } : it)));
+  }
+
+  /**
+   * رفع صورة الصفّ إلى مجلد المعلّم في حاوية `lesson-media` — نفس مسار
+   * صور الدروس وسياستها. تُصغَّر في المتصفّح قبل الرفع: صورة الكاميرا
+   * عدّة ميجابايت، ورفعها كما هي يُبطئ الإدخال واللعب معاً.
+   */
+  async function uploadImage(i: number, file: File | undefined) {
+    if (!file) return;
+    setImgErr("");
+    if (!file.type.startsWith("image/")) {
+      setImgErr("اختر ملفّ صورة.");
+      return;
+    }
+    setImgBusy(i);
+    try {
+      const blob = await shrinkImage(file, 900, 0.82);
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("انتهت الجلسة — سجّل الدخول مجدداً.");
+
+      const path = `${user.id}/${crypto.randomUUID()}.jpg`;
+      const { error } = await supabase.storage
+        .from("lesson-media")
+        .upload(path, blob, { contentType: "image/jpeg" });
+      if (error) throw new Error(error.message);
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("lesson-media").getPublicUrl(path);
+      patch(i, { img: publicUrl });
+    } catch (e) {
+      setImgErr(e instanceof Error ? e.message : "تعذّر رفع الصورة.");
+    } finally {
+      setImgBusy(null);
+    }
   }
 
   const templates: ActivityTemplate[] = [
@@ -261,6 +304,7 @@ export default function ActivityBuilder({
                 <th>#</th>
                 <th>{spec.labelA}</th>
                 <th>{spec.labelB}</th>
+                {spec.usesImages && <th>صورة</th>}
                 <th aria-label="حذف" />
               </tr>
             </thead>
@@ -290,6 +334,37 @@ export default function ActivityBuilder({
                       aria-label={`${spec.labelB} ${i + 1}`}
                     />
                   </td>
+                  {spec.usesImages && (
+                    <td>
+                      {it.img ? (
+                        <span className="item-img">
+                          {/* عنصر <img> عاديّ: الصور من الحاوية بأبعاد متغيّرة
+                              وهذه معاينةٌ صغيرة في المحرّر لا صفحة عامّة */}
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={it.img} alt="" className="item-img-thumb" />
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm btn-danger"
+                            onClick={() => patch(i, { img: "" })}
+                            aria-label={`إزالة صورة الصف ${i + 1}`}
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ) : (
+                        <label className="upload-box item-img-upload">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="upload-input"
+                            disabled={imgBusy !== null}
+                            onChange={(e) => uploadImage(i, e.target.files?.[0])}
+                          />
+                          {imgBusy === i ? "⏳" : "🖼️ صورة"}
+                        </label>
+                      )}
+                    </td>
+                  )}
                   <td>
                     <button
                       type="button"
@@ -304,6 +379,15 @@ export default function ActivityBuilder({
               ))}
             </tbody>
           </table>
+
+          {imgErr && <p className="form-error">{imgErr}</p>}
+          {spec.usesImages && (
+            <p className="form-hint">
+              🖼️ الصورة اختيارية لكل صفّ. الصفوف التي تحمل صورة تصير درجاتِ
+              «ما الذي تراه؟» في الهرم، والباقي يتنوّع بين الاختيار والحكم
+              وترتيب الحروف والكتابة.
+            </p>
+          )}
 
           <div className="card-actions">
             <button

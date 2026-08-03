@@ -14,6 +14,7 @@ import MemoryGame from "@/components/games/MemoryGame";
 import TrueFalseGame from "@/components/games/TrueFalseGame";
 import BalloonsGame from "@/components/games/BalloonsGame";
 import SpeedGame from "@/components/games/SpeedGame";
+import PyramidGame from "@/components/games/PyramidGame";
 import type { StudentActivity } from "@/lib/data/types";
 
 /**
@@ -135,6 +136,7 @@ export default function ActivityPlayer({
       {activity.kind === "truefalse" && <TrueFalseGame key={round} {...props} />}
       {activity.kind === "balloons" && <BalloonsGame key={round} {...props} />}
       {activity.kind === "speed" && <SpeedGame key={round} {...props} />}
+      {activity.kind === "pyramid" && <PyramidGame key={round} {...props} />}
 
       <div className="card-actions">
         <button
