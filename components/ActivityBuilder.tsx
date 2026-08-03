@@ -11,6 +11,7 @@ import {
 import InfoTip from "@/components/InfoTip";
 import { createClient } from "@/lib/supabase/client";
 import { shrinkImage } from "@/lib/image";
+import ImageFrame from "@/components/ImageFrame";
 import {
   BUILTIN_ACTIVITY_TEMPLATES,
   KINDS,
@@ -331,34 +332,33 @@ export default function ActivityBuilder({
               <span className="form-label">🖼️ صورة النشاط</span>
               {boardImg ? (
                 <>
-                  <div
-                    className="place-board"
-                    onClick={(e) => {
-                      if (placing === null) return;
-                      // نقيس على الصورة نفسها لا على الإطار: حدّ الإطار
-                      // بكسلٌ يزيح الأصل، فينحرف ما يحفظه المعلّم عمّا ضغطه
-                      const img = e.currentTarget.querySelector("img");
-                      const r = (img ?? e.currentTarget).getBoundingClientRect();
-                      patch(placing, {
-                        x: Math.round(((e.clientX - r.left) / r.width) * 1000) / 10,
-                        y: Math.round(((e.clientY - r.top) / r.height) * 1000) / 10,
-                      });
-                      setPlacing(null);
-                    }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={boardImg} alt="" className="place-image" />
-                    {items.map((it, i) =>
-                      it.x !== undefined && it.y !== undefined ? (
-                        <span
-                          key={i}
-                          className={`place-dot ${placing === i ? "place-dot-on" : ""}`}
-                          style={{ left: `${it.x}%`, top: `${it.y}%` }}
-                        >
-                          {i + 1}
-                        </span>
-                      ) : null
-                    )}
+                  <div className="place-board">
+                    <ImageFrame
+                      src={boardImg}
+                      className="place-frame"
+                      onClick={(e) => {
+                        if (placing === null) return;
+                        const r = e.currentTarget.getBoundingClientRect();
+                        if (r.width === 0 || r.height === 0) return;
+                        patch(placing, {
+                          x: Math.round(((e.clientX - r.left) / r.width) * 1000) / 10,
+                          y: Math.round(((e.clientY - r.top) / r.height) * 1000) / 10,
+                        });
+                        setPlacing(null);
+                      }}
+                    >
+                      {items.map((it, i) =>
+                        it.x !== undefined && it.y !== undefined ? (
+                          <span
+                            key={i}
+                            className={`place-dot ${placing === i ? "place-dot-on" : ""}`}
+                            style={{ left: `${it.x}%`, top: `${it.y}%` }}
+                          >
+                            {i + 1}
+                          </span>
+                        ) : null
+                      )}
+                    </ImageFrame>
                   </div>
                   <p className="form-hint">
                     {placing === null
