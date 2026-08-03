@@ -226,12 +226,20 @@ export async function deleteActivity(id: string): Promise<ActivityActionState> {
   const { supabase, teacher } = await requireMyTeacher();
   if (!teacher) return NOT_TEACHER;
 
-  const { error } = await supabase
+  /**
+   * `select` بعد الحذف **ليس زينة**: بدونه يعود PostgREST بلا خطأ ولا عدد،
+   * فيُقال «حُذف النشاط» حتى حين لم يُمسّ صفّ واحد — وهو أسوأ ما قد يُقال
+   * للمعلّم: يرى نجاحاً ويرى النشاط باقياً فلا يعرف أيّهما يصدّق.
+   */
+  const { data, error } = await supabase
     .from("activities")
     .delete()
     .eq("id", id)
-    .eq("teacher_id", teacher.id);
+    .eq("teacher_id", teacher.id)
+    .select("id");
   if (error) return { ok: false, message: "تعذّر حذف النشاط." };
+  if (!data || data.length === 0)
+    return { ok: false, message: "لم يُحذف — قد يكون محذوفاً بالفعل. حدّث الصفحة." };
 
   refresh();
   return { ok: true, message: "حُذف النشاط." };

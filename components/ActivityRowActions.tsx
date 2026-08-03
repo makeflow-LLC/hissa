@@ -8,9 +8,12 @@ import { duplicateActivity, deleteActivity } from "@/app/actions/activities";
 export default function ActivityRowActions({
   activityId,
   title,
+  onDeleted,
 }: {
   activityId: string;
   title: string;
+  /** يُخفي الصفّ فوراً — لا ينتظر وصول صفحةٍ جديدة من الخادم */
+  onDeleted?: () => void;
 }) {
   const router = useRouter();
   const [busy, startTransition] = useTransition();
@@ -44,12 +47,13 @@ export default function ActivityRowActions({
           setErr("");
           startTransition(async () => {
             const res = await deleteActivity(activityId);
-            if (!res.ok) setErr(res.message ?? "تعذّر الحذف.");
+            if (res.ok) onDeleted?.();
+            else setErr(res.message ?? "تعذّر الحذف.");
             router.refresh();
           });
         }}
       >
-        🗑
+        {busy ? "…" : "🗑"}
       </button>
       {err && <span className="form-error">{err}</span>}
     </>
