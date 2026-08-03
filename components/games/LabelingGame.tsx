@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { shuffle, type GameProps } from "@/components/games/shared";
 import { useGameSound } from "@/components/games/useGameSound";
+import { normalizeArabic } from "@/lib/arabic";
 
 /**
  * «سمِّ الأجزاء»: صورةٌ عليها نقاط، والطالب يسحب كل اسم إلى موضعه.
@@ -26,9 +27,29 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
   );
   const tray = useMemo(() => shuffle(items.map((_, i) => i)), [items]);
 
+  /**
+   * نصف قطر القبول لكل نقطة — **مشتقٌّ من تباعد النقاط لا رقماً ثابتاً**.
+   *
+   * كان حدّاً أدنى ٥٦ بكسل: على صورةٍ صغيرة أو نقاطٍ متقاربة تقع نقطتان
+   * داخل هذا المدى معاً، فيلتقط الإفلاتُ «الأقرب» لا ما قصده الطالب —
+   * وهذا بعينه ما يبدو «مطابقةً غير دقيقة». والآن لكل نقطة نصفُ المسافة
+   * إلى أقرب جارة لها، فلا يتداخل مداها مع مدى غيرها أبداً.
+   */
+  const radii = useMemo(() => {
+    return targets.map((t) => {
+      let nearest = Infinity;
+      for (const o of targets) {
+        if (o.i === t.i) continue;
+        nearest = Math.min(nearest, Math.hypot(o.x - t.x, o.y - t.y));
+      }
+      return Number.isFinite(nearest) ? nearest / 2 : 100;
+    });
+  }, [targets]);
+
   /** أي اسم وُضع على أي نقطة: مفتاحه رقم النقطة */
   const [placed, setPlaced] = useState<Record<number, number>>({});
   const [picked, setPicked] = useState<number | null>(null);
+  const [misses, setMisses] = useState(0);
   const [wrongAt, setWrongAt] = useState<number | null>(null);
   const [drag, setDrag] = useState<{
     label: number;
@@ -50,9 +71,17 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
   function assign(targetIdx: number, labelIdx: number) {
     if (done || placed[targetIdx] !== undefined) return;
 
-    // الاسم الصحيح للنقطة هو صاحبها نفسه — النقاط والأسماء عنصرٌ واحد
-    if (targetIdx !== labelIdx) {
+    /**
+     * المطابقة **بالاسم لا برقم الصفّ**: معلّمٌ يسمّي جزأين بنفس الاسم
+     * («ورقة» و«ورقة») كان يرى إفلاتاً صحيحاً يُرفض لأن الرقمين مختلفان،
+     * وهو خطأٌ لا يفهمه الطالب ولا يستطيع تجاوزه.
+     */
+    const ok =
+      normalizeArabic(items[targetIdx].a) === normalizeArabic(items[labelIdx].a);
+
+    if (!ok) {
       play("wrong");
+      setMisses((m) => m + 1);
       setWrongAt(targetIdx);
       setTimeout(() => setWrongAt(null), 600);
       return;
@@ -65,9 +94,9 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
 
     if (Object.keys(next).length === items.length) {
       setDone(true);
-      play("win");
-      // كل الأسماء وُضعت في مواضعها الصحيحة — الخطأ لا يُثبَّت أصلاً
-      setTimeout(() => onFinish(items.length, items.length), 700);
+      const score = scoreOf(items.length, misses);
+      if (score === items.length) play("win");
+      setTimeout(() => onFinish(score, items.length), 800);
     }
   }
 
@@ -75,9 +104,7 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
    * أقرب نقطة إلى موضع الإصبع — **بالبكسل لا بالنسبة المئوية**.
    *
    * المقارنة بالنسب كانت تخلط مقياسين: ١٢٪ من عرض صورة عريضة مسافةٌ
-   * أكبر بكثير من ١٢٪ من ارتفاعها، فيتّسع المدى أفقياً ويضيق رأسياً
-   * ويبدو السحب «غير دقيق» — يُصيب أحياناً ويُخطئ أحياناً بلا سبب ظاهر.
-   * والقياس بالبكسل واحدٌ في الاتجاهين.
+   * أكبر بكثير من ١٢٪ من ارتفاعها، فيتّسع المدى أفقياً ويضيق رأسياً.
    */
   function targetAt(clientX: number, clientY: number): number | null {
     // مستطيل **الصورة** لا الإطار: حدّ الإطار بكسلٌ يزيح الأصل والمقياس
@@ -87,26 +114,34 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
     if (r.width === 0 || r.height === 0) return null;
 
     let best: number | null = null;
-    let bestD = Infinity;
+    let bestScore = Infinity;
     for (const t of targets) {
       if (placed[t.i] !== undefined) continue;
       const tx = r.left + (t.x / 100) * r.width;
       const ty = r.top + (t.y / 100) * r.height;
       const d = Math.hypot(tx - clientX, ty - clientY);
-      if (d < bestD) {
-        bestD = d;
+
+      // مدى هذه النقطة بالبكسل، محصورٌ بين هدفٍ يُلمس وهدفٍ لا يبتلع جيرانه
+      const spanPx = (radii[t.i] / 100) * Math.min(r.width, r.height);
+      const radius = Math.max(26, Math.min(spanPx, 90));
+      if (d > radius) continue;
+      // النسبة إلى المدى تجعل النقطة الضيّقة تفوز على جارةٍ فضفاضة أبعد
+      const rel = d / radius;
+      if (rel < bestScore) {
+        bestScore = rel;
         best = t.i;
       }
     }
-    // نصف قطر سخيّ يغفر ارتعاش الإصبع، ولا يقلّ عن مقاس هدفٍ يُلمس
-    const radius = Math.max(56, Math.min(r.width, r.height) * 0.18);
-    return bestD <= radius ? best : null;
+    return best;
   }
+
+  const filledCount = Object.keys(placed).length;
 
   return (
     <div className="game game-labeling">
       <p className="game-status">
-        🏷️ {Object.keys(placed).length} من {items.length}
+        🏷️ {filledCount} من {items.length}
+        {misses > 0 && ` · ✕ ${misses}`}
       </p>
 
       <div className="label-board" ref={boardRef}>
@@ -129,7 +164,7 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
             <button
               key={t.i}
               type="button"
-              className={`label-target ${filled ? "label-filled" : ""} ${
+              className={`label-target ${filled ? "label-filled" : "label-empty"} ${
                 wrongAt === t.i ? "label-shake" : ""
               } ${drag?.over === t.i ? "label-over" : ""} ${
                 picked !== null && !filled ? "label-open" : ""
@@ -138,9 +173,15 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
               onClick={() => {
                 if (picked !== null) assign(t.i, picked);
               }}
-              aria-label={filled ? t.name : `نقطة ${t.i + 1}`}
+              aria-label={filled ? t.name : "نقطة فارغة"}
             >
-              {filled ? t.name : t.i + 1}
+              {/*
+                النقطة الفارغة **بلا رقم**. كانت تحمل رقم صفّها في جدول
+                المعلّم، وهو رقمٌ لا معنى له عند الطالب: يظهر مبعثراً
+                (١ ثم ٣ ثم ٤) كلّما امتلأت نقطة، فيظنّه ترتيباً مقصوداً
+                ويحتار في «تخبّط الأرقام».
+              */}
+              {filled ? t.name : ""}
             </button>
           );
         })}
@@ -191,8 +232,7 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
                   /**
                    * السحبة التي لم تصب هدفاً **تُبقي الاسم محدَّداً** بدل
                    * أن تضيع: كان الشرط `!moved` يعني أن ارتعاشة إصبع ١٠
-                   * بكسلات تبتلع الضغطة فلا يُحدَّد شيء ولا يُوضع شيء —
-                   * وهو ما يبدو للطالب عطلاً في التحديد.
+                   * بكسلات تبتلع الضغطة فلا يُحدَّد شيء ولا يُوضع شيء.
                    * والضغطة على اسمٍ محدَّد أصلاً تُلغي تحديده (تراجُع).
                    */
                   setPicked((p) => (p === l && !wasMoved ? null : l));
@@ -218,7 +258,23 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
         </span>
       )}
 
-      {done && <p className="form-ok">🎉 أتممت الصورة كاملة!</p>}
+      {done && (
+        <p className="form-ok">
+          🎉 أتممت الصورة كاملة!
+          {misses > 0 && ` (بـ${misses} محاولة خاطئة)`}
+        </p>
+      )}
     </div>
   );
+}
+
+/**
+ * الدرجة: عدد الأسماء ناقصاً ثلث المحاولات الخاطئة.
+ *
+ * كانت اللعبة تعطي العلامة الكاملة دائماً — لأن الإفلات الخاطئ يُرفض ولا
+ * يُثبَّت — فيخرج المتقن والمتخبّط بنفس النتيجة وتفقد الدرجة معناها.
+ * والخصم رفيقٌ عمداً: التجريب على صورةٍ جديدة جزءٌ من التعلّم لا غشّ.
+ */
+function scoreOf(n: number, misses: number): number {
+  return Math.max(1, n - Math.floor(misses / 3));
 }

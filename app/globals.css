@@ -6107,6 +6107,21 @@ input[type="radio"]:focus-visible {
 .place-dot {
   cursor: default;
 }
+/* النقطة الفارغة دبّوسٌ صغير لا رقم: الأرقام كانت تبدو ترتيباً مقصوداً */
+.label-empty {
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  background: var(--primary);
+}
+.label-empty::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+}
+
 .place-dot-on {
   background: var(--accent);
   box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.45);
@@ -6128,9 +6143,15 @@ input[type="radio"]:focus-visible {
   transform: translate(-50%, -50%) scale(1.35);
   box-shadow: 0 0 0 6px rgba(22, 163, 74, 0.3);
 }
+/* الاسم الموضوع يلتفّ في سطرين ويعلو جيرانه، فلا يحجبه اسمٌ طويل */
 .label-filled {
   background: var(--success);
   cursor: default;
+  z-index: 2;
+  max-width: 44%;
+  white-space: normal;
+  font-size: 0.72rem;
+  line-height: 1.25;
 }
 .label-shake {
   background: #dc2626;
