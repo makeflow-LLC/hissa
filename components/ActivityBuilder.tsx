@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   saveActivity,
@@ -25,6 +25,27 @@ import {
 import type { Activity, StudentGroup } from "@/lib/data/types";
 
 const initial: ActivityActionState = { ok: false };
+
+/**
+ * موضعٌ ابتدائيّ **متباعد** للنقطة رقم `i` من `n` — شبكةٌ تغطّي الصورة.
+ *
+ * سببه أن الخطوة الوحيدة الهشّة في «سمِّ الأجزاء» كانت وضعُ النقاط يدوياً:
+ * إن لم تنجح الضغطة — لأي سبب — يُحفظ النشاط بلا إحداثيات، فتتكدّس كل
+ * النقاط في منتصف الصورة عند اللعب دون أن ينبّه شيءٌ المعلّم. والآن لكل
+ * اسمٍ موضعٌ منذ لحظة كتابته، والمعلّم **يصحّحه بالسحب** لا ينشئه من عدم:
+ * أسوأ ما قد يحدث نقاطٌ موزّعة في غير مواضعها الدقيقة، لا لعبةٌ معطّلة.
+ */
+function spreadAt(i: number, n: number): { x: number; y: number } {
+  const cols = Math.max(1, Math.ceil(Math.sqrt(Math.max(1, n))));
+  const rows = Math.max(1, Math.ceil(n / cols));
+  const c = i % cols;
+  const r = Math.floor(i / cols);
+  const round = (v: number) => Math.round(v * 10) / 10;
+  return {
+    x: round(((c + 0.5) / cols) * 100),
+    y: round(((r + 0.5) / rows) * 100),
+  };
+}
 
 /**
  * محرّر النشاط.
@@ -65,6 +86,9 @@ export default function ActivityBuilder({
   const [boardBusy, setBoardBusy] = useState(false);
   /** الصفّ الذي سيُوضع موضعه عند الضغط التالي على الصورة */
   const [placing, setPlacing] = useState<number | null>(null);
+  /** النقطة المسحوبة الآن على الصورة */
+  const [dragDot, setDragDot] = useState<number | null>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
 
   const spec = kindSpec(kind);
   const payload = useMemo(() => JSON.stringify(items), [items]);
@@ -82,6 +106,41 @@ export default function ActivityBuilder({
 
   function patch(i: number, next: Partial<ActivityItem>) {
     setItems((prev) => prev.map((it, j) => (j === i ? { ...it, ...next } : it)));
+  }
+
+  /**
+   * كل اسمٍ في «سمِّ الأجزاء» يحصل على موضعٍ فور وجود صورة — **ولا يُترك
+   * بلا موضع أبداً**. راجع `spreadAt`: هذا ما يحوّل الفشل الصامت (نشاطٌ
+   * يُحفظ بلا إحداثيات فتتكدّس نقاطه في المنتصف عند اللعب) إلى حالةٍ
+   * مرئيةٍ يصحّحها المعلّم بالسحب.
+   */
+  useEffect(() => {
+    if (kind !== "labeling" || !boardImg) return;
+    setItems((prev) => {
+      const named = prev.filter((it) => it.a.trim()).length;
+      if (named === 0) return prev;
+      let seat = 0;
+      let changed = false;
+      const next = prev.map((it) => {
+        if (!it.a.trim()) return it;
+        const mine = seat++;
+        if (it.x !== undefined && it.y !== undefined) return it;
+        changed = true;
+        return { ...it, ...spreadAt(mine, named) };
+      });
+      return changed ? next : prev;
+    });
+  }, [kind, boardImg, items]);
+
+  /** موضعٌ بالنسبة المئوية من نقرةٍ أو سحبةٍ على إطار الصورة */
+  function pointAt(clientX: number, clientY: number) {
+    const r = frameRef.current?.getBoundingClientRect();
+    if (!r || r.width === 0 || r.height === 0) return null;
+    const clamp = (v: number) => Math.max(0, Math.min(100, Math.round(v * 10) / 10));
+    return {
+      x: clamp(((clientX - r.left) / r.width) * 100),
+      y: clamp(((clientY - r.top) / r.height) * 100),
+    };
   }
 
   /**
@@ -336,36 +395,71 @@ export default function ActivityBuilder({
                     <ImageFrame
                       src={boardImg}
                       className="place-frame"
+                      frameRef={frameRef}
                       onClick={(e) => {
                         if (placing === null) return;
-                        const r = e.currentTarget.getBoundingClientRect();
-                        if (r.width === 0 || r.height === 0) return;
-                        patch(placing, {
-                          x: Math.round(((e.clientX - r.left) / r.width) * 1000) / 10,
-                          y: Math.round(((e.clientY - r.top) / r.height) * 1000) / 10,
-                        });
+                        const p = pointAt(e.clientX, e.clientY);
+                        if (!p) return;
+                        patch(placing, p);
                         setPlacing(null);
                       }}
                     >
                       {items.map((it, i) =>
                         it.x !== undefined && it.y !== undefined ? (
-                          <span
+                          <button
                             key={i}
-                            className={`place-dot ${placing === i ? "place-dot-on" : ""}`}
+                            type="button"
+                            className={`place-dot ${
+                              placing === i || dragDot === i ? "place-dot-on" : ""
+                            }`}
                             style={{ left: `${it.x}%`, top: `${it.y}%` }}
+                            title={it.a || `الصفّ ${i + 1}`}
+                            aria-label={`موضع «${it.a || i + 1}» — اسحبه`}
+                            /* السحب بأحداث المؤشّر: تغطّي الفأرة واللمس معاً،
+                               بخلاف سحب HTML5 الذي لا يعمل على الجوال أصلاً */
+                            onPointerDown={(e) => {
+                              e.currentTarget.setPointerCapture?.(e.pointerId);
+                              setDragDot(i);
+                            }}
+                            onPointerMove={(e) => {
+                              if (dragDot !== i) return;
+                              const p = pointAt(e.clientX, e.clientY);
+                              if (p) patch(i, p);
+                            }}
+                            onPointerUp={() => setDragDot(null)}
+                            onPointerCancel={() => setDragDot(null)}
+                            /* لا تصل الضغطة إلى الإطار فتُنقل نقطةٌ أخرى فوق هذه */
+                            onClick={(e) => e.stopPropagation()}
                           >
                             {i + 1}
-                          </span>
+                          </button>
                         ) : null
                       )}
                     </ImageFrame>
                   </div>
                   <p className="form-hint">
-                    {placing === null
-                      ? "اضغط «📍 ضع» بجانب أي صفّ ثم اضغط موضعه على الصورة."
-                      : `اضغط الآن موضع «${items[placing]?.a || `الصفّ ${placing + 1}`}» على الصورة.`}
+                    {placing !== null
+                      ? `اضغط الآن موضع «${items[placing]?.a || `الصفّ ${placing + 1}`}» على الصورة.`
+                      : "🖐️ اسحب كل نقطة إلى موضعها على الصورة. النقاط تُوضع تلقائياً موزّعةً حين تكتب الأسماء، فلا يبقى اسمٌ بلا موضع."}
                   </p>
                   <div className="card-actions">
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => {
+                        // إعادة التوزيع من جديد — مخرجٌ حين تتراكم النقاط بالسحب
+                        setPlacing(null);
+                        setItems((p) => {
+                          const named = p.filter((it) => it.a.trim()).length;
+                          let seat = 0;
+                          return p.map((it) =>
+                            it.a.trim() ? { ...it, ...spreadAt(seat++, named) } : it
+                          );
+                        });
+                      }}
+                    >
+                      ⚖️ وزّع النقاط من جديد
+                    </button>
                     <button
                       type="button"
                       className="btn btn-outline btn-sm btn-danger"
@@ -477,9 +571,9 @@ export default function ActivityBuilder({
                         }`}
                         disabled={!boardImg}
                         onClick={() => setPlacing(placing === i ? null : i)}
-                        title={boardImg ? "" : "ارفع صورة النشاط أولاً"}
+                        title={boardImg ? "اضغط ثم اضغط الموضع على الصورة" : "ارفع صورة النشاط أولاً"}
                       >
-                        {it.x !== undefined ? "📍 مثبَّت" : "📍 ضع"}
+                        {placing === i ? "👆 اضغط الصورة" : "📍 انقله"}
                       </button>
                     </td>
                   )}
