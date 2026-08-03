@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { shuffle, type GameProps } from "@/components/games/shared";
 import { useGameSound } from "@/components/games/useGameSound";
+import { normalizeArabic } from "@/lib/arabic";
 
 /**
  * «سمِّ الأجزاء»: صورةٌ عليها نقاط، والطالب يسحب كل اسم إلى موضعه.
@@ -26,15 +27,43 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
   );
   const tray = useMemo(() => shuffle(items.map((_, i) => i)), [items]);
 
+  /**
+   * نصف قطر القبول لكل نقطة — **مشتقٌّ من تباعد النقاط لا رقماً ثابتاً**.
+   *
+   * كان حدّاً أدنى ٥٦ بكسل: على صورةٍ صغيرة أو نقاطٍ متقاربة تقع نقطتان
+   * داخل هذا المدى معاً، فيلتقط الإفلاتُ «الأقرب» لا ما قصده الطالب —
+   * وهذا بعينه ما يبدو «مطابقةً غير دقيقة». والآن لكل نقطة نصفُ المسافة
+   * إلى أقرب جارة لها، فلا يتداخل مداها مع مدى غيرها أبداً.
+   */
+  const radii = useMemo(() => {
+    return targets.map((t) => {
+      let nearest = Infinity;
+      for (const o of targets) {
+        if (o.i === t.i) continue;
+        nearest = Math.min(nearest, Math.hypot(o.x - t.x, o.y - t.y));
+      }
+      return Number.isFinite(nearest) ? nearest / 2 : 100;
+    });
+  }, [targets]);
+
   /** أي اسم وُضع على أي نقطة: مفتاحه رقم النقطة */
   const [placed, setPlaced] = useState<Record<number, number>>({});
   const [picked, setPicked] = useState<number | null>(null);
+  const [misses, setMisses] = useState(0);
   const [wrongAt, setWrongAt] = useState<number | null>(null);
-  const [drag, setDrag] = useState<{ label: number; x: number; y: number } | null>(
-    null
-  );
+  const [drag, setDrag] = useState<{
+    label: number;
+    x: number;
+    y: number;
+    /** بَعُدت الإصبع عن نقطة البدء؟ حينها هي سحبةٌ لا ضغطة */
+    moved: boolean;
+    /** النقطة التي ستستقبل الإفلات لو رُفعت الإصبع الآن */
+    over: number | null;
+  } | null>(null);
   const [done, setDone] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const startRef = useRef({ x: 0, y: 0 });
 
   const usedLabels = new Set(Object.values(placed));
   const remaining = tray.filter((l) => !usedLabels.has(l));
@@ -42,9 +71,17 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
   function assign(targetIdx: number, labelIdx: number) {
     if (done || placed[targetIdx] !== undefined) return;
 
-    // الاسم الصحيح للنقطة هو صاحبها نفسه — النقاط والأسماء عنصرٌ واحد
-    if (targetIdx !== labelIdx) {
+    /**
+     * المطابقة **بالاسم لا برقم الصفّ**: معلّمٌ يسمّي جزأين بنفس الاسم
+     * («ورقة» و«ورقة») كان يرى إفلاتاً صحيحاً يُرفض لأن الرقمين مختلفان،
+     * وهو خطأٌ لا يفهمه الطالب ولا يستطيع تجاوزه.
+     */
+    const ok =
+      normalizeArabic(items[targetIdx].a) === normalizeArabic(items[labelIdx].a);
+
+    if (!ok) {
       play("wrong");
+      setMisses((m) => m + 1);
       setWrongAt(targetIdx);
       setTimeout(() => setWrongAt(null), 600);
       return;
@@ -57,43 +94,66 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
 
     if (Object.keys(next).length === items.length) {
       setDone(true);
-      play("win");
-      // كل الأسماء وُضعت في مواضعها الصحيحة — الخطأ لا يُثبَّت أصلاً
-      setTimeout(() => onFinish(items.length, items.length), 700);
+      const score = scoreOf(items.length, misses);
+      if (score === items.length) play("win");
+      setTimeout(() => onFinish(score, items.length), 800);
     }
   }
 
-  /** أقرب نقطة إلى إحداثيات الإفلات، إن كانت داخل مداها */
+  /**
+   * أقرب نقطة إلى موضع الإصبع — **بالبكسل لا بالنسبة المئوية**.
+   *
+   * المقارنة بالنسب كانت تخلط مقياسين: ١٢٪ من عرض صورة عريضة مسافةٌ
+   * أكبر بكثير من ١٢٪ من ارتفاعها، فيتّسع المدى أفقياً ويضيق رأسياً.
+   */
   function targetAt(clientX: number, clientY: number): number | null {
-    const board = boardRef.current;
-    if (!board) return null;
-    const r = board.getBoundingClientRect();
-    const px = ((clientX - r.left) / r.width) * 100;
-    const py = ((clientY - r.top) / r.height) * 100;
+    // مستطيل **الصورة** لا الإطار: حدّ الإطار بكسلٌ يزيح الأصل والمقياس
+    const el = imgRef.current ?? boardRef.current;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) return null;
+
     let best: number | null = null;
-    let bestD = Infinity;
+    let bestScore = Infinity;
     for (const t of targets) {
       if (placed[t.i] !== undefined) continue;
-      const d = Math.hypot(t.x - px, t.y - py);
-      if (d < bestD) {
-        bestD = d;
+      const tx = r.left + (t.x / 100) * r.width;
+      const ty = r.top + (t.y / 100) * r.height;
+      const d = Math.hypot(tx - clientX, ty - clientY);
+
+      // مدى هذه النقطة بالبكسل، محصورٌ بين هدفٍ يُلمس وهدفٍ لا يبتلع جيرانه
+      const spanPx = (radii[t.i] / 100) * Math.min(r.width, r.height);
+      const radius = Math.max(26, Math.min(spanPx, 90));
+      if (d > radius) continue;
+      // النسبة إلى المدى تجعل النقطة الضيّقة تفوز على جارةٍ فضفاضة أبعد
+      const rel = d / radius;
+      if (rel < bestScore) {
+        bestScore = rel;
         best = t.i;
       }
     }
-    // ١٢٪ من مقاس الصورة: مدىً سخيّ يغفر ارتعاش الإصبع
-    return bestD <= 12 ? best : null;
+    return best;
   }
+
+  const filledCount = Object.keys(placed).length;
 
   return (
     <div className="game game-labeling">
       <p className="game-status">
-        🏷️ {Object.keys(placed).length} من {items.length}
+        🏷️ {filledCount} من {items.length}
+        {misses > 0 && ` · ✕ ${misses}`}
       </p>
 
       <div className="label-board" ref={boardRef}>
         {imageUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={imageUrl} alt="" className="label-image" draggable={false} />
+          <img
+            ref={imgRef}
+            src={imageUrl}
+            alt=""
+            className="label-image"
+            draggable={false}
+          />
         ) : (
           <p className="drafts-empty">لا صورة لهذا النشاط.</p>
         )}
@@ -104,16 +164,24 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
             <button
               key={t.i}
               type="button"
-              className={`label-target ${filled ? "label-filled" : ""} ${
+              className={`label-target ${filled ? "label-filled" : "label-empty"} ${
                 wrongAt === t.i ? "label-shake" : ""
-              } ${picked !== null && !filled ? "label-open" : ""}`}
+              } ${drag?.over === t.i ? "label-over" : ""} ${
+                picked !== null && !filled ? "label-open" : ""
+              }`}
               style={{ left: `${t.x}%`, top: `${t.y}%` }}
               onClick={() => {
                 if (picked !== null) assign(t.i, picked);
               }}
-              aria-label={filled ? t.name : `نقطة ${t.i + 1}`}
+              aria-label={filled ? t.name : "نقطة فارغة"}
             >
-              {filled ? t.name : t.i + 1}
+              {/*
+                النقطة الفارغة **بلا رقم**. كانت تحمل رقم صفّها في جدول
+                المعلّم، وهو رقمٌ لا معنى له عند الطالب: يظهر مبعثراً
+                (١ ثم ٣ ثم ٤) كلّما امتلأت نقطة، فيظنّه ترتيباً مقصوداً
+                ويحتار في «تخبّط الأرقام».
+              */}
+              {filled ? t.name : ""}
             </button>
           );
         })}
@@ -133,20 +201,41 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
                   drag?.label === l ? "label-dragging" : ""
                 }`}
                 onPointerDown={(e) => {
-                  (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-                  setDrag({ label: l, x: e.clientX, y: e.clientY });
+                  e.currentTarget.setPointerCapture?.(e.pointerId);
+                  startRef.current = { x: e.clientX, y: e.clientY };
+                  setDrag({ label: l, x: e.clientX, y: e.clientY, moved: false, over: null });
                 }}
                 onPointerMove={(e) => {
-                  if (drag?.label === l) setDrag({ label: l, x: e.clientX, y: e.clientY });
+                  if (drag?.label !== l) return;
+                  const moved =
+                    Math.hypot(
+                      e.clientX - startRef.current.x,
+                      e.clientY - startRef.current.y
+                    ) > 10;
+                  setDrag({
+                    label: l,
+                    x: e.clientX,
+                    y: e.clientY,
+                    moved: drag.moved || moved,
+                    over: targetAt(e.clientX, e.clientY),
+                  });
                 }}
                 onPointerUp={(e) => {
-                  const moved =
-                    drag && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8;
+                  const wasMoved = drag?.moved ?? false;
                   const hit = targetAt(e.clientX, e.clientY);
                   setDrag(null);
-                  // سحبةٌ حقيقية فوق نقطة ⇐ إفلات؛ ضغطةٌ ثابتة ⇐ تحديد
-                  if (hit !== null) assign(hit, l);
-                  else if (!moved) setPicked((p) => (p === l ? null : l));
+
+                  if (hit !== null) {
+                    assign(hit, l);
+                    return;
+                  }
+                  /**
+                   * السحبة التي لم تصب هدفاً **تُبقي الاسم محدَّداً** بدل
+                   * أن تضيع: كان الشرط `!moved` يعني أن ارتعاشة إصبع ١٠
+                   * بكسلات تبتلع الضغطة فلا يُحدَّد شيء ولا يُوضع شيء.
+                   * والضغطة على اسمٍ محدَّد أصلاً تُلغي تحديده (تراجُع).
+                   */
+                  setPicked((p) => (p === l && !wasMoved ? null : l));
                 }}
                 onPointerCancel={() => setDrag(null)}
               >
@@ -157,7 +246,9 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
         </>
       )}
 
-      {drag && (
+      {/* الشريحة الطائرة **على الإصبع تماماً**: لو رُسمت فوقه لاختلف ما
+          يراه الطالب عن الموضع الذي يُحتسب عند الإفلات */}
+      {drag?.moved && (
         <span
           className="label-ghost"
           style={{ left: drag.x, top: drag.y }}
@@ -167,7 +258,23 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
         </span>
       )}
 
-      {done && <p className="form-ok">🎉 أتممت الصورة كاملة!</p>}
+      {done && (
+        <p className="form-ok">
+          🎉 أتممت الصورة كاملة!
+          {misses > 0 && ` (بـ${misses} محاولة خاطئة)`}
+        </p>
+      )}
     </div>
   );
+}
+
+/**
+ * الدرجة: عدد الأسماء ناقصاً ثلث المحاولات الخاطئة.
+ *
+ * كانت اللعبة تعطي العلامة الكاملة دائماً — لأن الإفلات الخاطئ يُرفض ولا
+ * يُثبَّت — فيخرج المتقن والمتخبّط بنفس النتيجة وتفقد الدرجة معناها.
+ * والخصم رفيقٌ عمداً: التجريب على صورةٍ جديدة جزءٌ من التعلّم لا غشّ.
+ */
+function scoreOf(n: number, misses: number): number {
+  return Math.max(1, n - Math.floor(misses / 3));
 }

@@ -104,6 +104,8 @@ export default function PyramidGame({ items, onFinish }: GameProps) {
   const [typed, setTyped] = useState("");
   const [verdict, setVerdict] = useState<"right" | "wrong" | null>(null);
   const [done, setDone] = useState(false);
+  /** نفدت المحاولات قبل القمّة — يُقال للطالب لماذا انتهت اللعبة */
+  const [fell, setFell] = useState(false);
 
   const lv = levels[step];
   const item = items[lv.idx];
@@ -122,6 +124,7 @@ export default function PyramidGame({ items, onFinish }: GameProps) {
       // نفدت المحاولات، أو بلغ القمّة
       if (nextLives <= 0 || step + 1 >= levels.length) {
         setDone(true);
+        if (nextLives <= 0) setFell(true);
         if (nextScore === levels.length) play("win");
         onFinish(nextScore, levels.length);
         return;
@@ -280,6 +283,13 @@ export default function PyramidGame({ items, onFinish }: GameProps) {
       {verdict && (
         <p className={verdict === "right" ? "form-ok" : "form-error"}>
           {verdict === "right" ? "✓ أحسنت — اصعد!" : `✕ الصحيح: ${item.b}`}
+        </p>
+      )}
+
+      {/* نهايةٌ بلا سبب تُربك: نقول إن المحاولات نفدت لا أن اللعبة تعطّلت */}
+      {fell && (
+        <p className="form-error">
+          💔 نفدت محاولاتك الثلاث عند الدرجة {step + 1} — أعِد المحاولة.
         </p>
       )}
     </div>

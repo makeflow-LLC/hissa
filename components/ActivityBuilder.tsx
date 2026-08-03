@@ -335,7 +335,10 @@ export default function ActivityBuilder({
                     className="place-board"
                     onClick={(e) => {
                       if (placing === null) return;
-                      const r = e.currentTarget.getBoundingClientRect();
+                      // نقيس على الصورة نفسها لا على الإطار: حدّ الإطار
+                      // بكسلٌ يزيح الأصل، فينحرف ما يحفظه المعلّم عمّا ضغطه
+                      const img = e.currentTarget.querySelector("img");
+                      const r = (img ?? e.currentTarget).getBoundingClientRect();
                       patch(placing, {
                         x: Math.round(((e.clientX - r.left) / r.width) * 1000) / 10,
                         y: Math.round(((e.clientY - r.top) / r.height) * 1000) / 10,
