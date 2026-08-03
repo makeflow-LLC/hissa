@@ -6033,56 +6033,43 @@ input[type="radio"]:focus-visible {
 
 /* النقاط تُوضع بالنسبة المئوية فوق الصورة، فتصحّ على كل مقاس */
 /**
- * اللوحة **تلتفّ على الصورة بالضبط** ولا تتمدّد على عرض السطر.
- *
- * مواضع النقاط نِسَبٌ من الصورة نفسها؛ فلو صار الإطار أوسع منها (أو
- * أعلى) لظهر فراغٌ حولها وانزاحت كل النقاط عن مواضعها. و`fit-content`
- * تجعل مستطيل الإطار هو مستطيل الصورة تماماً، فتصحّ النسب دائماً.
- *
- * والارتفاع محدود بـ`70vh`: بعض الصور طويلة جداً فتتجاوز الشاشة، فيضطرّ
- * الطالب إلى التمرير بين النقطة والاسم — وهو ما يجعل السحب مستحيلاً.
+ * إطار الصورة: مقاسه محدَّدٌ من نسبة الصورة (انظر `ImageFrame`)، فلا
+ * اعتماد دائريّ ولا انهيار إلى صفر، ومستطيله = مستطيل الصورة تماماً.
  */
 .label-board,
 .place-board {
+  width: 100%;
+  text-align: center;
+  line-height: 0;
+}
+.img-frame {
   position: relative;
-  width: fit-content;
-  max-width: 100%;
+  display: inline-block;
   margin-inline: auto;
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid var(--border);
   background: var(--surface);
-  line-height: 0;
 }
-.place-board {
-  cursor: crosshair;
-}
-.label-image,
-.place-image {
+.img-frame-img {
   display: block;
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  /**
-   * نصف الشاشة لا سبعون بالمئة: الصورة والأسماء يجب أن يظهرا **معاً**.
-   * الصورة الطويلة كانت تدفع درج الأسماء تحت حافّة الشاشة، فيضطرّ الطالب
-   * إلى التمرير — ولا يمكن السحب عبر تمرير، فيبدو السحب «غير دقيق» وهو
-   * في الحقيقة مستحيل.
-   */
-  max-height: 50vh;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   user-select: none;
   -webkit-user-drag: none;
 }
-/**
- * الموضع بـ`left` لا `inset-inline-start` — **عمداً**.
- * المنصة RTL، فالخاصية المنطقية تقلب النقطة إلى الجهة الأخرى: يضغط
- * المعلّم يمين الصورة فتظهر النقطة يسارها، ولا يصيب سحبُ الطالب هدفاً
- * أبداً لأن الإحداثي المحفوظ يُقاس من اليسار والعرض يُقاس من اليمين.
- * وموضعٌ على صورة ليس نصّاً يتبع اتجاه القراءة.
- */
+.place-frame {
+  cursor: crosshair;
+}
 .label-target,
 .place-dot {
   position: absolute;
+  /**
+   * الموضع بـ`left` لا `inset-inline-start` — **عمداً**.
+   * المنصة RTL، فالخاصية المنطقية تقلب النقطة إلى الجهة الأخرى.
+   * وموضعٌ على صورة ليس نصّاً يتبع اتجاه القراءة.
+   */
   transform: translate(-50%, -50%);
   min-width: 30px;
   min-height: 30px;

@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { shuffle, type GameProps } from "@/components/games/shared";
 import { useGameSound } from "@/components/games/useGameSound";
 import { normalizeArabic } from "@/lib/arabic";
+import ImageFrame from "@/components/ImageFrame";
 
 /**
  * «سمِّ الأجزاء»: صورةٌ عليها نقاط، والطالب يسحب كل اسم إلى موضعه.
@@ -62,7 +63,6 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
   } | null>(null);
   const [done, setDone] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
   const startRef = useRef({ x: 0, y: 0 });
 
   const usedLabels = new Set(Object.values(placed));
@@ -107,8 +107,8 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
    * أكبر بكثير من ١٢٪ من ارتفاعها، فيتّسع المدى أفقياً ويضيق رأسياً.
    */
   function targetAt(clientX: number, clientY: number): number | null {
-    // مستطيل **الصورة** لا الإطار: حدّ الإطار بكسلٌ يزيح الأصل والمقياس
-    const el = imgRef.current ?? boardRef.current;
+    // الإطار = مستطيل الصورة بالضبط (انظر `ImageFrame`)
+    const el = boardRef.current;
     if (!el) return null;
     const r = el.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) return null;
@@ -144,47 +144,36 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
         {misses > 0 && ` · ✕ ${misses}`}
       </p>
 
-      <div className="label-board" ref={boardRef}>
+      <div className="label-board">
         {imageUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            ref={imgRef}
-            src={imageUrl}
-            alt=""
-            className="label-image"
-            draggable={false}
-          />
+          <ImageFrame src={imageUrl} frameRef={boardRef}>
+            {targets.map((t) => {
+              const filled = placed[t.i] !== undefined;
+              return (
+                <button
+                  key={t.i}
+                  type="button"
+                  className={`label-target ${filled ? "label-filled" : "label-empty"} ${
+                    wrongAt === t.i ? "label-shake" : ""
+                  } ${drag?.over === t.i ? "label-over" : ""} ${
+                    picked !== null && !filled ? "label-open" : ""
+                  }`}
+                  style={{ left: `${t.x}%`, top: `${t.y}%` }}
+                  onClick={() => {
+                    if (picked !== null) assign(t.i, picked);
+                  }}
+                  aria-label={filled ? t.name : "نقطة فارغة"}
+                >
+                  {/* النقطة الفارغة بلا رقم: رقم الصفّ لا معنى له عند
+                      الطالب، ويظهر مبعثراً كلّما امتلأت نقطة */}
+                  {filled ? t.name : ""}
+                </button>
+              );
+            })}
+          </ImageFrame>
         ) : (
           <p className="drafts-empty">لا صورة لهذا النشاط.</p>
         )}
-
-        {targets.map((t) => {
-          const filled = placed[t.i] !== undefined;
-          return (
-            <button
-              key={t.i}
-              type="button"
-              className={`label-target ${filled ? "label-filled" : "label-empty"} ${
-                wrongAt === t.i ? "label-shake" : ""
-              } ${drag?.over === t.i ? "label-over" : ""} ${
-                picked !== null && !filled ? "label-open" : ""
-              }`}
-              style={{ left: `${t.x}%`, top: `${t.y}%` }}
-              onClick={() => {
-                if (picked !== null) assign(t.i, picked);
-              }}
-              aria-label={filled ? t.name : "نقطة فارغة"}
-            >
-              {/*
-                النقطة الفارغة **بلا رقم**. كانت تحمل رقم صفّها في جدول
-                المعلّم، وهو رقمٌ لا معنى له عند الطالب: يظهر مبعثراً
-                (١ ثم ٣ ثم ٤) كلّما امتلأت نقطة، فيظنّه ترتيباً مقصوداً
-                ويحتار في «تخبّط الأرقام».
-              */}
-              {filled ? t.name : ""}
-            </button>
-          );
-        })}
       </div>
 
       {!done && (
