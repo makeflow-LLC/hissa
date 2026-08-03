@@ -11,7 +11,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/dashboard", "/teacher/me", "/login", "/auth/"],
+      disallow: ["/dashboard", "/teacher/me", "/login", "/auth/", "/admin"],
     },
     sitemap: "https://hissa.sbs/sitemap.xml",
   };

@@ -9,9 +9,8 @@ import {
   type TeachingContext,
 } from "@/lib/ai/prompts";
 import { sanitizeLessonHtml, stripTags } from "@/lib/sanitize";
-
-/** سقف شهري لكل معلّم — المنصة مجانية، فالاستهلاك بلا حدّ خسارة مباشرة */
-const MONTHLY_LIMIT = 40;
+import { spend, refund } from "@/lib/ai/spend";
+import { CREDIT_COST } from "@/lib/ai/credits";
 
 /** أقصى طول محتوى نرسله للنموذج (حماية من التكلفة ومن تجاوز السياق) */
 const MAX_INPUT_CHARS = 12_000;
@@ -119,39 +118,6 @@ async function loadLessonContext(
   };
 }
 
-/** عدّ استهلاك الشهر الجاري وفرض السقف */
-async function checkQuota(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  teacherId: string
-): Promise<{ ok: boolean; remaining: number }> {
-  const since = new Date();
-  since.setDate(1);
-  since.setHours(0, 0, 0, 0);
-
-  const { count } = await supabase
-    .from("ai_usage")
-    .select("id", { count: "exact", head: true })
-    .eq("teacher_id", teacherId)
-    .gte("created_at", since.toISOString());
-
-  const used = count ?? 0;
-  return { ok: used < MONTHLY_LIMIT, remaining: Math.max(0, MONTHLY_LIMIT - used) };
-}
-
-async function recordUsage(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  teacherId: string,
-  kind: "quiz" | "summary" | "format",
-  tokens: number,
-  cost: number
-): Promise<void> {
-  await supabase
-    .from("ai_usage")
-    .insert({ teacher_id: teacherId, kind, tokens, cost });
-}
-
-const QUOTA_MESSAGE = `استنفدت حصّتك الشهرية (${MONTHLY_LIMIT} توليدة). تتجدّد مع بداية الشهر القادم.`;
-
 /* ------------------------------ التلخيص ------------------------------ */
 
 /**
@@ -173,8 +139,9 @@ export async function aiSummarize(
     return { ok: false, message: "اكتب شرح الدرس أولاً ثم اطلب التلخيص." };
   }
 
-  const quota = await checkQuota(data.supabase, data.teacherId);
-  if (!quota.ok) return { ok: false, message: QUOTA_MESSAGE };
+  // الخصم قبل النداء، والردّ إن فشل — انظر lib/ai/spend.ts
+  const paid = await spend(data.supabase, "summary");
+  if (!paid.ok) return { ok: false, message: paid.message };
 
   const note = stripTags(instructions).slice(0, 500);
   const res = await chat({
@@ -191,21 +158,16 @@ export async function aiSummarize(
       .join("\n"),
   });
 
-  if (!res.ok) return { ok: false, message: res.message };
-
-  await recordUsage(
-    data.supabase,
-    data.teacherId,
-    "summary",
-    res.tokens ?? 0,
-    res.cost ?? 0
-  );
+  if (!res.ok) {
+    await refund(data.supabase, "summary");
+    return { ok: false, message: `${res.message} (أُعيد الكريدت إلى رصيدك)` };
+  }
 
   // مخرجات النموذج مُدخَل غير موثوق كأي مُدخَل آخر — تُعقَّم قبل العرض
   return {
     ok: true,
     html: sanitizeLessonHtml(res.text ?? ""),
-    remaining: quota.remaining - 1,
+    remaining: paid.remaining,
   };
 }
 
@@ -232,8 +194,9 @@ export async function aiFormat(
     return { ok: false, message: "لا يوجد نص لتنسيقه في هذا القسم." };
   }
 
-  const quota = await checkQuota(data.supabase, data.teacherId);
-  if (!quota.ok) return { ok: false, message: QUOTA_MESSAGE };
+  // الخصم قبل النداء، والردّ إن فشل — انظر lib/ai/spend.ts
+  const paid = await spend(data.supabase, "format");
+  if (!paid.ok) return { ok: false, message: paid.message };
 
   const note = stripTags(instructions).slice(0, 500);
   const res = await chat({
@@ -250,20 +213,15 @@ export async function aiFormat(
       .join("\n"),
   });
 
-  if (!res.ok) return { ok: false, message: res.message };
-
-  await recordUsage(
-    data.supabase,
-    data.teacherId,
-    "format",
-    res.tokens ?? 0,
-    res.cost ?? 0
-  );
+  if (!res.ok) {
+    await refund(data.supabase, "format");
+    return { ok: false, message: `${res.message} (أُعيد الكريدت إلى رصيدك)` };
+  }
 
   return {
     ok: true,
     html: sanitizeLessonHtml(res.text ?? ""),
-    remaining: quota.remaining - 1,
+    remaining: paid.remaining,
   };
 }
 
@@ -285,8 +243,9 @@ export async function aiQuiz(
     return { ok: false, message: "اكتب شرح الدرس أولاً ثم اطلب توليد الأسئلة." };
   }
 
-  const quota = await checkQuota(data.supabase, data.teacherId);
-  if (!quota.ok) return { ok: false, message: QUOTA_MESSAGE };
+  // الخصم قبل النداء، والردّ إن فشل — انظر lib/ai/spend.ts
+  const paid = await spend(data.supabase, "quiz");
+  if (!paid.ok) return { ok: false, message: paid.message };
 
   const n = Math.min(10, Math.max(3, count || 5));
   const note = stripTags(instructions).slice(0, 500);
@@ -306,13 +265,20 @@ export async function aiQuiz(
     temperature: 0.7,
   });
 
-  if (!res.ok) return { ok: false, message: res.message };
+  if (!res.ok) {
+    await refund(data.supabase, "quiz");
+    return { ok: false, message: `${res.message} (أُعيد الكريدت إلى رصيدك)` };
+  }
 
   const parsed = extractJson<
     { prompt?: unknown; options?: unknown; correct_index?: unknown }[]
   >(res.text ?? "");
   if (!Array.isArray(parsed)) {
-    return { ok: false, message: "تعذّر قراءة الأسئلة المولَّدة — أعد المحاولة." };
+    await refund(data.supabase, "quiz");
+    return {
+      ok: false,
+      message: "تعذّر قراءة الأسئلة المولَّدة — أعد المحاولة. (أُعيد الكريدت)",
+    };
   }
 
   // ننظّف كل سؤال ونتحقّق من صلاحيته بدل الثقة بشكل الردّ
@@ -339,16 +305,12 @@ export async function aiQuiz(
     );
 
   if (quiz.length === 0) {
-    return { ok: false, message: "لم تُنتَج أسئلة صالحة — أعد المحاولة." };
+    await refund(data.supabase, "quiz");
+    return {
+      ok: false,
+      message: "لم تُنتَج أسئلة صالحة — أعد المحاولة. (أُعيد الكريدت)",
+    };
   }
 
-  await recordUsage(
-    data.supabase,
-    data.teacherId,
-    "quiz",
-    res.tokens ?? 0,
-    res.cost ?? 0
-  );
-
-  return { ok: true, quiz, remaining: quota.remaining - 1 };
+  return { ok: true, quiz, remaining: paid.remaining };
 }

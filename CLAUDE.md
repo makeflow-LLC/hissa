@@ -46,7 +46,7 @@ SUPABASE_SERVICE_ROLE_KEY=<secret key>   # npm run seed only — never NEXT_PUBL
 
 ### Tables
 
-In use: `teachers`, `units`, `lessons`, `lesson_attachments`, `quiz_questions`, `profiles`, `follows`, `lesson_progress`, `teacher_messages`, `student_grants`, `reviews`, `parent_reports`, `student_groups`, `student_group_members`, `report_cards`, `report_card_requests`, `exams` (+ `exam_questions` / `exam_attempts` / `exam_answers` / `exam_templates`), `activities` (+ `activity_plays` / `activity_templates`).
+In use: `teachers`, `units`, `lessons`, `lesson_attachments`, `quiz_questions`, `profiles`, `follows`, `lesson_progress`, `teacher_messages`, `student_grants`, `reviews`, `parent_reports`, `student_groups`, `student_group_members`, `report_cards`, `report_card_requests`, `exams` (+ `exam_questions` / `exam_attempts` / `exam_answers` / `exam_templates`), `activities` (+ `activity_plays` / `activity_templates`), `admins`, `lesson_posters`.
 
 - `lessons.is_free_preview` — the one visitor-visible lesson per teacher.
 - `lessons.is_restricted` — hidden entirely unless the student holds a `student_grants` row.
@@ -83,6 +83,8 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0022_teacher_overrides_auto_mark.sql` | `recalc_attempt_score` rebuilds `auto_score` too, so a teacher can correct an auto-graded mark |
 | `0023_pyramid_activity.sql` | `pyramid` kind (11 total); items gain an optional `img` inside the existing `jsonb` |
 | `0024_labeling_activity.sql` | `labeling` kind (12 total) + `activities.image_url` — one image per activity |
+| `0025_ai_design_kind.sql` | `ai_usage.kind` accepts `design` |
+| `0026_credits_and_admin.sql` | `teachers.credits` (+ column-privilege lockout), `admins`, `spend_credits` / `refund_credits` / `admin_set_credits` / `admin_teacher_list`, `lesson_posters` |
 
 ### Removed: live sessions
 
@@ -293,7 +295,7 @@ Non-negotiables baked into the design:
 - **The key is server-only.** `OPENROUTER_API_KEY` never gets a `NEXT_PUBLIC_` prefix, and both AI modules import `server-only` so a client-component import fails the build rather than shipping the key.
 - **The model suggests, never publishes.** Every result lands in the editor for the teacher to review and edit before saving. A wrong fact published under a teacher's name damages them.
 - **Output is untrusted input.** Generated HTML goes through `sanitizeLessonHtml` exactly like teacher-typed HTML; quiz JSON is re-validated field by field (`correct_index` must be in range) before it reaches the form.
-- **There is a hard monthly cap** (`MONTHLY_LIMIT` in `app/actions/ai.ts`, 40). Teacher signup is open to anyone and the platform has no revenue, so an uncapped endpoint is an open invitation to drain the balance.
+- **Every tool costs credits** (`lib/ai/credits.ts`). Teacher signup is open to anyone and the platform has no revenue, so an uncapped endpoint is an open invitation to drain the balance. This replaced a flat `MONTHLY_LIMIT` of 40 — see "Credits".
 
 Prompts inject the teacher's own `subject` and `stages`, so wording targets the right level (a primary pupil and a secondary student get different registers). The allowed-tag list in `prompts.ts` deliberately mirrors the sanitizer's allowlist — asking for tags that would be stripped produces silently truncated output. Teachers can add free-text توصيات that are appended to the request.
 
@@ -440,3 +442,37 @@ Enforcement is in the `lessons` / `live_sessions` SELECT policies via the `secur
 - **Width and the 44px minimum apply only to `.form-field > input|select|textarea`.** A standalone control in a toolbar or search bar sizes to its content; forcing `width: 100%` globally would make it eat its row.
 - **`.form-row` serves both button rows and field rows**, so only `.form-row > .form-field` grows (`flex: 1 1 220px`). On mobile it stacks via `flex-basis: 100%`, never `flex-direction: column` — in a column `flex-basis` becomes *height*, which is what opened tall blank gaps between fields (the same trap as `.exam-kind` and `.exam-card-main`).
 - Placeholder media is CSS-only (gradients + initials/emoji). Lesson videos are Google's public sample MP4s; attachments point at three real PDFs in `public/files/`.
+
+### Credits, and the admin panel
+
+Every AI tool costs **credits** from `teachers.credits` (starts at 40). This replaced a flat `MONTHLY_LIMIT` counted in code, which could not tell a cheap tool from an expensive one, could not be raised for one teacher, and reset itself every month with nobody deciding it should.
+
+| Tool | Cost |
+|---|---|
+| تلخيص · تحسين التنسيق · توليد الأسئلة · تحويل إلى صوت | 1 |
+| تصميم درس كامل · بطاقة/ملصق/مخطّط | 2 |
+
+`lib/ai/credits.ts` holds the price table **for display**; the actual guard is in the database.
+
+**A teacher cannot write their own balance.** RLS filters rows, not columns, and the `teachers` policy lets an owner update their row — so without a second guard any teacher could `PATCH` themselves `credits: 999999` straight at the REST API. `0026` therefore **revokes the blanket UPDATE grant and re-grants it column by column, minus `credits`** — the same column-privilege technique that hides lesson content from `anon` in `0004`. Verified by role-switching SQL: the update is refused and the balance is unchanged, while ordinary profile edits still work.
+
+`spend_credits(n, kind)` is the only way the column changes: `security definer`, validates the kind, and decrements with `where credits >= n` **inside the UPDATE itself** so two concurrent requests cannot both spend the same balance. It returns the remainder, or `-1` when there isn't enough — and in that case nothing is deducted and no `ai_usage` row is written.
+
+**Spend before the call, refund on failure** (`lib/ai/spend.ts`). Deducting after success would let a teacher abort the request and call the model for free, over and over. So the charge lands first, and `refund_credits` returns it when the model call fails — a teacher does not pay for an expired key or a busy service. The refund writes a *negative* `ai_usage` row rather than erasing the charge, so the ledger stays a story you can read, and it refuses unless a matching charge exists in the last 10 minutes (otherwise it is an open credit tap).
+
+**The admin panel is `/admin`.** Membership lives in `admins`, which is **fully closed to the REST API** — no policy, no grant — because a list of who owns the platform is the first thing an attacker asks for. Access goes through `is_admin()` (`security definer`), and `getAdminTeachers()` reads `admin_teacher_list()`, which joins `auth.users` for the email *behind* that check rather than exposing it. A non-admin hitting `/admin` is redirected to the home page, not shown a "forbidden" — the message itself would confirm they found something. `/admin` is in `robots.ts` disallow and carries `robots: noindex`.
+
+### Cards, posters and diagrams (`lesson_posters`)
+
+`/teacher/me/lessons/<id>/visuals` turns a lesson into a printable visual, in two steps:
+
+1. **The model reads the lesson and proposes topics** — a lesson on plants might yield a poster on its parts, one on the cell, one on photosynthesis. This step is **free**: making the teacher pay to see the options makes them pay twice to reach what they wanted. It does require a balance that could afford the draw, so nobody without credits can open an unbounded model call.
+2. **The teacher picks one, and only that one is drawn** — 2 credits. Design is left to the model deliberately: a fixed template makes every poster a copy of the last. Subject, stage, grade, lesson title and the **teacher's name** go into the prompt, and the name is printed under the design.
+
+Three decisions came out of measurement, not preference:
+
+- **The model is `google/gemini-3.1-flash-image`, not an OpenAI one.** The owner asked for "gpt2"; no such model exists on OpenRouter, and the nearest match (`openai/gpt-5.4-image-2`) was measured at **3 minutes and $0.226 per image** — the latency alone kills the feature, since it exceeds any serverless function limit. Gemini did the same job in **8–11 seconds at $0.069**. Override with `OPENROUTER_IMAGE_MODEL`.
+- **The aspect ratio goes in the prompt, not `image_config`.** The model ignores `image_config.size`: all three formats came back the same portrait shape on different canvases, so a "landscape diagram" was a portrait poster with empty margins either side.
+- **No sentences, ever.** Image models render short Arabic labels beautifully and long Arabic sentences as *gibberish* — a browser-verified diagram came back with real headings and body text reading «حماية الِبصعة البذور ،عدجيا». The prompt now forbids full sentences outright and caps every string at three words; the meaning is carried by drawing, arrows and colour. That single rule turned the garbled diagram into a clean one.
+
+Images are uploaded to `lesson-media/<auth.uid()>/posters/…` (the 0007 owner-folder policy, unchanged) and only the URL is stored — a megabyte of base64 inside a row would be read on every list query. Rendered with a plain `<img>`, not `next/image`, for the same reason as activity images.

@@ -5,17 +5,12 @@ import { createClient } from "@/lib/supabase/server";
 import { chat, extractJson, isAiConfigured } from "@/lib/ai/openrouter";
 import { designSystem } from "@/lib/ai/prompts";
 import { stripTags } from "@/lib/sanitize";
+import { spend, refund } from "@/lib/ai/spend";
 import {
   cleanPlan,
   composeSections,
   type LessonPlan,
 } from "@/lib/ai/lessonPlan";
-
-/**
- * نفس السقف الشهريّ الذي في `app/actions/ai.ts` — المنصّة مجانية ولا إيراد
- * لها، فنقطة نهاية بلا سقف دعوةٌ مفتوحة لاستنزاف الرصيد.
- */
-const MONTHLY_LIMIT = 40;
 
 /**
  * تصميم درسٍ كامل أطول من تلخيصه: أقسامٌ وأهدافٌ ومفرداتٌ وأسئلةٌ ونشاط
@@ -79,21 +74,12 @@ export async function designLesson(
   const sections = clamp(Number(formData.get("sections")), 2, 8, 4);
   const questions = clamp(Number(formData.get("questions")), 0, 10, 5);
 
-  // السقف الشهري — يُحسب من أول الشهر الجاري كبقية الأدوات
-  const since = new Date();
-  since.setDate(1);
-  since.setHours(0, 0, 0, 0);
-  const { count } = await supabase
-    .from("ai_usage")
-    .select("id", { count: "exact", head: true })
-    .eq("teacher_id", teacher.id)
-    .gte("created_at", since.toISOString());
-  const used = count ?? 0;
-  if (used >= MONTHLY_LIMIT)
-    return {
-      ok: false,
-      message: `استنفدت حصّتك الشهرية (${MONTHLY_LIMIT} توليدة). تتجدّد مع بداية الشهر القادم.`,
-    };
+  /**
+   * الخصم قبل النداء، والردّ إن فشل — نفس ترتيب بقية الأدوات، وسببه أن
+   * الخصم بعد النجاح يجعل قطعَ الطلب طريقاً لاستدعاء النموذج بلا حساب.
+   */
+  const paid = await spend(supabase, "design");
+  if (!paid.ok) return { ok: false, message: paid.message };
 
   const res = await chat({
     system: designSystem(
@@ -118,22 +104,21 @@ export async function designLesson(
     maxTokens: DESIGN_MAX_TOKENS,
   });
 
-  if (!res.ok) return { ok: false, message: res.message };
+  if (!res.ok) {
+    await refund(supabase, "design");
+    return { ok: false, message: `${res.message} (أُعيدت الكريدتان إلى رصيدك)` };
+  }
 
   const plan = cleanPlan(extractJson<unknown>(res.text ?? ""), minutes);
-  if (!plan)
-    return { ok: false, message: "تعذّر قراءة الخطّة المولَّدة — أعد المحاولة." };
+  if (!plan) {
+    await refund(supabase, "design");
+    return {
+      ok: false,
+      message: "تعذّر قراءة الخطّة المولَّدة — أعد المحاولة. (أُعيدت الكريدتان)",
+    };
+  }
 
-  await supabase
-    .from("ai_usage")
-    .insert({
-      teacher_id: teacher.id,
-      kind: "design",
-      tokens: res.tokens ?? 0,
-      cost: res.cost ?? 0,
-    });
-
-  return { ok: true, plan, remaining: MONTHLY_LIMIT - used - 1 };
+  return { ok: true, plan, remaining: paid.remaining };
 }
 
 function clamp(n: number, min: number, max: number, dflt: number): number {

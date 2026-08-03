@@ -2560,3 +2560,91 @@ export async function getActivityLeaderboard(
     return [];
   }
 }
+
+/* ==================== الرصيد والإدارة ==================== */
+
+/** رصيد المعلّم الحالي — للعرض؛ الحارس الحقيقيّ `spend_credits` في القاعدة */
+export async function getMyCredits(): Promise<number> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return 0;
+  const { data } = await supabase
+    .from("teachers")
+    .select("credits")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  return Number(data?.credits ?? 0);
+}
+
+/**
+ * هل المستخدم من الإدارة؟
+ *
+ * عبر `is_admin()` لا بقراءة `admins`: الجدول مغلقٌ على الواجهة عمداً،
+ * لأن قائمةً بأسماء من يملك المنصّة أول ما يطلبه مهاجم. **يفشل مغلقاً**:
+ * أيّ خطأ يعني «لا».
+ */
+export async function isAdmin(): Promise<boolean> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("is_admin");
+    if (error) return false;
+    return data === true;
+  } catch {
+    return false;
+  }
+}
+
+export interface AdminTeacherRow {
+  id: string;
+  name: string;
+  slug: string;
+  subject: string;
+  email: string;
+  credits: number;
+  usedCredits: number;
+  createdAt: string;
+}
+
+/** قائمة المعلّمين وأرصدتهم — تعود فارغة لغير الإدارة (الدالّة تشترط `is_admin()`) */
+export async function getAdminTeachers(): Promise<AdminTeacherRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_teacher_list");
+  if (error || !Array.isArray(data)) return [];
+  return (data as Record<string, unknown>[]).map((r) => ({
+    id: String(r.id),
+    name: String(r.name ?? ""),
+    slug: String(r.slug ?? ""),
+    subject: String(r.subject ?? ""),
+    email: String(r.email ?? ""),
+    credits: Number(r.credits ?? 0),
+    usedCredits: Number(r.used_credits ?? 0),
+    createdAt: String(r.created_at ?? ""),
+  }));
+}
+
+export interface PosterRow {
+  id: string;
+  kind: string;
+  title: string;
+  imageUrl: string;
+  createdAt: string;
+}
+
+/** ملصقات درسٍ بعينه — مقيّدةٌ بمالكه عبر RLS */
+export async function getLessonPosters(lessonId: string): Promise<PosterRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("lesson_posters")
+    .select("id, kind, title, image_url, created_at")
+    .eq("lesson_id", lessonId)
+    .order("created_at", { ascending: false });
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: String(r.id),
+    kind: String(r.kind ?? "poster"),
+    title: String(r.title ?? ""),
+    imageUrl: String(r.image_url ?? ""),
+    createdAt: String(r.created_at ?? ""),
+  }));
+}

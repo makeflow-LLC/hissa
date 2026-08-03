@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import {
   getCurrentUser,
+  getMyCredits,
   getMyTeacher,
   getRecentExamResults,
 } from "@/lib/data/queries";
@@ -22,7 +23,10 @@ export default async function TeacherMePage() {
   const teacher = await getMyTeacher();
   if (!teacher) redirect("/teacher/onboarding");
 
-  const results = await getRecentExamResults();
+  const [results, credits] = await Promise.all([
+    getRecentExamResults(),
+    getMyCredits(),
+  ]);
   const needGrading = results.filter((r) => r.status === "submitted").length;
 
   return (
@@ -119,6 +123,13 @@ export default async function TeacherMePage() {
         <div className="stat-box">
           <span className="stat-value">{teacher.stages.length}</span>
           <span className="stat-label">مراحل تدرّسها</span>
+        </div>
+        {/* الرصيد ظاهرٌ دائماً لا عند نفاده: أداةٌ لها ثمن يجب أن يُعرف ثمنها قبل الضغط */}
+        <div className="stat-box">
+          <span className={`stat-value ${credits < 2 ? "stat-value-muted" : ""}`}>
+            {credits}
+          </span>
+          <span className="stat-label">كريدت للذكاء الاصطناعي</span>
         </div>
       </section>
 
