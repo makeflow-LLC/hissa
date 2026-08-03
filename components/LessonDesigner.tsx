@@ -134,6 +134,23 @@ export default function LessonDesigner({
 
         <label className="form-field">
           <span className="form-label">
+            📚 مادّة مرجعية (اختيارية)
+            <InfoTip>
+              الصِق هنا فقرةً من كتاب المنهج، أو التعريفات والأمثلة التي
+              تريد الدرس مبنياً عليها. يلتزم بها النموذج ولا يخالفها، ويكمل
+              ما لم يرد فيها بما يناسب المرحلة. اتركها فارغة ليبني من معرفته.
+            </InfoTip>
+          </span>
+          <textarea
+            name="references"
+            rows={4}
+            placeholder="الصِق نصّ الدرس من الكتاب المقرّر، أو التعريفات والقوانين التي تريد الالتزام بها…"
+            maxLength={6000}
+          />
+        </label>
+
+        <label className="form-field">
+          <span className="form-label">
             توصياتك
             <InfoTip>
               ما تكتبه هنا يلتزم به النموذج: «ركّز على الأمثلة المحلولة»،

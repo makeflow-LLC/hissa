@@ -84,6 +84,12 @@ interface QuizUI {
 
 const initialState: ContentFormState = { ok: false };
 
+/** أوّل ما يُقرأ من قسمٍ مطويّ — نصّاً مجرّداً لا وسوماً */
+function stripPeek(html: string): string {
+  const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return text.length > 110 ? `${text.slice(0, 110)}…` : text;
+}
+
 export default function LessonForm({
   units,
   initial,
@@ -108,6 +114,8 @@ export default function LessonForm({
         }))
       : [{ id: newSectionId(), heading: "", html: "" }]
   );
+  /** أيّ قسمٍ مفتوح — الأوّل ابتداءً حين تكثر الأقسام */
+  const [openSection, setOpenSection] = useState<number | null>(0);
   const [quiz, setQuiz] = useState<QuizUI[]>(
     initial?.quiz?.map((q) => ({
       prompt: q.prompt,
@@ -284,11 +292,36 @@ export default function LessonForm({
 
       {/* أقسام الشرح */}
       <div className="form-field">
-        <span className="form-label">الشرح المكتوب</span>
+        <div className="section-head-row">
+          <span className="form-label">الشرح المكتوب — {sections.length} أقسام</span>
+        </div>
+        {/*
+          الأقسام مطويّة إلا المفتوح منها حين تكثر.
+          درسٌ مصمَّمٌ آلياً يأتي بعشرة أقسام، ولكلٍّ محرّرٌ كامل بشريط
+          أدواته — فتصير الصفحة جداراً من الصناديق لا يُعرف أين يبدأ منه.
+          والطيّ يخفّفها ويُخفّف الصفحة معاً: المحرّر لا يُركَّب إلا للقسم
+          المفتوح.
+        */}
+        {sections.length > 2 && (
+          <p className="form-hint">اضغط عنوان القسم لفتحه أو طيّه.</p>
+        )}
         <div className="repeater">
-          {sections.map((s, i) => (
-            <div key={s.id} className="repeater-item">
+          {sections.map((s, i) => {
+            const open = sections.length <= 2 || openSection === i;
+            return (
+            <div key={s.id} className={`repeater-item ${open ? "" : "repeater-closed"}`}>
               <div className="repeater-head">
+                {sections.length > 2 && (
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm section-toggle"
+                    onClick={() => setOpenSection(open ? null : i)}
+                    aria-expanded={open}
+                    aria-label={`${open ? "طيّ" : "فتح"} القسم ${i + 1}`}
+                  >
+                    {open ? "▾" : "▸"}
+                  </button>
+                )}
                 <input
                   type="text"
                   className="search-input"
@@ -306,37 +339,48 @@ export default function LessonForm({
                   <button
                     type="button"
                     className="btn btn-outline btn-sm"
-                    onClick={() =>
-                      setSections((prev) => prev.filter((_, j) => j !== i))
-                    }
+                    onClick={() => {
+                      setSections((prev) => prev.filter((_, j) => j !== i));
+                      setOpenSection(null);
+                    }}
                     aria-label="حذف القسم"
                   >
                     ✕
                   </button>
                 )}
               </div>
-              <RichTextEditor
-                value={s.html}
-                onChange={(html) =>
-                  setSections((prev) =>
-                    prev.map((x, j) => (j === i ? { ...x, html } : x))
-                  )
-                }
-                placeholder="اكتب الشرح هنا…"
-              />
-              <AiFormatButton
-                lessonId={initial?.id ?? ""}
-                html={s.html}
-                title={titleRef.current?.value ?? ""}
-                enabled={aiEnabled}
-                onResult={(html) =>
-                  setSections((prev) =>
-                    prev.map((x, j) => (j === i ? { ...x, html } : x))
-                  )
-                }
-              />
+              {open ? (
+                <>
+                  <RichTextEditor
+                    value={s.html}
+                    onChange={(html) =>
+                      setSections((prev) =>
+                        prev.map((x, j) => (j === i ? { ...x, html } : x))
+                      )
+                    }
+                    placeholder="اكتب الشرح هنا…"
+                  />
+                  <AiFormatButton
+                    lessonId={initial?.id ?? ""}
+                    html={s.html}
+                    title={titleRef.current?.value ?? ""}
+                    enabled={aiEnabled}
+                    onResult={(html) =>
+                      setSections((prev) =>
+                        prev.map((x, j) => (j === i ? { ...x, html } : x))
+                      )
+                    }
+                  />
+                </>
+              ) : (
+                /* سطرٌ واحد يُنبئ عن المحتوى بلا فتحه — الطيّ لا يُخفي أن ثمّة شرحاً */
+                <p className="repeater-peek">
+                  {stripPeek(s.html) || "— لا شرح بعد —"}
+                </p>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
         <button
           type="button"
