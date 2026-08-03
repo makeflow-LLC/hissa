@@ -86,6 +86,7 @@ export default async function EditActivityPage({
               instructions: activity.instructions,
               kind: activity.kind,
               items: activity.items,
+              imageUrl: activity.image_url ?? "",
               teacherName: teacher.name,
               showLeaderboard: activity.show_leaderboard,
               bestScore: null,

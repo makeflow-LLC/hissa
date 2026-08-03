@@ -8,6 +8,7 @@ import {
   activityProblem,
   cleanItems,
   kindSpec,
+  safeImageUrl,
   type ActivityItem,
   type ActivityKind,
 } from "@/lib/activityKinds";
@@ -126,6 +127,8 @@ export async function saveActivity(
     kind,
     items,
     show_leaderboard: showLeaderboard,
+    // الصورة تُنظَّف بنفس قاعدة صور العناصر: مضيف المشروع وحده
+    image_url: safeImageUrl(formData.get("imageUrl")) || null,
   };
 
   if (id) {

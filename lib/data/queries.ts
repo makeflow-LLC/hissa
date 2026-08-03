@@ -2369,7 +2369,7 @@ export async function getMyStudentActivities(): Promise<StudentActivity[]> {
     const [{ data }, { data: plays }] = await Promise.all([
       supabase
         .from("activities")
-        .select("id, title, instructions, kind, items, show_leaderboard, teachers(name)")
+        .select("id, title, instructions, kind, items, image_url, show_leaderboard, teachers(name)")
         .eq("status", "published")
         .order("created_at", { ascending: false }),
       supabase
@@ -2402,6 +2402,7 @@ export async function getMyStudentActivities(): Promise<StudentActivity[]> {
       instructions: string;
       kind: ActivityKind;
       items: unknown;
+      image_url: string | null;
       show_leaderboard: boolean;
       teachers: { name: string } | { name: string }[] | null;
     }[]).map((a) => {
@@ -2414,6 +2415,7 @@ export async function getMyStudentActivities(): Promise<StudentActivity[]> {
         kind: a.kind,
         items: Array.isArray(a.items) ? (a.items as ActivityItem[]) : [],
         teacherName: t?.name ?? "معلّم",
+        imageUrl: a.image_url ?? "",
         showLeaderboard: a.show_leaderboard !== false,
         bestScore: b ? b.score : null,
         bestTotal: b ? b.total : null,
@@ -2435,7 +2437,7 @@ export async function getActivityToPlay(id: string): Promise<StudentActivity | n
 
   const { data } = await supabase
     .from("activities")
-    .select("id, title, instructions, kind, items, show_leaderboard, teachers(name)")
+    .select("id, title, instructions, kind, items, image_url, show_leaderboard, teachers(name)")
     .eq("id", id)
     .eq("status", "published")
     .maybeSingle();
@@ -2447,6 +2449,7 @@ export async function getActivityToPlay(id: string): Promise<StudentActivity | n
     instructions: string;
     kind: ActivityKind;
     items: unknown;
+    image_url: string | null;
     show_leaderboard: boolean;
     teachers: { name: string } | { name: string }[] | null;
   };
@@ -2473,6 +2476,7 @@ export async function getActivityToPlay(id: string): Promise<StudentActivity | n
     kind: row.kind,
     items: Array.isArray(row.items) ? (row.items as ActivityItem[]) : [],
     teacherName: t?.name ?? "معلّم",
+    imageUrl: row.image_url ?? "",
     showLeaderboard: row.show_leaderboard !== false,
     bestScore: top?.score ?? null,
     bestTotal: top?.total ?? null,

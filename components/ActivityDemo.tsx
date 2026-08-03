@@ -79,6 +79,7 @@ export default function ActivityDemo({ initial = "match" }: { initial?: Activity
             instructions: "نموذج تجريبيّ — العب كما سيلعب طالبك تماماً.",
             kind,
             items,
+            imageUrl: "",
             teacherName: "منصة حصة",
             showLeaderboard: false,
             bestScore: null,

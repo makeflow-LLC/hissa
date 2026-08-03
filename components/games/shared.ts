@@ -18,6 +18,8 @@ export function shuffle<T>(list: T[]): T[] {
  */
 export interface GameProps {
   items: ActivityItem[];
+  /** صورة النشاط الواحدة — لا تستعملها إلا «سمِّ الأجزاء» */
+  imageUrl?: string;
   onFinish: (score: number, total: number) => void;
 }
 

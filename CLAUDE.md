@@ -81,6 +81,8 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0020_activities.sql` | `activities` / `activity_plays` / `activity_templates` — Wordwall-style games over one shared item list |
 | `0021_more_activity_kinds.sql` | four more game kinds (10 total), `activities.show_leaderboard` + `activity_leaderboard()` |
 | `0022_teacher_overrides_auto_mark.sql` | `recalc_attempt_score` rebuilds `auto_score` too, so a teacher can correct an auto-graded mark |
+| `0023_pyramid_activity.sql` | `pyramid` kind (11 total); items gain an optional `img` inside the existing `jsonb` |
+| `0024_labeling_activity.sql` | `labeling` kind (12 total) + `activities.image_url` — one image per activity |
 
 ### Removed: live sessions
 
@@ -210,11 +212,11 @@ A teacher writes an exam, points it at **one group**, and only that group's memb
 
 **A total the teacher declares, checked against the questions.** `exams.target_points` is optional; when set, `ExamBuilder` compares it to the live sum on every keystroke and `setExamStatus` refuses to publish on a mismatch — with the numbers in the message and a "publish anyway" button, since the teacher may have changed their mind about the total. It is never used for grading: `grade_exam_attempt` always sums `exam_questions` itself. `⚖️ وزّع بالتساوي` divides the target across the questions, putting the remainder on the last one so the sum lands exactly.
 
-### Interactive activities: one content set, ten games
+### Interactive activities: one content set, twelve games
 
 `activities` is the Wordwall idea: the teacher enters **pairs** once — `items` is `[{a, b}]` — and `kind` decides how they are played. Switching the kind never touches the content, which is the whole point; the meaning of `a` and `b` is what differs (`lib/activityKinds.ts` carries the label, per-column headings, minimum item count, whether it is scored, an example row, and the explanation per kind).
 
-Ten kinds: `match` · `flashcards` · `quiz` · `anagram` · `sort` · `memory` · `truefalse` · `balloons` · `speed` · `wheel`. Each is one file under `components/games/`, and `ActivityPlayer` is the shell that dispatches and records. A game's only outlet is `onFinish(score, total)` — it knows nothing about the database, so an eleventh kind is one file, one line in the dispatch, one entry in `KINDS`, and one widened `check` constraint. `readKind()` in `app/actions/activities.ts` derives from `KINDS`, so a new kind cannot be silently rejected by the server action.
+Twelve kinds: `pyramid` · `labeling` · `match` · `flashcards` · `quiz` · `anagram` · `sort` · `memory` · `truefalse` · `balloons` · `speed` · `wheel`. Each is one file under `components/games/`, and `ActivityPlayer` is the shell that dispatches and records. A game's only outlet is `onFinish(score, total)` — it knows nothing about the database, so a thirteenth kind is one file, one line in the dispatch, one entry in `KINDS`, and one widened `check` constraint. `readKind()` in `app/actions/activities.ts` derives from `KINDS`, so a new kind cannot be silently rejected by the server action.
 
 **An activity is practice, not assessment — and the design says so out loud.** Unlike `exams`, the answers are *sent to the browser*: a match-up cannot be played without the student seeing both sides, so hiding them is impossible rather than merely inconvenient. The score is therefore computed client-side and stored for encouragement only; it never enters a real average, the UI tells the student that, and `recordPlay` clamps the numbers. Anything needing a protected mark belongs in `exams`.
 
@@ -227,6 +229,19 @@ Templates mirror the exam ones exactly — built-in structures, `activity_templa
 - `memory` grants **`n` free misses** (one per pair). A memory game starts in necessary ignorance — the only way to learn what a card hides is to turn it — so charging for the first pass made a flawless player finish on half marks and read as unfair. Beyond that, one point per two extra misses.
 - `speed` scores **correct out of what was shown**, not out of the item list: someone who answered 12 of 14 in sixty seconds beat someone who answered 6 of 6 slowly, and dividing by the item count would have tied them. Its streak counter is for encouragement and never multiplies the score. Because the total varies per play, the leaderboard must take best *and* total from **one row** — see below.
 - `truefalse` writes its own false statements by pairing one item's `a` with another's `b`, so the teacher never types a wrong answer.
+
+**`pyramid` (هرم المعلومات) is the one kind that mixes challenge types inside a single play.** The student climbs levels; each level is a different task built from the same items — multiple choice, judge a statement, name an image, unscramble the answer, type it from memory — and difficulty rises with height: the base is a four-way choice, the summit is typing with no options. Three lives; a wrong answer costs one and moves on rather than dropping the player to the ground, since the point is practice.
+
+The preference list per level **alternates on purpose**. Without alternation `truefalse` wins every middle level, because it is the only type every item accepts — a browser play-through showed exactly three of the four types appearing. Typed answers are compared through `normalizeArabic`, so a hamza or a ة never fails a correct answer.
+
+**Images live on the item (`items[].img`) and are restricted to the project's own Supabase host** by `safeImageUrl`, mirroring the sanitizer's rule for lesson HTML: a teacher-supplied external image URL rendered in a student's browser is a tracking beacon. Uploads go to `lesson-media/<auth.uid()>/…` (the 0007 policy, unchanged) after being shrunk in the browser. Rendered with a plain `<img>`, **not `next/image`** — the latter rejects a hostname absent from `images.remotePatterns` at runtime, which would crash the page for the first teacher who used the feature.
+
+**`labeling` (سمِّ الأجزاء) is the first kind that needs one image for the whole activity**, so `activities.image_url` is a real column while each label's position (`x`, `y`) rides inside its item in `items`. Positions are stored as **percentages**, not pixels, so they survive every screen size.
+
+Two things about it are easy to get wrong and were:
+
+- **Dragging uses pointer events, never HTML5 drag-and-drop.** `dragstart/drop` does nothing at all on touch screens, and this audience is overwhelmingly on phones — the game would have looked simply broken to most students. A **tap-then-tap** path exists alongside it, because precise dragging fails often on small fingers and slow devices and one path only would lock some students out entirely.
+- **Dot positions use `left`, not `inset-inline-start`.** The platform is RTL, so the logical property mirrors the point: the teacher clicks the right of the image and the dot lands on the left, and no student drag ever hits a target because the stored coordinate is measured from the left while the render measures from the right. A position on a picture is not text and does not follow reading direction. A browser drag test caught this — the tap path passed while dragging failed 100% of the time.
 
 **The leaderboard is opt-out per activity.** `activities.show_leaderboard` (default true) gates `activity_leaderboard(a_id, top)`, a `security definer` function returning each student's best result. It has to be `security definer`: the `activity_plays` policy correctly limits a student to their own plays, and opening the table for a ranking would be the wrong trade. The function refuses unless `can_play_activity()` or `owns_activity()` holds *and* the teacher left the board on. Competition drives repetition and repetition is the practice — but a struggling student seeing their name last every time is a reason to leave, so the switch is the teacher's.
 
