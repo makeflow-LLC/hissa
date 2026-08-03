@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import PageHeader from "@/components/PageHeader";
 import Hint from "@/components/Hint";
 import ConnectionNotice from "@/components/ConnectionNotice";
-import ActivityRowActions from "@/components/ActivityRowActions";
+import ActivityRow from "@/components/ActivityRow";
 import { KINDS, kindSpec } from "@/lib/activityKinds";
 import {
   getCurrentUser,
@@ -69,7 +69,18 @@ export default async function ActivitiesPage() {
           {activities.map((a) => {
             const spec = kindSpec(a.kind);
             return (
-              <li key={a.id} className="exam-card">
+              <ActivityRow
+                key={a.id}
+                activityId={a.id}
+                title={a.title}
+                side={
+                  a.status === "published" ? (
+                    <span className="pill pill-live">منشور</span>
+                  ) : (
+                    <span className="pill pill-draft">مسودّة</span>
+                  )
+                }
+              >
                 <div className="exam-card-main">
                   <h2 className="exam-card-title">
                     <Link href={`/teacher/me/activities/${a.id}`}>
@@ -85,24 +96,7 @@ export default async function ActivitiesPage() {
                       : "لم يلعبه أحد بعد"}
                   </p>
                 </div>
-
-                <div className="exam-card-side">
-                  {a.status === "published" ? (
-                    <span className="pill pill-live">منشور</span>
-                  ) : (
-                    <span className="pill pill-draft">مسودّة</span>
-                  )}
-                  <div className="card-actions">
-                    <Link
-                      href={`/teacher/me/activities/${a.id}`}
-                      className="btn btn-outline btn-sm"
-                    >
-                      ✏️ تعديل
-                    </Link>
-                    <ActivityRowActions activityId={a.id} title={a.title} />
-                  </div>
-                </div>
-              </li>
+              </ActivityRow>
             );
           })}
         </ul>
