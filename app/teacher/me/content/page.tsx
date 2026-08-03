@@ -28,6 +28,7 @@ export default async function TeacherContentPage() {
 
   const content = await getMyTeacherContent();
   const units = content?.units ?? [];
+  const looseLessons = content?.looseLessons ?? [];
 
   return (
     <main className="container">
@@ -192,6 +193,50 @@ export default async function TeacherContentPage() {
           </div>
         )}
       </section>
+
+      {/*
+        الدروس بلا وحدة قسمٌ قائم بذاته، لا مخفيّة.
+        كانت تُسقَط من التوزيع على الوحدات فتختفي من الصفحة كأن الحفظ فشل
+        — ومصمّم الدروس يحفظ بلا وحدة افتراضياً، فالحالة عاديّة لا نادرة.
+      */}
+      {looseLessons.length > 0 && (
+        <section className="dashboard-section">
+          <h2 className="section-title">📄 دروس بلا وحدة</h2>
+          <p className="form-hint">
+            هذه دروسٌ لم تُسنَد إلى وحدة بعد — تظهر للطلاب أسفل الوحدات.
+            افتح الدرس واختر وحدته من قائمة «الوحدة».
+          </p>
+          <ul className="lesson-manage-list">
+            {looseLessons.map((l) => (
+              <li key={l.id} className="lesson-manage-row">
+                <div className="lesson-manage-main">
+                  <span className="lesson-manage-title">
+                    {l.emoji} {l.title}
+                  </span>
+                  <span className="group-meta">
+                    {l.status === "published" ? "منشور" : "مسودّة"}
+                    {l.duration ? ` · ${l.duration}` : ""}
+                  </span>
+                </div>
+                <div className="card-actions">
+                  <Link
+                    href={`/teacher/me/lessons/${l.id}`}
+                    className="btn btn-outline btn-sm"
+                  >
+                    ✏️ تعديل
+                  </Link>
+                  <Link
+                    href={`/teacher/me/lessons/${l.id}/visuals`}
+                    className="btn btn-outline btn-sm"
+                  >
+                    🎨 وسائل
+                  </Link>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <p className="content-foot-hint">
         👁 عاين النتيجة في{" "}

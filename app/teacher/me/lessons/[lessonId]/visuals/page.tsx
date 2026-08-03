@@ -4,6 +4,7 @@ import PageHeader from "@/components/PageHeader";
 import Hint from "@/components/Hint";
 import ConnectionNotice from "@/components/ConnectionNotice";
 import PosterStudio from "@/components/PosterStudio";
+import LessonAudio from "@/components/LessonAudio";
 import {
   getCurrentUser,
   getMyCredits,
@@ -60,8 +61,8 @@ export default async function LessonVisualsPage({
         backHref={`/teacher/me/lessons/${lessonId}`}
         backLabel={lesson.title}
         emoji="🎨"
-        title="بطاقات وملصقات ومخطّطات"
-        subtitle="يقرأ الذكاء الاصطناعي درسك، يقترح ما يصلح فيه، ثم يرسم ما تختاره."
+        title="وسائل الدرس"
+        subtitle="صوتٌ يسمعه الطالب، وبطاقاتٌ وملصقاتٌ ومخطّطاتٌ تُطبع وتُعلَّق."
       />
 
       <Hint>
@@ -72,12 +73,30 @@ export default async function LessonVisualsPage({
       </Hint>
 
       {isAiConfigured() ? (
-        <PosterStudio
-          lessonId={lessonId}
-          lessonTitle={lesson.title}
-          credits={credits}
-          posters={posters}
-        />
+        <>
+          <section className="dashboard-section">
+            <h2 className="section-title">🔊 صوت الدرس</h2>
+            <p className="form-hint">
+              يُقرأ الشرح بصوتٍ عربيّ واضح، ويظهر مشغّلٌ للطالب في صفحة
+              الدرس — لمن يقرأ ببطء، ولمن يراجع في الطريق.
+            </p>
+            <LessonAudio
+              lessonId={lessonId}
+              audioUrl={lesson.audio_url ?? null}
+              credits={credits}
+            />
+          </section>
+
+          <section className="dashboard-section">
+            <h2 className="section-title">🖼️ بطاقات وملصقات ومخطّطات</h2>
+            <PosterStudio
+              lessonId={lessonId}
+              lessonTitle={lesson.title}
+              credits={credits}
+              posters={posters}
+            />
+          </section>
+        </>
       ) : (
         <p className="drafts-empty">
           هذه الميزة تحتاج تفعيل الذكاء الاصطناعي على الخادم.

@@ -76,6 +76,14 @@ export interface LessonContent {
   sections: ContentSection[];
   gallery: GalleryItem[];
   video_url: string | null;
+  /**
+   * صوت الدرس المولَّد.
+   *
+   * **لا يصل الزائر أبداً**: العمود محجوبٌ عنه بمنحة أعمدة (0027) وليس
+   * ضمن `get_free_preview_content` — سماعُ الدرس كاملاً وهو ممنوعٌ من
+   * قراءته يلتفّ على البوّابة كلّها.
+   */
+  audio_url: string | null;
 }
 
 export interface UnitWithLessons {

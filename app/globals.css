@@ -6811,3 +6811,67 @@ details[open] > summary.help-q::after {
   width: 90px;
   text-align: center;
 }
+
+/* دروس بلا وحدة — صفٌّ بسيط، لا بطاقة وحدة كاملة */
+.lesson-manage-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lesson-manage-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.lesson-manage-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.lesson-manage-title { font-weight: 700; }
+
+/* ===== صوت الدرس ===== */
+
+.lesson-audio {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lesson-audio-block {
+  margin-block: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+/* المشغّل يملأ عرضه: مشغّلٌ ضيّق على الجوال يصعب ضغط أزراره */
+.lesson-audio-player {
+  width: 100%;
+  margin-block-start: 8px;
+}
+
+/* قسمٌ مطويّ في محرّر الدرس: يبقى عنوانه ولمحةٌ من نصّه */
+.repeater-closed {
+  padding-block: 8px;
+}
+.section-toggle {
+  flex: 0 0 auto;
+  min-width: 34px;
+  padding-inline: 8px;
+}
+.repeater-peek {
+  margin: 6px 2px 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}

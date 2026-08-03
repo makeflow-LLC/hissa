@@ -369,7 +369,7 @@ export async function getLessonPage(
       const [contentRes, attRes, quizRes, progressRes, attemptRes] = await Promise.all([
         supabase
           .from("lessons")
-          .select("sections, gallery, video_url")
+          .select("sections, gallery, video_url, audio_url")
           .eq("id", lesson.id)
           .maybeSingle(),
         supabase
@@ -407,7 +407,11 @@ export async function getLessonPage(
         p_lesson_id: lesson.id,
       });
       const row = Array.isArray(data) ? data[0] : data;
-      content = (row as LessonContent) ?? null;
+      /**
+       * `audio_url` صريحاً `null` للزائر: الدالّة لا تعيده أصلاً، والتصريح
+       * هنا يمنع أن يتسرّب يوماً بتوسيع الدالّة دون انتباه.
+       */
+      content = row ? { ...(row as LessonContent), audio_url: null } : null;
     }
   }
 
@@ -627,6 +631,8 @@ export interface TeacherUnit {
     is_free_preview: boolean;
     is_restricted: boolean;
     position: number;
+    /** صوت الدرس المولَّد — null إن لم يُولَّد بعد */
+    audio_url: string | null;
   }[];
 }
 
@@ -634,6 +640,15 @@ export interface TeacherContent {
   teacherId: string;
   slug: string;
   units: TeacherUnit[];
+  /**
+   * دروسٌ لا وحدة لها.
+   *
+   * كانت تُسقَط إسقاطاً: الدروس تُوزَّع على وحداتها و`unit_id = null` لا
+   * يطابق أيّ وحدة، فيختفي الدرس من مدير المحتوى كأنه لم يُحفظ — ولا
+   * يظنّ المعلّم إلا أن الحفظ فشل. والوحدة اختيارية أصلاً، ومصمّم الدروس
+   * يحفظ بلا وحدة افتراضياً، فالحالة عاديّة لا نادرة.
+   */
+  looseLessons: TeacherUnit["lessons"];
 }
 
 /** كل محتوى المعلّم الحالي (بما فيه المسودات) لإدارته */
@@ -659,7 +674,7 @@ export async function getMyTeacherContent(): Promise<TeacherContent | null> {
       .order("position"),
     supabase
       .from("lessons")
-      .select("id, unit_id, title, description, duration, emoji, status, is_free_preview, is_restricted, position")
+      .select("id, unit_id, title, description, duration, emoji, status, is_free_preview, is_restricted, position, audio_url")
       .eq("teacher_id", teacher.id)
       .order("position"),
   ]);
@@ -675,6 +690,7 @@ export async function getMyTeacherContent(): Promise<TeacherContent | null> {
     teacherId: teacher.id,
     slug: teacher.slug,
     units,
+    looseLessons: lessons.filter((l) => !l.unit_id),
   };
 }
 

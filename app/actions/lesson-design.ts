@@ -70,6 +70,14 @@ export async function designLesson(
 
   const grade = stripTags(String(formData.get("grade") ?? "")).trim().slice(0, 80);
   const notes = stripTags(String(formData.get("notes") ?? "")).trim().slice(0, 600);
+  /**
+   * مادّةٌ مرجعية يلصقها المعلّم — فقرة من كتاب المنهج، تعريفاتٌ بعينها،
+   * أمثلةٌ يريدها. تُنزع وسومها كأيّ مُدخَل، وحدّها أعلى من حدّ التوصيات
+   * لأنها محتوىً لا توجيه.
+   */
+  const references = stripTags(String(formData.get("references") ?? ""))
+    .trim()
+    .slice(0, 6000);
   const minutes = clamp(Number(formData.get("minutes")), 10, 120, 45);
   const sections = clamp(Number(formData.get("sections")), 2, 8, 4);
   const questions = clamp(Number(formData.get("questions")), 0, 10, 5);
@@ -89,12 +97,15 @@ export async function designLesson(
         grade: grade || undefined,
         lessonTitle: topic,
       },
-      { minutes, sections, questions }
+      { minutes, sections, questions, hasRefs: Boolean(references) }
     ),
     user: [
       `موضوع الدرس المطلوب: ${topic}`,
       grade ? `الصفّ: ${grade}` : "",
       notes ? `توصيات المعلّم التي يجب الالتزام بها: ${notes}` : "",
+      references
+        ? `المادّة المرجعية التي يجب أن يُبنى الدرس عليها:\n---\n${references}\n---`
+        : "",
       questions === 0 ? "لا تُنتج أسئلة — اترك quiz مصفوفة فارغة." : "",
       "صمّم الدرس الآن وأعِد JSON فقط.",
     ]

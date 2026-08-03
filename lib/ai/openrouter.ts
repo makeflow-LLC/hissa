@@ -335,3 +335,166 @@ export async function image({
     clearTimeout(timer);
   }
 }
+
+/* ==================== توليد الصوت ==================== */
+
+/**
+ * نموذج قراءة النصّ.
+ *
+ * طلب المالك «google 3.1 flash tts» ولا وجود له على OpenRouter — نماذج
+ * Google الصوتية هناك موسيقية (`lyria`) لا قارئة. والمتاح فعلاً هو
+ * `openai/gpt-audio` وأخوه المصغَّر، وقِيس فقرأ العربية في خمس ثوانٍ
+ * بأقلّ من سنتٍ واحد. يُبدَّل بـ`OPENROUTER_AUDIO_MODEL`.
+ */
+const DEFAULT_AUDIO_MODEL = "openai/gpt-audio-mini";
+
+const AUDIO_TIMEOUT_MS = 110_000;
+
+/** تردّد العيّنة الذي يعيده النموذج — يدخل ترويسة WAV */
+const PCM_RATE = 24_000;
+
+export interface AiAudioResult {
+  ok: boolean;
+  /** WAV جاهز للتشغيل */
+  wav?: Buffer;
+  seconds?: number;
+  cost?: number;
+  message?: string;
+}
+
+/**
+ * يلفّ عيّنات PCM الخام بترويسة WAV.
+ *
+ * ضروريّ لا تجميليّ: النموذج **لا يعيد إلا `pcm16`** (طلبُ mp3 مع البثّ
+ * يعود فارغاً)، والمتصفّحات لا تشغّل PCM خاماً في عنصر `<audio>`. وهي
+ * أربعةٌ وأربعون بايتاً تُغني عن مكتبة ترميزٍ كاملة.
+ */
+function wavOf(pcm: Buffer): Buffer {
+  const channels = 1;
+  const bits = 16;
+  const head = Buffer.alloc(44);
+  head.write("RIFF", 0);
+  head.writeUInt32LE(36 + pcm.length, 4);
+  head.write("WAVE", 8);
+  head.write("fmt ", 12);
+  head.writeUInt32LE(16, 16);
+  head.writeUInt16LE(1, 20); // PCM
+  head.writeUInt16LE(channels, 22);
+  head.writeUInt32LE(PCM_RATE, 24);
+  head.writeUInt32LE((PCM_RATE * channels * bits) / 8, 28);
+  head.writeUInt16LE((channels * bits) / 8, 32);
+  head.writeUInt16LE(bits, 34);
+  head.write("data", 36);
+  head.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([head, pcm]);
+}
+
+/**
+ * يقرأ النموذج نصّاً بصوتٍ عربيّ.
+ *
+ * **بالبثّ إلزاماً**: الخدمة ترفض إخراج الصوت بغيره صراحةً
+ * («Audio output requires stream: true»)، فالطلب العاديّ يعود بخطأ ٤٠٠
+ * لا بصوت.
+ */
+export async function speak({
+  text,
+  voice = "alloy",
+}: {
+  text: string;
+  voice?: string;
+}): Promise<AiAudioResult> {
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key) {
+    return { ok: false, message: "ميزات الذكاء الاصطناعي غير مفعّلة على الخادم." };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), AUDIO_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(ENDPOINT, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://hissa.sbs",
+        "X-Title": "Hissa Platform",
+      },
+      body: JSON.stringify({
+        model: process.env.OPENROUTER_AUDIO_MODEL || DEFAULT_AUDIO_MODEL,
+        stream: true,
+        modalities: ["text", "audio"],
+        audio: { voice, format: "pcm16" },
+        messages: [{ role: "user", content: text }],
+      }),
+    });
+
+    if (!res.ok || !res.body) {
+      const raw = await res.text().catch(() => "");
+      console.error("[openrouter:audio]", res.status, raw.slice(0, 200));
+      const hint =
+        res.status === 402
+          ? "رصيد الذكاء الاصطناعي نفد — اشحن حساب OpenRouter."
+          : res.status === 429
+            ? "الخدمة مزدحمة الآن. أعد المحاولة بعد قليل."
+            : res.status === 401 || res.status === 403
+              ? "مفتاح OpenRouter غير صالح أو غير مصرّح."
+              : "تعذّر توليد الصوت.";
+      return { ok: false, message: hint };
+    }
+
+    // البثّ يصل أسطراً `data: {...}`، وقطع الصوت base64 داخل `delta.audio.data`
+    const parts: Buffer[] = [];
+    let cost = 0;
+    let carry = "";
+    const decoder = new TextDecoder();
+
+    for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
+      carry += decoder.decode(chunk, { stream: true });
+      const lines = carry.split("\n");
+      // آخر سطر قد يكون نصفَ سطر — يُترك للدفعة التالية
+      carry = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const payload = line.slice(6).trim();
+        if (!payload || payload === "[DONE]") continue;
+        try {
+          const j = JSON.parse(payload) as {
+            choices?: { delta?: { audio?: { data?: string } } }[];
+            usage?: { cost?: number };
+          };
+          const b64 = j.choices?.[0]?.delta?.audio?.data;
+          if (b64) parts.push(Buffer.from(b64, "base64"));
+          if (j.usage?.cost) cost = j.usage.cost;
+        } catch {
+          // سطرٌ غير مكتمل أو تعليق من البوّابة — يُتجاوز
+        }
+      }
+    }
+
+    const pcm = Buffer.concat(parts);
+    if (pcm.length === 0) {
+      return { ok: false, message: "لم يُنتِج النموذج صوتاً — أعد المحاولة." };
+    }
+
+    return {
+      ok: true,
+      wav: wavOf(pcm),
+      seconds: Math.round(pcm.length / 2 / PCM_RATE),
+      cost,
+    };
+  } catch (e) {
+    const aborted = e instanceof Error && e.name === "AbortError";
+    const why = e instanceof Error ? e.message : String(e);
+    console.error("[openrouter:audio] failed:", why);
+    return {
+      ok: false,
+      message: aborted
+        ? "استغرقت القراءة وقتاً طويلاً — جرّب درساً أقصر."
+        : `تعذّر الوصول إلى خدمة الصوت (${why.slice(0, 120)})`,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
