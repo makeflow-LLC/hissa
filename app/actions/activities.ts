@@ -64,12 +64,24 @@ function readItems(raw: unknown, kind: ActivityKind): ActivityItem[] {
     return [];
   }
   const arr = Array.isArray(parsed) ? parsed : [];
+  /**
+   * **تمرير كل حقول العنصر لا الطرفين فقط.**
+   * كانت هذه الخطوة تعيد بناء العنصر بـ`{a, b}` وحدهما، فتُسقِط صورته
+   * (`img`) وموضعه على الصورة (`x`, `y`) قبل أن يراهما `cleanItems`
+   * أصلاً — فتُحفظ الأنشطة بلا صور وبلا مواضع، وتظهر لعبة «سمِّ الأجزاء»
+   * بصورةٍ بلا نقاط ودرجةُ الصورة في الهرم بلا صورة. والتنظيف والتحقّق
+   * يجريان في `cleanItems` على أي حال: `safeImageUrl` للرابط و`pct`
+   * للإحداثيات، فالتمرير هنا لا يفتح ثغرة.
+   */
   return cleanItems(
     arr.map((x) => {
       const o = (x ?? {}) as Record<string, unknown>;
       return {
         a: stripTags(String(o.a ?? "")),
         b: stripTags(String(o.b ?? "")),
+        img: o.img,
+        x: o.x,
+        y: o.y,
       };
     }),
     kind
@@ -237,7 +249,7 @@ export async function duplicateActivity(id: string): Promise<ActivityActionState
 
   const { data: src } = await supabase
     .from("activities")
-    .select("group_id, lesson_id, title, instructions, kind, items")
+    .select("group_id, lesson_id, title, instructions, kind, items, image_url")
     .eq("id", id)
     .eq("teacher_id", teacher.id)
     .maybeSingle();
@@ -248,6 +260,7 @@ export async function duplicateActivity(id: string): Promise<ActivityActionState
     lesson_id: string | null;
     title: string;
     instructions: string;
+    image_url: string | null;
     kind: ActivityKind;
     items: unknown;
   };
@@ -260,6 +273,7 @@ export async function duplicateActivity(id: string): Promise<ActivityActionState
       lesson_id: s.lesson_id,
       title: `${s.title} — نسخة`.slice(0, 150),
       instructions: s.instructions,
+      image_url: s.image_url,
       kind: s.kind,
       items: s.items,
       status: "draft",

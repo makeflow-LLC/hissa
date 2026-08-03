@@ -6032,10 +6032,22 @@ input[type="radio"]:focus-visible {
 /* ===== سمِّ الأجزاء ===== */
 
 /* النقاط تُوضع بالنسبة المئوية فوق الصورة، فتصحّ على كل مقاس */
+/**
+ * اللوحة **تلتفّ على الصورة بالضبط** ولا تتمدّد على عرض السطر.
+ *
+ * مواضع النقاط نِسَبٌ من الصورة نفسها؛ فلو صار الإطار أوسع منها (أو
+ * أعلى) لظهر فراغٌ حولها وانزاحت كل النقاط عن مواضعها. و`fit-content`
+ * تجعل مستطيل الإطار هو مستطيل الصورة تماماً، فتصحّ النسب دائماً.
+ *
+ * والارتفاع محدود بـ`70vh`: بعض الصور طويلة جداً فتتجاوز الشاشة، فيضطرّ
+ * الطالب إلى التمرير بين النقطة والاسم — وهو ما يجعل السحب مستحيلاً.
+ */
 .label-board,
 .place-board {
   position: relative;
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid var(--border);
@@ -6047,9 +6059,17 @@ input[type="radio"]:focus-visible {
 }
 .label-image,
 .place-image {
-  width: 100%;
-  height: auto;
   display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  /**
+   * نصف الشاشة لا سبعون بالمئة: الصورة والأسماء يجب أن يظهرا **معاً**.
+   * الصورة الطويلة كانت تدفع درج الأسماء تحت حافّة الشاشة، فيضطرّ الطالب
+   * إلى التمرير — ولا يمكن السحب عبر تمرير، فيبدو السحب «غير دقيق» وهو
+   * في الحقيقة مستحيل.
+   */
+  max-height: 50vh;
   user-select: none;
   -webkit-user-drag: none;
 }
@@ -6102,6 +6122,12 @@ input[type="radio"]:focus-visible {
   animation: pulse-dot 0.9s ease-in-out 3;
   box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.35);
 }
+/* الهدف الذي سيستقبل الإفلات يكبر ويخضرّ — الطالب يرى أين ستقع قبل أن يرفع إصبعه */
+.label-over {
+  background: var(--success);
+  transform: translate(-50%, -50%) scale(1.35);
+  box-shadow: 0 0 0 6px rgba(22, 163, 74, 0.3);
+}
 .label-filled {
   background: var(--success);
   cursor: default;
@@ -6115,7 +6141,16 @@ input[type="radio"]:focus-visible {
   75% { transform: translate(-50%, -50%) rotate(7deg); }
 }
 
+/* الدرج ملتصقٌ بأسفل الشاشة فوق شريط التنقّل، فلا يغيب عن الأنظار */
 .label-tray {
+  position: sticky;
+  bottom: 8px;
+  z-index: 5;
+  padding: 8px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--shadow);
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -6148,7 +6183,9 @@ input[type="radio"]:focus-visible {
 /* الشريحة الطائرة تتبع الإصبع، ولا تلتقط الأحداث فيقع الإفلات على ما تحتها */
 .label-ghost {
   position: fixed;
-  transform: translate(-50%, -140%);
+  /* مركزها على الإصبع تماماً: ما يراه الطالب هو ما يُحتسب عند الإفلات */
+  transform: translate(-50%, -50%);
+  opacity: 0.9;
   z-index: 60;
   padding: 8px 14px;
   border-radius: 999px;

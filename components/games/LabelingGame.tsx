@@ -30,11 +30,19 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
   const [placed, setPlaced] = useState<Record<number, number>>({});
   const [picked, setPicked] = useState<number | null>(null);
   const [wrongAt, setWrongAt] = useState<number | null>(null);
-  const [drag, setDrag] = useState<{ label: number; x: number; y: number } | null>(
-    null
-  );
+  const [drag, setDrag] = useState<{
+    label: number;
+    x: number;
+    y: number;
+    /** بَعُدت الإصبع عن نقطة البدء؟ حينها هي سحبةٌ لا ضغطة */
+    moved: boolean;
+    /** النقطة التي ستستقبل الإفلات لو رُفعت الإصبع الآن */
+    over: number | null;
+  } | null>(null);
   const [done, setDone] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const startRef = useRef({ x: 0, y: 0 });
 
   const usedLabels = new Set(Object.values(placed));
   const remaining = tray.filter((l) => !usedLabels.has(l));
@@ -63,25 +71,36 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
     }
   }
 
-  /** أقرب نقطة إلى إحداثيات الإفلات، إن كانت داخل مداها */
+  /**
+   * أقرب نقطة إلى موضع الإصبع — **بالبكسل لا بالنسبة المئوية**.
+   *
+   * المقارنة بالنسب كانت تخلط مقياسين: ١٢٪ من عرض صورة عريضة مسافةٌ
+   * أكبر بكثير من ١٢٪ من ارتفاعها، فيتّسع المدى أفقياً ويضيق رأسياً
+   * ويبدو السحب «غير دقيق» — يُصيب أحياناً ويُخطئ أحياناً بلا سبب ظاهر.
+   * والقياس بالبكسل واحدٌ في الاتجاهين.
+   */
   function targetAt(clientX: number, clientY: number): number | null {
-    const board = boardRef.current;
-    if (!board) return null;
-    const r = board.getBoundingClientRect();
-    const px = ((clientX - r.left) / r.width) * 100;
-    const py = ((clientY - r.top) / r.height) * 100;
+    // مستطيل **الصورة** لا الإطار: حدّ الإطار بكسلٌ يزيح الأصل والمقياس
+    const el = imgRef.current ?? boardRef.current;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) return null;
+
     let best: number | null = null;
     let bestD = Infinity;
     for (const t of targets) {
       if (placed[t.i] !== undefined) continue;
-      const d = Math.hypot(t.x - px, t.y - py);
+      const tx = r.left + (t.x / 100) * r.width;
+      const ty = r.top + (t.y / 100) * r.height;
+      const d = Math.hypot(tx - clientX, ty - clientY);
       if (d < bestD) {
         bestD = d;
         best = t.i;
       }
     }
-    // ١٢٪ من مقاس الصورة: مدىً سخيّ يغفر ارتعاش الإصبع
-    return bestD <= 12 ? best : null;
+    // نصف قطر سخيّ يغفر ارتعاش الإصبع، ولا يقلّ عن مقاس هدفٍ يُلمس
+    const radius = Math.max(56, Math.min(r.width, r.height) * 0.18);
+    return bestD <= radius ? best : null;
   }
 
   return (
@@ -93,7 +112,13 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
       <div className="label-board" ref={boardRef}>
         {imageUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={imageUrl} alt="" className="label-image" draggable={false} />
+          <img
+            ref={imgRef}
+            src={imageUrl}
+            alt=""
+            className="label-image"
+            draggable={false}
+          />
         ) : (
           <p className="drafts-empty">لا صورة لهذا النشاط.</p>
         )}
@@ -106,7 +131,9 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
               type="button"
               className={`label-target ${filled ? "label-filled" : ""} ${
                 wrongAt === t.i ? "label-shake" : ""
-              } ${picked !== null && !filled ? "label-open" : ""}`}
+              } ${drag?.over === t.i ? "label-over" : ""} ${
+                picked !== null && !filled ? "label-open" : ""
+              }`}
               style={{ left: `${t.x}%`, top: `${t.y}%` }}
               onClick={() => {
                 if (picked !== null) assign(t.i, picked);
@@ -133,20 +160,42 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
                   drag?.label === l ? "label-dragging" : ""
                 }`}
                 onPointerDown={(e) => {
-                  (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-                  setDrag({ label: l, x: e.clientX, y: e.clientY });
+                  e.currentTarget.setPointerCapture?.(e.pointerId);
+                  startRef.current = { x: e.clientX, y: e.clientY };
+                  setDrag({ label: l, x: e.clientX, y: e.clientY, moved: false, over: null });
                 }}
                 onPointerMove={(e) => {
-                  if (drag?.label === l) setDrag({ label: l, x: e.clientX, y: e.clientY });
+                  if (drag?.label !== l) return;
+                  const moved =
+                    Math.hypot(
+                      e.clientX - startRef.current.x,
+                      e.clientY - startRef.current.y
+                    ) > 10;
+                  setDrag({
+                    label: l,
+                    x: e.clientX,
+                    y: e.clientY,
+                    moved: drag.moved || moved,
+                    over: targetAt(e.clientX, e.clientY),
+                  });
                 }}
                 onPointerUp={(e) => {
-                  const moved =
-                    drag && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8;
+                  const wasMoved = drag?.moved ?? false;
                   const hit = targetAt(e.clientX, e.clientY);
                   setDrag(null);
-                  // سحبةٌ حقيقية فوق نقطة ⇐ إفلات؛ ضغطةٌ ثابتة ⇐ تحديد
-                  if (hit !== null) assign(hit, l);
-                  else if (!moved) setPicked((p) => (p === l ? null : l));
+
+                  if (hit !== null) {
+                    assign(hit, l);
+                    return;
+                  }
+                  /**
+                   * السحبة التي لم تصب هدفاً **تُبقي الاسم محدَّداً** بدل
+                   * أن تضيع: كان الشرط `!moved` يعني أن ارتعاشة إصبع ١٠
+                   * بكسلات تبتلع الضغطة فلا يُحدَّد شيء ولا يُوضع شيء —
+                   * وهو ما يبدو للطالب عطلاً في التحديد.
+                   * والضغطة على اسمٍ محدَّد أصلاً تُلغي تحديده (تراجُع).
+                   */
+                  setPicked((p) => (p === l && !wasMoved ? null : l));
                 }}
                 onPointerCancel={() => setDrag(null)}
               >
@@ -157,7 +206,9 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
         </>
       )}
 
-      {drag && (
+      {/* الشريحة الطائرة **على الإصبع تماماً**: لو رُسمت فوقه لاختلف ما
+          يراه الطالب عن الموضع الذي يُحتسب عند الإفلات */}
+      {drag?.moved && (
         <span
           className="label-ghost"
           style={{ left: drag.x, top: drag.y }}
