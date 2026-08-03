@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { getCurrentUser, getMyTeacher, getStudentName } from "@/lib/data/queries";
+import {
+  getCurrentUser,
+  getMyTeacher,
+  getStudentName,
+  isAdmin,
+} from "@/lib/data/queries";
 
 /**
  * أزرار الشريط العلوي — مكوّن خادم يقرأ جلسة Supabase مباشرة،
@@ -28,6 +33,18 @@ export default async function NavbarActions() {
   // المستخدم قد يكون معلّماً (له بروفايل) أو طالباً
   const teacher = await getMyTeacher();
 
+  /**
+   * مدخل الإدارة يظهر لأهله وحدهم. وهو إخفاءٌ لا حماية — الحماية في
+   * القاعدة: دوالّ الإدارة كلّها ترفض من ليس في `admins`، والصفحة نفسها
+   * تعيد غير الإداريّ إلى الرئيسة.
+   */
+  const admin = await isAdmin();
+  const adminLink = admin ? (
+    <Link href="/admin" className="navbar-link">
+      🛡️ الإدارة
+    </Link>
+  ) : null;
+
   if (teacher) {
     return (
       <span className="navbar-actions">
@@ -40,6 +57,7 @@ export default async function NavbarActions() {
         <Link href="/teacher/me/students" className="navbar-link">
           طلابي
         </Link>
+        {adminLink}
         <span
           className="navbar-user navbar-user-teacher"
           title={user.email ?? undefined}
@@ -62,6 +80,7 @@ export default async function NavbarActions() {
       <Link href="/" className="navbar-link">
         دليل المعلّمين
       </Link>
+      {adminLink}
       <Link href="/dashboard" className="btn btn-primary btn-sm">
         لوحتي
       </Link>
