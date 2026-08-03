@@ -38,9 +38,14 @@ export default async function TeacherContentPage() {
         title="إدارة المحتوى"
         subtitle="أضِف الوحدات والدروس — تظهر مباشرةً في صفحتك العامة للطلاب."
         actions={
-          <Link href="/teacher/me/lessons/new" className="btn btn-primary">
-            ➕ درس جديد
-          </Link>
+          <>
+            <Link href="/teacher/me/lessons/design" className="btn btn-primary">
+              ✨ صمّم درساً
+            </Link>
+            <Link href="/teacher/me/lessons/new" className="btn btn-outline">
+              ➕ درس فارغ
+            </Link>
+          </>
         }
       />
 

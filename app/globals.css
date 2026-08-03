@@ -6567,3 +6567,106 @@ details[open] > summary.help-q::after {
     padding: 10px 6px;
   }
 }
+
+/* ===== مصمّم الدروس ===== */
+
+.lesson-designer {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.designer-brief,
+.designer-review {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px;
+  background: var(--surface);
+}
+.designer-review {
+  border-color: var(--primary);
+}
+.designer-block {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-block-start: 12px;
+  background: var(--bg);
+}
+/* مفتاح الإبقاء يتصدّر الكتلة، فيُعرف قبل قراءتها أنها اختيارية */
+.designer-keep {
+  font-weight: 700;
+  margin-block-end: 8px;
+}
+/* صفّ حقلٍ وزرّ حذفه — الحقل يتمدّد والزرّ بحجم محتواه */
+.designer-line {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-block-end: 8px;
+}
+.designer-line > input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.designer-term {
+  flex: 0 1 32%;
+}
+.designer-section > summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  cursor: pointer;
+  padding-block: 6px;
+}
+.designer-section > summary > input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* المثلّث الافتراضي يزاحم الحقل داخل summary مرن */
+.designer-section > summary::-webkit-details-marker {
+  display: none;
+}
+.designer-preview {
+  border-inline-start: 3px solid var(--primary);
+  padding-inline-start: 12px;
+  margin-block: 8px;
+  font-size: 0.95rem;
+}
+.designer-quiz {
+  padding-inline-start: 20px;
+  margin: 0;
+}
+.designer-quiz > li {
+  margin-block-end: 12px;
+}
+.designer-options {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.designer-options > li {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: var(--surface);
+}
+.designer-right {
+  border-color: var(--success);
+  color: var(--success);
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  /* في عمودٍ يصير flex-basis ارتفاعاً — نُبقي الصفّ ونجعل الأساس كامل العرض */
+  .designer-term {
+    flex-basis: 100%;
+  }
+  .designer-line {
+    flex-wrap: wrap;
+  }
+}
