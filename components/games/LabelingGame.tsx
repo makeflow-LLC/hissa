@@ -21,6 +21,15 @@ import ImageFrame from "@/components/ImageFrame";
 export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
   const play = useGameSound();
 
+  /**
+   * نشاطٌ حُفظ قبل أن تُوضع مواضع أسمائه — **يُقال صراحةً لا يُلعب**.
+   *
+   * كان الافتراض `x ?? 50` يضع كل النقاط في منتصف الصورة فوق بعضها: لعبةٌ
+   * لا تُلعب أصلاً، ولا شيء في الشاشة يفسّر لماذا. والأنشطة القديمة تُشفى
+   * بفتحها في المحرّر وحفظها — فالمواضع صارت تُوضع تلقائياً.
+   */
+  const unplaced = items.some((it) => it.x === undefined || it.y === undefined);
+
   /** النقاط بترتيبها الأصلي (مواضعها)، والأسماء مخلوطة في الدرج */
   const targets = useMemo(
     () => items.map((it, i) => ({ i, x: it.x ?? 50, y: it.y ?? 50, name: it.a })),
@@ -137,6 +146,22 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
 
   const filledCount = Object.keys(placed).length;
 
+  if (!imageUrl || unplaced) {
+    return (
+      <div className="game game-labeling">
+        <p className="form-error">
+          {!imageUrl
+            ? "لا صورة لهذا النشاط بعد."
+            : "لم تُوضَع مواضع الأسماء على الصورة بعد، فلا يمكن لعبه."}
+        </p>
+        <p className="form-hint">
+          إن كنتَ المعلّم: افتح النشاط في المحرّر — تُوضع النقاط تلقائياً
+          موزّعةً على الصورة، اسحب كلّاً منها إلى موضعها ثم احفظ.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="game game-labeling">
       <p className="game-status">
@@ -145,8 +170,7 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
       </p>
 
       <div className="label-board">
-        {imageUrl ? (
-          <ImageFrame src={imageUrl} frameRef={boardRef}>
+        <ImageFrame src={imageUrl} frameRef={boardRef}>
             {targets.map((t) => {
               const filled = placed[t.i] !== undefined;
               return (
@@ -169,11 +193,8 @@ export default function LabelingGame({ items, imageUrl, onFinish }: GameProps) {
                   {filled ? t.name : ""}
                 </button>
               );
-            })}
-          </ImageFrame>
-        ) : (
-          <p className="drafts-empty">لا صورة لهذا النشاط.</p>
-        )}
+          })}
+        </ImageFrame>
       </div>
 
       {!done && (

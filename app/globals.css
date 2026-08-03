@@ -6091,8 +6091,14 @@ input[type="radio"]:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* النقطة تُسحب بالإصبع، و`touch-action: none` يمنع المتصفّح من تمرير
+   الصفحة بدلاً من تحريكها */
 .place-dot {
-  cursor: default;
+  cursor: grab;
+  touch-action: none;
+}
+.place-dot:active {
+  cursor: grabbing;
 }
 /* النقطة الفارغة دبّوسٌ صغير لا رقم: الأرقام كانت تبدو ترتيباً مقصوداً */
 .label-empty {
