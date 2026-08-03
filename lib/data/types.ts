@@ -437,6 +437,8 @@ export interface Activity {
   instructions: string;
   kind: ActivityKind;
   items: ActivityItem[];
+  /** صورة النشاط الواحدة — تستعملها «سمِّ الأجزاء» */
+  image_url: string;
   /** يرى الطلاب ترتيب أفضل النتائج؟ يقرّره المعلّم */
   show_leaderboard: boolean;
   status: "draft" | "published";
@@ -458,6 +460,7 @@ export interface StudentActivity {
   instructions: string;
   kind: ActivityKind;
   items: ActivityItem[];
+  imageUrl: string;
   teacherName: string;
   showLeaderboard: boolean;
   /** أفضل نتيجة سجّلها الطالب (null إن لم يلعب أو كانت اللعبة بلا درجة) */

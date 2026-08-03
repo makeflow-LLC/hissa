@@ -15,6 +15,7 @@ import TrueFalseGame from "@/components/games/TrueFalseGame";
 import BalloonsGame from "@/components/games/BalloonsGame";
 import SpeedGame from "@/components/games/SpeedGame";
 import PyramidGame from "@/components/games/PyramidGame";
+import LabelingGame from "@/components/games/LabelingGame";
 import type { StudentActivity } from "@/lib/data/types";
 
 /**
@@ -123,7 +124,11 @@ export default function ActivityPlayer({
   }
 
   // `key` يعيد بناء اللعبة في كل جولة، فتُخلَط من جديد ولا تحمل حالة سابقة
-  const props = { items: activity.items, onFinish: finish };
+  const props = {
+    items: activity.items,
+    imageUrl: activity.imageUrl,
+    onFinish: finish,
+  };
   return (
     <div className="activity-stage">
       {activity.kind === "match" && <MatchGame key={round} {...props} />}
@@ -137,6 +142,7 @@ export default function ActivityPlayer({
       {activity.kind === "balloons" && <BalloonsGame key={round} {...props} />}
       {activity.kind === "speed" && <SpeedGame key={round} {...props} />}
       {activity.kind === "pyramid" && <PyramidGame key={round} {...props} />}
+      {activity.kind === "labeling" && <LabelingGame key={round} {...props} />}
 
       <div className="card-actions">
         <button

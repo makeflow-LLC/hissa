@@ -19,13 +19,21 @@ export type ActivityKind =
   | "truefalse"
   | "balloons"
   | "speed"
-  | "pyramid";
+  | "pyramid"
+  | "labeling";
 
 export interface ActivityItem {
   a: string;
   b: string;
   /** صورة اختيارية للعنصر — رابط داخل مساحة تخزين المشروع وحدها */
   img?: string;
+  /**
+   * موضع الاسم على صورة النشاط في «سمِّ الأجزاء» — **نسبة مئوية** من
+   * العرض والارتفاع لا بكسلات، فالصورة تُعرض بمقاسات مختلفة على الجوال
+   * وسطح المكتب والموضع بالبكسل يقع في غير مكانه.
+   */
+  x?: number;
+  y?: number;
 }
 
 /**
@@ -99,6 +107,20 @@ export const KINDS: KindSpec[] = [
     exampleA: "أكبر كواكب المجموعة الشمسية",
     exampleB: "المشتري",
     usesImages: true,
+  },
+  {
+    value: "labeling",
+    label: "سمِّ الأجزاء",
+    icon: "🏷️",
+    about:
+      "ترفع صورةً واحدة — خريطة أو رسماً أو جهازاً — وتضع عليها نقاطاً بالضغط، ولكل نقطة اسمها. والطالب يسحب كل اسم إلى موضعه الصحيح.",
+    labelA: "اسم الجزء",
+    labelB: "ملاحظة (اختيارية)",
+    needsB: false,
+    min: 3,
+    scored: true,
+    exampleA: "القلب",
+    exampleB: "",
   },
   {
     value: "flashcards",
@@ -256,6 +278,13 @@ export const BUILTIN_ACTIVITY_TEMPLATES: ActivityTemplate[] = KINDS.map((k) => (
   builtin: true,
 }));
 
+/** نسبة مئوية صالحة داخل الصورة، أو null */
+function pct(v: unknown): number | null {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0 || n > 100) return null;
+  return Math.round(n * 10) / 10;
+}
+
 /** تنظيف قائمة العناصر: قصّ، وحذف الفارغ، وحدّ أعلى */
 export function cleanItems(raw: unknown, kind: ActivityKind): ActivityItem[] {
   const spec = kindSpec(kind);
@@ -265,10 +294,13 @@ export function cleanItems(raw: unknown, kind: ActivityKind): ActivityItem[] {
     .map((x) => {
       const o = (x ?? {}) as Record<string, unknown>;
       const img = safeImageUrl(o.img);
+      const px = pct(o.x);
+      const py = pct(o.y);
       return {
         a: String(o.a ?? "").trim().slice(0, 200),
         b: String(o.b ?? "").trim().slice(0, 200),
         ...(img ? { img } : {}),
+        ...(px !== null && py !== null ? { x: px, y: py } : {}),
       };
     })
     .filter((it) => (spec.needsB ? it.a && it.b : it.a));
@@ -299,6 +331,13 @@ export function activityProblem(
    * وكلاهما يحتاج إجابةً قصيرة يمكن كتابتها. فننبّه إن كانت كل الإجابات
    * جُملاً طويلة، لأن اللعبة عندها تنحصر في الاختيار وتفقد تنوّعها.
    */
+  if (kind === "labeling") {
+    const placed = clean.filter((i) => i.x !== undefined && i.y !== undefined).length;
+    if (placed < clean.length)
+      return `ضع كل اسم على الصورة — بقي ${clean.length - placed} بلا موضع.`;
+    if (clean.length > 12)
+      return "«سمِّ الأجزاء» تقبل ١٢ اسماً كحدّ أقصى لئلّا تزدحم الصورة.";
+  }
   if (kind === "pyramid") {
     const short = clean.filter((i) => i.b.replace(/\s/g, "").length <= 20).length;
     if (short < 2)
