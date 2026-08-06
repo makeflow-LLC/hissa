@@ -11,13 +11,12 @@
  * وحدها حارساً على الرصيد.
  */
 
-export type AiTool = "quiz" | "summary" | "format" | "design" | "poster" | "tts";
+export type AiTool = "quiz" | "summary" | "format" | "design" | "poster";
 
 export const CREDIT_COST: Record<AiTool, number> = {
   summary: 1,
   format: 1,
   quiz: 1,
-  tts: 1,
   design: 2,
   poster: 2,
 };
@@ -31,7 +30,6 @@ export const TOOL_LABEL: Record<AiTool, string> = {
   quiz: "توليد الأسئلة",
   design: "تصميم درس كامل",
   poster: "بطاقة أو ملصق أو مخطّط",
-  tts: "تحويل الدرس إلى صوت",
 };
 
 /** «٢ كريدت» بصيغة عربية سليمة */

@@ -4,7 +4,6 @@ import PageHeader from "@/components/PageHeader";
 import Hint from "@/components/Hint";
 import ConnectionNotice from "@/components/ConnectionNotice";
 import PosterStudio from "@/components/PosterStudio";
-import LessonAudio from "@/components/LessonAudio";
 import {
   getCurrentUser,
   getMyCredits,
@@ -62,7 +61,7 @@ export default async function LessonVisualsPage({
         backLabel={lesson.title}
         emoji="🎨"
         title="وسائل الدرس"
-        subtitle="صوتٌ يسمعه الطالب، وبطاقاتٌ وملصقاتٌ ومخطّطاتٌ تُطبع وتُعلَّق."
+        subtitle="بطاقاتٌ وملصقاتٌ ومخطّطاتٌ من درسك — تُطبع وتُعلَّق."
       />
 
       <Hint>
@@ -74,19 +73,6 @@ export default async function LessonVisualsPage({
 
       {isAiConfigured() ? (
         <>
-          <section className="dashboard-section">
-            <h2 className="section-title">🔊 صوت الدرس</h2>
-            <p className="form-hint">
-              يُقرأ الشرح بصوتٍ عربيّ واضح، ويظهر مشغّلٌ للطالب في صفحة
-              الدرس — لمن يقرأ ببطء، ولمن يراجع في الطريق.
-            </p>
-            <LessonAudio
-              lessonId={lessonId}
-              audioUrl={lesson.audio_url ?? null}
-              credits={credits}
-            />
-          </section>
-
           <section className="dashboard-section">
             <h2 className="section-title">🖼️ بطاقات وملصقات ومخطّطات</h2>
             <PosterStudio
