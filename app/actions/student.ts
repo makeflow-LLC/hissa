@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { scheduleReview, unscheduleReview } from "@/app/actions/reviews";
 import { createClient } from "@/lib/supabase/server";
 import { stripTags } from "@/lib/sanitize";
 
@@ -195,6 +196,15 @@ export async function toggleLessonComplete(
       );
 
   if (error) return { ok: false, message: "تعذّر حفظ التقدّم." };
+
+  /**
+   * الدرس المنجَز يدخل قائمة المراجعة المتباعدة، والملغى يخرج منها.
+   *
+   * هنا لا في الواجهة: «أنهيت الدرس» و«جدوِله للمراجعة» فعلٌ واحد في ذهن
+   * الطالب، وفصلهما يعني زرّاً ثانياً لا يضغطه أحد.
+   */
+  if (completed) await unscheduleReview(lessonId);
+  else await scheduleReview(lessonId);
 
   revalidatePath(`/teacher/${teacherSlug}`);
   revalidatePath(`/teacher/${teacherSlug}/lesson/${lessonId}`);

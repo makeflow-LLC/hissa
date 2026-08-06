@@ -65,6 +65,15 @@ export default async function TeacherMePage() {
           </Link>
         </div>
         <div className="dashboard-header-secondary">
+          <Link href="/teacher/me/questions" className="btn btn-outline btn-sm">
+            ❓ أسئلة الطلاب
+          </Link>
+          <Link href="/teacher/me/assignments" className="btn btn-outline btn-sm">
+            📋 الواجبات
+          </Link>
+          <Link href="/teacher/me/insights" className="btn btn-outline btn-sm">
+            🔍 أين يتعثّر صفّي
+          </Link>
           <Link href="/teacher/me/lessons/design" className="btn btn-outline btn-sm">
             ✨ صمّم درساً
           </Link>

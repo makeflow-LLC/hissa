@@ -6875,3 +6875,215 @@ details[open] > summary.help-q::after {
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+
+/* ===== بنك الأسئلة ===== */
+
+.lesson-qa {
+  margin-block: 24px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.qa-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-block: 10px;
+}
+.qa-list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.qa-item {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg);
+}
+/* السؤال المعلّق يُميَّز بحافّة لا بلون كامل — التمييز لا الصياح */
+.qa-pending {
+  border-inline-start: 4px solid var(--accent);
+}
+.qa-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-block-end: 6px;
+  font-size: 0.85rem;
+}
+.qa-body {
+  margin: 0 0 8px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.qa-answer {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface);
+  border-inline-start: 3px solid var(--success);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.qa-foot {
+  margin-block-start: 8px;
+}
+.qa-waiting {
+  margin-block-end: 12px;
+}
+
+/* ===== المراجعة ===== */
+
+.review-banner {
+  border-color: var(--primary);
+}
+.review-session,
+.review-done,
+.review-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.review-questions {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  counter-reset: rq;
+}
+.review-questions > li {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+/* ===== الواجبات ===== */
+
+.assignment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.assignment-card {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.assignment-body {
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+  margin-block: 8px;
+}
+.assignment-graded {
+  margin-block-start: 8px;
+}
+.submission-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.submission-item {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.submission-body {
+  margin: 0 0 10px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+/* صفّ التصحيح: العلامة ضيّقة والملاحظة تتمدّد */
+.grade-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.grade-form > input[type="text"] {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.grade-input {
+  width: 90px;
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+/* ===== لوحة التشخيص ===== */
+
+.insight-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.insight-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.insight-main {
+  flex: 1 1 200px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.insight-title {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+/* شريطٌ صغير يُري النسبة قبل قراءة الرقم */
+.insight-bar {
+  flex: 0 0 84px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.insight-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+}
+
+/* ===== الشارات ===== */
+
+.badge-row {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.badge-chip {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.85rem;
+  font-weight: 700;
+}

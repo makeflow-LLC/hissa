@@ -1,11 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getCurrentUser, getLessonPage, isCurrentUserTeacher } from "@/lib/data/queries";
+import {
+  getCurrentUser,
+  getLessonPage,
+  getLessonQuestions,
+  isApprovedStudentOf,
+  isCurrentUserTeacher,
+} from "@/lib/data/queries";
 import { sanitizeLessonHtml } from "@/lib/sanitize";
 import VideoPlayer from "@/components/VideoPlayer";
 import LessonCompleteButton from "@/components/LessonCompleteButton";
 import QuizSection from "@/components/QuizSection";
+import LessonQuestions from "@/components/LessonQuestions";
 import ConnectionNotice from "@/components/ConnectionNotice";
 
 export const dynamic = "force-dynamic";
@@ -106,6 +113,20 @@ export default async function LessonPage({
     quizAttempt,
   } = page;
   const isAuthed = Boolean(user);
+
+  /**
+   * الأسئلة تُقرأ فقط لمن يستطيع رؤيتها — و`canAsk` يحدّده انتماء الطالب
+   * إلى صفّ هذا المعلّم. وهو **إخفاءٌ للواجهة لا حماية**: سياسة الإدراج
+   * في القاعدة تشترط قبولاً معتمَداً على أي حال.
+   */
+  const canRead = isAuthed && !isTeacherAccount && !locked;
+  const [questions, canAsk] = canRead
+    ? await Promise.all([
+        getLessonQuestions(lesson.id),
+        isApprovedStudentOf(teacher.id),
+      ])
+    : [[], false];
+
   const loginHref = `/login?next=${encodeURIComponent(
     `/teacher/${slug}/lesson/${lessonId}`
   )}`;
@@ -291,6 +312,19 @@ export default async function LessonPage({
                 options: q.options,
                 correctIndex: q.correct_index,
               }))}
+            />
+          )}
+
+          {/*
+            بنك الأسئلة تحت الدرس مباشرةً — حيث يقع السؤال في ذهن الطالب.
+            وضعُه في الرسائل الخاصّة هو ما جعل السؤال الواحد يُجاب عشرين
+            مرّة.
+          */}
+          {isAuthed && !isTeacherAccount && (
+            <LessonQuestions
+              lessonId={lesson.id}
+              questions={questions}
+              canAsk={canAsk}
             />
           )}
         </>
