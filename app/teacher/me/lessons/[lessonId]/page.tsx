@@ -49,12 +49,26 @@ export default async function EditLessonPage({
         emoji="✏️"
         title="تعديل الدرس"
         actions={
-          <Link
-            href={`/teacher/me/lessons/${lessonId}/visuals`}
-            className="btn btn-outline"
-          >
-            🎨 بطاقات وملصقات
-          </Link>
+          <>
+            <Link
+              href={`/teacher/me/lessons/${lessonId}/levels`}
+              className="btn btn-outline"
+            >
+              🪜 المستويات
+            </Link>
+            <Link
+              href={`/teacher/me/lessons/${lessonId}/worksheet`}
+              className="btn btn-outline"
+            >
+              🖨️ ورقة عمل
+            </Link>
+            <Link
+              href={`/teacher/me/lessons/${lessonId}/visuals`}
+              className="btn btn-outline"
+            >
+              🎨 بطاقات وملصقات
+            </Link>
+          </>
         }
       />
       <LessonForm units={units} initial={initial} aiEnabled={isAiConfigured()} />

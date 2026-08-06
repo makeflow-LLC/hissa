@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import {
   getCurrentUser,
   getLessonPage,
+  getLessonLevels,
   getLessonQuestions,
   isApprovedStudentOf,
   isCurrentUserTeacher,
@@ -13,6 +14,7 @@ import VideoPlayer from "@/components/VideoPlayer";
 import LessonCompleteButton from "@/components/LessonCompleteButton";
 import QuizSection from "@/components/QuizSection";
 import LessonQuestions from "@/components/LessonQuestions";
+import LessonLevels from "@/components/LessonLevels";
 import ConnectionNotice from "@/components/ConnectionNotice";
 
 export const dynamic = "force-dynamic";
@@ -127,6 +129,9 @@ export default async function LessonPage({
       ])
     : [[], false];
 
+  // نسخ المستويات — السياسة ترث بوّابة الدرس، فتعود فارغةً للزائر
+  const levels = !locked && isAuthed ? await getLessonLevels(lesson.id) : [];
+
   const loginHref = `/login?next=${encodeURIComponent(
     `/teacher/${slug}/lesson/${lessonId}`
   )}`;
@@ -218,31 +223,24 @@ export default async function LessonPage({
           )}
 
           {content && content.sections.length > 0 && (
-            <article className="lesson-content">
-              {content.sections.map((section, si) => (
-                <section key={si}>
-                  {section.heading && (
-                    <h2 className="content-heading">{section.heading}</h2>
-                  )}
-                  {section.html ? (
-                    // محتوى المعلّم مُعقَّم هنا أيضاً وليس عند الحفظ فقط:
-                    // لا نثق بما هو مخزّن مسبقاً في قاعدة البيانات.
-                    <div
-                      className="rich-content"
-                      dangerouslySetInnerHTML={{
-                        __html: sanitizeLessonHtml(section.html),
-                      }}
-                    />
-                  ) : (
-                    (section.paragraphs ?? []).map((p, i) => (
-                      <p key={i} className="content-paragraph">
-                        {p}
-                      </p>
-                    ))
-                  )}
-                </section>
-              ))}
-            </article>
+            /*
+              المحتوى مُعقَّم هنا أيضاً لا عند الحفظ فقط — لا نثق بما هو
+              مخزَّن مسبقاً. ويشمل ذلك نسخ المستويات: هي مخرجات نموذج،
+              أي مُدخَلٌ غير موثوق كأيّ نصٍّ آخر.
+            */
+            <LessonLevels
+              standard={content.sections.map((x) => ({
+                ...x,
+                html: x.html ? sanitizeLessonHtml(x.html) : x.html,
+              }))}
+              levels={levels.map((l) => ({
+                level: l.level,
+                sections: l.sections.map((x) => ({
+                  ...x,
+                  html: x.html ? sanitizeLessonHtml(x.html) : x.html,
+                })),
+              }))}
+            />
           )}
 
           {content && content.gallery.length > 0 && (
