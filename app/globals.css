@@ -7087,3 +7087,179 @@ details[open] > summary.help-q::after {
   font-size: 0.85rem;
   font-weight: 700;
 }
+
+/* ===== مستويات القراءة ===== */
+
+.level-switch {
+  margin-block: 14px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.level-switch-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-block-end: 8px;
+}
+.level-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.level-chip {
+  font: inherit;
+  font-weight: 700;
+  padding: 8px 16px;
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.level-chip:hover { border-color: var(--primary); }
+.level-chip-on {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary-dark);
+}
+.level-about {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.level-studio {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.level-preview {
+  margin-block-start: 10px;
+  padding: 12px;
+  border-inline-start: 3px solid var(--primary);
+  background: var(--bg);
+  border-radius: 10px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+/* ===== ورقة العمل ===== */
+
+.worksheet-controls {
+  padding: 14px;
+  border: 1px solid var(--primary);
+  border-radius: 16px;
+  background: var(--surface);
+  margin-block-end: 18px;
+}
+.worksheet-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-block: 10px;
+}
+.worksheet {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px;
+  background: #fff;
+  color: #111;
+}
+.ws-head { border-bottom: 2px solid #111; padding-bottom: 10px; }
+.ws-title { font-size: 1.5rem; margin: 0 0 4px; }
+.ws-sub { margin: 0 0 10px; color: #444; font-size: 0.9rem; }
+.ws-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 0.9rem;
+}
+.ws-desc { font-style: italic; color: #333; }
+.ws-h2 {
+  font-size: 1.15rem;
+  border-bottom: 1px solid #999;
+  padding-bottom: 4px;
+  margin-block: 18px 10px;
+}
+.ws-heading { font-size: 1.05rem; margin-block: 14px 6px; }
+.ws-questions { padding-inline-start: 22px; }
+.ws-questions > li { margin-block-end: 14px; }
+.ws-q { margin: 0 0 6px; font-weight: 700; }
+.ws-options {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px 14px;
+}
+.ws-options > li { display: flex; gap: 6px; }
+.ws-letter { font-weight: 700; }
+/* سطور الكتابة تظهر فقط حين يطلبها المعلّم */
+.ws-lines { display: none; }
+.ws-lines::after {
+  content: "";
+  display: block;
+  height: 54px;
+  background-image: repeating-linear-gradient(
+    to bottom, transparent, transparent 26px, #bbb 26px, #bbb 27px
+  );
+  margin-block-start: 6px;
+}
+:root.ws-with-lines .ws-lines { display: block; }
+.ws-key-list { padding-inline-start: 22px; }
+.ws-foot { margin-block-start: 20px; font-size: 0.85rem; color: #555; }
+.ws-note { margin-block-start: 12px; }
+
+/*
+ * تبديل المستوى بـCSS لا بإعادة رسم: المستويات الثلاثة كلّها في
+ * الصفحة، ويُظهر المحدَّد منها — فما يراه المعلّم هو ما يُطبع بالضبط.
+ */
+.ws-level { display: none; }
+:root:not([data-ws-level]) .ws-level[data-level="standard"],
+:root[data-ws-level="standard"] .ws-level[data-level="standard"],
+:root[data-ws-level="simple"]   .ws-level[data-level="simple"],
+:root[data-ws-level="advanced"] .ws-level[data-level="advanced"] {
+  display: block;
+}
+:root.ws-no-quiz .ws-quiz { display: none; }
+:root.ws-no-key  .ws-key  { display: none; }
+
+@media print {
+  /*
+   * لا شيء من هيكل الموقع على الورق.
+   * الأصناف من `app/layout.tsx` نفسه (`footer` لا `site-footer`) —
+   * تخمينُ الاسم يمرّ في البناء ويظهر شعار المنصّة أسفل ورقة الامتحان.
+   */
+  .no-print,
+  .navbar,
+  .footer,
+  .bottom-nav,
+  .install-app,
+  .live-notifier,
+  .toast { display: none !important; }
+
+  body { background: #fff; padding: 0; margin: 0; }
+  .container,
+  .container-narrow { max-width: none; padding: 0; margin: 0; }
+  .worksheet {
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    font-size: 12pt;
+    line-height: 1.7;
+  }
+  /* عنوانٌ في آخر الصفحة ونصّه في التالية أسوأ من فراغٍ في الأسفل */
+  .ws-heading,
+  .ws-h2 { break-after: avoid; }
+  .ws-questions > li { break-inside: avoid; }
+  /* المفتاح في ورقةٍ منفصلة دائماً — لا يُوزَّع مع الأسئلة */
+  .ws-key { break-before: page; }
+  .rich-content img { max-width: 100%; }
+  a { text-decoration: none; color: inherit; }
+  @page { margin: 1.6cm; }
+}

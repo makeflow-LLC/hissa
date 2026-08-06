@@ -11,12 +11,13 @@
  * وحدها حارساً على الرصيد.
  */
 
-export type AiTool = "quiz" | "summary" | "format" | "design" | "poster";
+export type AiTool = "quiz" | "summary" | "format" | "design" | "poster" | "level";
 
 export const CREDIT_COST: Record<AiTool, number> = {
   summary: 1,
   format: 1,
   quiz: 1,
+  level: 1,
   design: 2,
   poster: 2,
 };
@@ -28,6 +29,7 @@ export const TOOL_LABEL: Record<AiTool, string> = {
   summary: "تلخيص الدرس",
   format: "تحسين التنسيق",
   quiz: "توليد الأسئلة",
+  level: "تبسيط الدرس أو توسيعه",
   design: "تصميم درس كامل",
   poster: "بطاقة أو ملصق أو مخطّط",
 };

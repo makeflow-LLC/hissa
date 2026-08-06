@@ -46,7 +46,7 @@ SUPABASE_SERVICE_ROLE_KEY=<secret key>   # npm run seed only — never NEXT_PUBL
 
 ### Tables
 
-In use: `teachers`, `units`, `lessons`, `lesson_attachments`, `quiz_questions`, `profiles`, `follows`, `lesson_progress`, `teacher_messages`, `student_grants`, `reviews`, `parent_reports`, `student_groups`, `student_group_members`, `report_cards`, `report_card_requests`, `exams` (+ `exam_questions` / `exam_attempts` / `exam_answers` / `exam_templates`), `activities` (+ `activity_plays` / `activity_templates`), `admins`, `lesson_posters`, `lesson_questions` (+ `question_votes`), `lesson_reviews`, `assignments` (+ `assignment_submissions`).
+In use: `teachers`, `units`, `lessons`, `lesson_attachments`, `quiz_questions`, `profiles`, `follows`, `lesson_progress`, `teacher_messages`, `student_grants`, `reviews`, `parent_reports`, `student_groups`, `student_group_members`, `report_cards`, `report_card_requests`, `exams` (+ `exam_questions` / `exam_attempts` / `exam_answers` / `exam_templates`), `activities` (+ `activity_plays` / `activity_templates`), `admins`, `lesson_posters`, `lesson_questions` (+ `question_votes`), `lesson_reviews`, `assignments` (+ `assignment_submissions`), `lesson_levels`.
 
 - `lessons.is_free_preview` — the one visitor-visible lesson per teacher.
 - `lessons.is_restricted` — hidden entirely unless the student holds a `student_grants` row.
@@ -88,6 +88,7 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0027_lesson_audio.sql` | `lessons.audio_url` (superseded — dropped by `0028`) |
 | `0028_remove_lesson_audio.sql` | drops `lessons.audio_url` and narrows the credit kinds back to five |
 | `0029_qa_reviews_assignments.sql` | `lesson_questions` / `question_votes`, `lesson_reviews`, `assignments` / `assignment_submissions`, plus derived `student_points` / `teacher_hard_questions` / `teacher_quiet_students` / `teacher_lesson_reach` |
+| `0030_lesson_levels.sql` | `lesson_levels` — the same lesson rewritten simpler or deeper; `level` added to the credit kinds |
 
 ### Removed: live sessions
 
@@ -452,7 +453,7 @@ Every AI tool costs **credits** from `teachers.credits` (starts at 40). This rep
 
 | Tool | Cost |
 |---|---|
-| تلخيص · تحسين التنسيق · توليد الأسئلة | 1 |
+| تلخيص · تحسين التنسيق · توليد الأسئلة · تبسيط/توسيع الدرس | 1 |
 | تصميم درس كامل · بطاقة/ملصق/مخطّط | 2 |
 
 `lib/ai/credits.ts` holds the price table **for display**; the actual guard is in the database.
@@ -536,3 +537,25 @@ All three are `security definer` because the aggregation crosses `exam_answers`,
 **There is no points table.** Any table a student can write is a cheating surface needing a guard, and any function that writes points for them has to verify the act it rewards — i.e. read the same tables anyway. So `student_points()` reads them directly: untamperable by construction, never out of sync, nothing to backfill.
 
 Weights favour **mastery and consistency over clicks** — a completed review (15) and an on-time submission (25) outrank opening a lesson (10) — because points that reward motion alone teach students to open lessons for the counter rather than to learn. Streaks come from distinct active days across every activity table.
+
+## Reading levels and the printable worksheet (`0030`)
+
+Both are Diffit's ideas, deliberately implemented the opposite way round: Diffit hands the teacher a **file** and the loop ends there — nothing comes back. Here the alternate version lives **inside the lesson**, so progress, quiz and questions all stay on one lesson.
+
+### `lesson_levels` — the same lesson, simpler or deeper
+
+Two generated versions per lesson, `simple` and `advanced`. **`standard` is never stored**: it *is* `lessons.sections`. Storing it twice means two copies that diverge on the first edit.
+
+**The gate is inherited, not rewritten.** The read policy is `exists (select 1 from lessons l where l.id = lesson_id)` — a subquery that passes through the `lessons` policies, so exactly whoever can read the lesson can read its levels: no drafts, no restricted lessons without a grant. Writing a second condition here would mean two rules that drift apart. `anon` is revoked outright, so the levels are absent even on a free-preview lesson; `get_free_preview_content` gives the visitor the standard version and that is enough.
+
+**The generation prompt forbids removing or adding content.** A "simplified" version that drops an idea makes the weaker student study a different lesson from their classmates and then fail the same exam. Simplification is in the language and the examples, never the substance — and the output is truncated to the source's section count for the same reason. Verified on a real generation: 3/3 sections both ways, headings identical, scientific terms kept with parenthetical explanations. ~$0.07 and ~35s per level.
+
+**The student picks their own level**, and it is remembered in `localStorage`. I considered deriving it from `profiles.grade` and rejected that: grade is free text («الصف السابع», «سابع», «7»), and a wrong guess hides the real lesson from a strong student who has no way to know why.
+
+### The worksheet (`/teacher/me/lessons/<id>/worksheet`)
+
+**No AI, no credits** — it is built from content that already exists. Printing is not a nicety in our schools; many classes have no devices at all, and this was the one thing the platform could not do.
+
+- **All three levels are printed into the page and CSS shows one.** Switching costs no round trip, and what the teacher sees is exactly what prints.
+- **The answer key always gets `break-before: page`.** A sheet carrying its key on the back is not one you can hand out.
+- `@media print` hides the site chrome by the classes that actually exist in `app/layout.tsx` — `.footer`, not `.site-footer`. A guessed class name compiles fine and puts the platform logo at the bottom of an exam paper; a browser screenshot in print media caught exactly that.

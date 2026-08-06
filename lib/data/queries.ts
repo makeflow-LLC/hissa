@@ -7,6 +7,7 @@ import type {
   ActivityTemplate,
 } from "@/lib/activityKinds";
 import type {
+  ContentSection,
   FollowStatus,
   JoinRequest,
   MyTeacher,
@@ -3170,4 +3171,87 @@ export async function isApprovedStudentOf(teacherId: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/* ==================== مستويات القراءة ==================== */
+
+export interface LevelSections {
+  level: "simple" | "advanced";
+  sections: ContentSection[];
+}
+
+/**
+ * نسخ الدرس بمستوياتها.
+ *
+ * السياسة ترث بوّابة `lessons`: لا يقرأها إلا من يقرأ الدرس الأصلي،
+ * والزائر ممنوعٌ من الجدول كلّه. فلا حاجة إلى فحصٍ ثانٍ هنا.
+ */
+export async function getLessonLevels(lessonId: string): Promise<LevelSections[]> {
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("lesson_levels")
+      .select("level, sections")
+      .eq("lesson_id", lessonId);
+    return ((data ?? []) as Record<string, unknown>[])
+      .map((r) => ({
+        level: String(r.level) as "simple" | "advanced",
+        sections: (Array.isArray(r.sections) ? r.sections : []) as ContentSection[],
+      }))
+      .filter((r) => r.sections.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+/** ورقة العمل: الدرس وأسئلته ومعلّمه — للمعلّم صاحبه وحده */
+export async function getWorksheetData(lessonId: string): Promise<{
+  lesson: { id: string; title: string; description: string; duration: string };
+  teacherName: string;
+  sections: ContentSection[];
+  levels: LevelSections[];
+  quiz: QuizQuestionRow[];
+} | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id, name")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return null;
+
+  const { data: lesson } = await supabase
+    .from("lessons")
+    .select("id, title, description, duration, sections")
+    .eq("id", lessonId)
+    .eq("teacher_id", teacher.id)
+    .maybeSingle();
+  if (!lesson) return null;
+
+  const [levels, quizRes] = await Promise.all([
+    getLessonLevels(lessonId),
+    supabase
+      .from("quiz_questions")
+      .select("id, prompt, options, correct_index")
+      .eq("lesson_id", lessonId)
+      .order("position"),
+  ]);
+
+  return {
+    lesson: {
+      id: String(lesson.id),
+      title: String(lesson.title ?? ""),
+      description: String(lesson.description ?? ""),
+      duration: String(lesson.duration ?? ""),
+    },
+    teacherName: String(teacher.name ?? ""),
+    sections: (Array.isArray(lesson.sections) ? lesson.sections : []) as ContentSection[],
+    levels,
+    quiz: (quizRes.data ?? []) as QuizQuestionRow[],
+  };
 }
