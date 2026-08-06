@@ -46,7 +46,7 @@ SUPABASE_SERVICE_ROLE_KEY=<secret key>   # npm run seed only — never NEXT_PUBL
 
 ### Tables
 
-In use: `teachers`, `units`, `lessons`, `lesson_attachments`, `quiz_questions`, `profiles`, `follows`, `lesson_progress`, `teacher_messages`, `student_grants`, `reviews`, `parent_reports`, `student_groups`, `student_group_members`, `report_cards`, `report_card_requests`, `exams` (+ `exam_questions` / `exam_attempts` / `exam_answers` / `exam_templates`), `activities` (+ `activity_plays` / `activity_templates`), `admins`, `lesson_posters`.
+In use: `teachers`, `units`, `lessons`, `lesson_attachments`, `quiz_questions`, `profiles`, `follows`, `lesson_progress`, `teacher_messages`, `student_grants`, `reviews`, `parent_reports`, `student_groups`, `student_group_members`, `report_cards`, `report_card_requests`, `exams` (+ `exam_questions` / `exam_attempts` / `exam_answers` / `exam_templates`), `activities` (+ `activity_plays` / `activity_templates`), `admins`, `lesson_posters`, `lesson_questions` (+ `question_votes`), `lesson_reviews`, `assignments` (+ `assignment_submissions`).
 
 - `lessons.is_free_preview` — the one visitor-visible lesson per teacher.
 - `lessons.is_restricted` — hidden entirely unless the student holds a `student_grants` row.
@@ -87,6 +87,7 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0026_credits_and_admin.sql` | `teachers.credits` (+ column-privilege lockout), `admins`, `spend_credits` / `refund_credits` / `admin_set_credits` / `admin_teacher_list`, `lesson_posters` |
 | `0027_lesson_audio.sql` | `lessons.audio_url` (superseded — dropped by `0028`) |
 | `0028_remove_lesson_audio.sql` | drops `lessons.audio_url` and narrows the credit kinds back to five |
+| `0029_qa_reviews_assignments.sql` | `lesson_questions` / `question_votes`, `lesson_reviews`, `assignments` / `assignment_submissions`, plus derived `student_points` / `teacher_hard_questions` / `teacher_quiet_students` / `teacher_lesson_reach` |
 
 ### Removed: live sessions
 
@@ -496,3 +497,42 @@ An AI-designed lesson arrives with ten sections, and each one used to render a f
 Text-to-speech was built and then **removed at the owner's request** — there is no audio anywhere in the product. `0028` drops `lessons.audio_url` and narrows the credit kinds back to five; the `speak()` client, `LessonAudio` and `app/actions/lesson-audio.ts` are gone.
 
 Four findings are worth keeping if it ever returns, because each cost a round of trial: OpenRouter has **no Google TTS model** (its `lyria` models generate music, not speech) — `openai/gpt-audio-mini` is the working one; audio output is **refused without `stream: true`**; the stream returns **raw `pcm16` only** (asking for mp3 yields an empty body), so a 44-byte WAV header has to be prepended before a browser will play it; and at ~2.7 MB per minute the 20 MB bucket limit caps the readable text at roughly 6000 characters — which must be enforced *before* generating, or a credit is spent on a file that cannot be stored.
+
+## Five features added together (`0029`)
+
+### The question bank (`lesson_questions`)
+
+A student asks under the lesson; the teacher answers once and **the answer is published to everyone who opens that lesson afterwards**. Before this the same question was asked in twenty private threads and answered twenty times — the only feature here whose cost to the teacher *falls* as the class grows.
+
+- **An unanswered question is visible only to its author.** `questions_student_read` requires `answered_at is not null` for anyone else. Otherwise the lesson page becomes a wall of unanswered questions, and every classmate sees what a classmate did not understand before any answer exists to make it useful.
+- **«عندي نفس السؤال»** (`question_votes`) raises a question in the teacher's queue instead of duplicating it, so urgency is measured by how many are waiting rather than by arrival order. The inbox sorts unanswered first, then by votes.
+- The student may delete their own question **only while unanswered** — once answered it belongs to the class.
+- `lesson_owner()` is `security definer` because a policy that reads `lessons` goes through the `lessons` policies, so a draft or restricted lesson returns nothing and the policy built on it collapses.
+
+### Spaced review (`lesson_reviews`)
+
+`lesson_progress` recorded "done" and the lesson was then forgotten forever. Now finishing a lesson schedules it: **3 → 7 → 21 → 60 days**, and a failed review drops a stage and returns tomorrow rather than receding. Scheduling hangs off `toggleLessonComplete` — "I finished it" and "queue it for review" are one act in the student's mind, and splitting them means a second button nobody presses.
+
+**Three questions per session, not the whole lesson.** The point is retrieval, not rereading; a minute-long session gets repeated daily, a quarter-hour one gets postponed forever. Grading is server-side like every other quiz: the client posts choices, the server reads `correct_index`.
+
+The row is student-owned and student-writable. Someone who tampers with their own schedule cheats nobody but themselves, and nothing here reaches a grade or a teacher.
+
+### Assignments (`assignments` + `assignment_submissions`)
+
+A due date, a submission, and a board showing who submitted, who was late, and who has not. `group_id` is **nullable** = every approved student, like activities rather than exams: an assignment is practice that widens, an exam is measurement that targets.
+
+**The grade column is unwritable by students.** `submissions_student_edit` lets a student edit their own row while ungraded, and RLS filters rows, not columns — so without a second guard a student could `PATCH` themselves a grade. UPDATE is revoked at table level and re-granted `(body, file_url, submitted_at)` only; teachers write marks through `grade_submission()`, a `security definer` function that checks ownership. **Supabase grants ALL on every new table by default, so the `revoke` is mandatory** — omitting it silently leaves the column writable, which role-switching SQL caught here before release.
+
+A submission stops being editable once graded, otherwise the student could change what the mark was given for.
+
+### The insights board (`/teacher/me/insights`)
+
+Three readings, **all derived — no new tables and no writes**: the exam questions most students got wrong, the lessons where class progress stalls, and students with no activity for two weeks. The data was already there and saying nothing.
+
+All three are `security definer` because the aggregation crosses `exam_answers`, `lesson_progress` and `profiles`, whose policies rightly refuse to hand one user rows belonging to many. Each function scopes itself to `auth.uid()`'s own teacher row.
+
+### Points and badges — derived, never stored
+
+**There is no points table.** Any table a student can write is a cheating surface needing a guard, and any function that writes points for them has to verify the act it rewards — i.e. read the same tables anyway. So `student_points()` reads them directly: untamperable by construction, never out of sync, nothing to backfill.
+
+Weights favour **mastery and consistency over clicks** — a completed review (15) and an on-time submission (25) outrank opening a lesson (10) — because points that reward motion alone teach students to open lessons for the counter rather than to learn. Streaks come from distinct active days across every activity table.

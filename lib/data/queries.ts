@@ -2658,3 +2658,516 @@ export async function getLessonPosters(lessonId: string): Promise<PosterRow[]> {
     createdAt: String(r.created_at ?? ""),
   }));
 }
+
+/* ==================== بنك الأسئلة ==================== */
+
+export interface LessonQuestionRow {
+  id: string;
+  body: string;
+  answer: string;
+  answeredAt: string | null;
+  createdAt: string;
+  hidden: boolean;
+  mine: boolean;
+  votes: number;
+  votedByMe: boolean;
+  studentName: string;
+  lessonId: string;
+  lessonTitle: string;
+}
+
+/** أسئلة درسٍ واحد كما يراها الطالب — RLS يرشّح المُجاب من غيره */
+export async function getLessonQuestions(
+  lessonId: string
+): Promise<LessonQuestionRow[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from("lesson_questions")
+    .select("id, body, answer, answered_at, created_at, hidden, student_id, lesson_id")
+    .eq("lesson_id", lessonId)
+    .order("created_at", { ascending: false });
+
+  const rows = (data ?? []) as Record<string, unknown>[];
+  if (rows.length === 0) return [];
+
+  const ids = rows.map((r) => String(r.id));
+  const { data: votes } = await supabase
+    .from("question_votes")
+    .select("question_id, student_id")
+    .in("question_id", ids);
+  const all = (votes ?? []) as { question_id: string; student_id: string }[];
+
+  return rows.map((r) => {
+    const id = String(r.id);
+    const mine = all.filter((v) => v.question_id === id);
+    return {
+      id,
+      body: String(r.body ?? ""),
+      answer: String(r.answer ?? ""),
+      answeredAt: (r.answered_at as string | null) ?? null,
+      createdAt: String(r.created_at ?? ""),
+      hidden: Boolean(r.hidden),
+      mine: r.student_id === user.id,
+      votes: mine.length,
+      votedByMe: mine.some((v) => v.student_id === user.id),
+      studentName: "",
+      lessonId: String(r.lesson_id ?? ""),
+      lessonTitle: "",
+    };
+  });
+}
+
+/**
+ * صندوق أسئلة المعلّم — **غير المُجاب أولاً، والأكثر تصويتاً قبله**.
+ *
+ * الترتيب هو الميزة: سؤالٌ يشترك فيه خمسة طلاب يستحقّ جواباً قبل سؤالٍ
+ * انفرد به واحد، وإجابته تنفع الخمسة دفعةً واحدة.
+ */
+export async function getQuestionInbox(): Promise<LessonQuestionRow[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return [];
+
+  const { data } = await supabase
+    .from("lesson_questions")
+    .select(
+      "id, body, answer, answered_at, created_at, hidden, student_id, lesson_id, lessons(title), profiles:student_id(full_name)"
+    )
+    .eq("teacher_id", teacher.id)
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  const rows = (data ?? []) as Record<string, unknown>[];
+  if (rows.length === 0) return [];
+
+  const ids = rows.map((r) => String(r.id));
+  const { data: votes } = await supabase
+    .from("question_votes")
+    .select("question_id")
+    .in("question_id", ids);
+  const counts = new Map<string, number>();
+  for (const v of (votes ?? []) as { question_id: string }[])
+    counts.set(v.question_id, (counts.get(v.question_id) ?? 0) + 1);
+
+  const one = (x: unknown) => (Array.isArray(x) ? x[0] : x) as Record<string, unknown> | null;
+
+  return rows
+    .map((r) => ({
+      id: String(r.id),
+      body: String(r.body ?? ""),
+      answer: String(r.answer ?? ""),
+      answeredAt: (r.answered_at as string | null) ?? null,
+      createdAt: String(r.created_at ?? ""),
+      hidden: Boolean(r.hidden),
+      mine: false,
+      votes: counts.get(String(r.id)) ?? 0,
+      votedByMe: false,
+      studentName: String(one(r.profiles)?.full_name ?? "طالب"),
+      lessonId: String(r.lesson_id ?? ""),
+      lessonTitle: String(one(r.lessons)?.title ?? ""),
+    }))
+    .sort((a, b) => {
+      const aw = a.answeredAt ? 1 : 0;
+      const bw = b.answeredAt ? 1 : 0;
+      if (aw !== bw) return aw - bw; // غير المُجاب أولاً
+      if (a.votes !== b.votes) return b.votes - a.votes;
+      return a.createdAt < b.createdAt ? 1 : -1;
+    });
+}
+
+/* ==================== المراجعة المتباعدة ==================== */
+
+export interface DueReview {
+  lessonId: string;
+  lessonTitle: string;
+  teacherSlug: string;
+  teacherName: string;
+  stage: number;
+  dueAt: string;
+}
+
+/** الدروس التي حان وقت مراجعتها */
+export async function getDueReviews(): Promise<DueReview[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from("lesson_reviews")
+    .select("lesson_id, stage, due_at, lessons(title, teachers(slug, name))")
+    .eq("student_id", user.id)
+    .lte("due_at", new Date().toISOString())
+    .order("due_at")
+    .limit(30);
+
+  const one = (x: unknown) => (Array.isArray(x) ? x[0] : x) as Record<string, unknown> | null;
+
+  return ((data ?? []) as Record<string, unknown>[])
+    .map((r) => {
+      const lesson = one(r.lessons);
+      const teacher = one(lesson?.teachers);
+      return {
+        lessonId: String(r.lesson_id ?? ""),
+        lessonTitle: String(lesson?.title ?? ""),
+        teacherSlug: String(teacher?.slug ?? ""),
+        teacherName: String(teacher?.name ?? ""),
+        stage: Number(r.stage ?? 0),
+        dueAt: String(r.due_at ?? ""),
+      };
+    })
+    .filter((r) => r.lessonTitle);
+}
+
+/** أسئلة درسٍ لجلسة مراجعة — من اختبار الدرس نفسه */
+export async function getReviewQuestions(lessonId: string): Promise<QuizQuestionRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("quiz_questions")
+    .select("id, prompt, options, correct_index")
+    .eq("lesson_id", lessonId)
+    .order("position");
+  return (data ?? []) as QuizQuestionRow[];
+}
+
+/* ==================== الواجبات ==================== */
+
+export interface AssignmentRow {
+  id: string;
+  title: string;
+  body: string;
+  dueAt: string | null;
+  status: string;
+  groupName: string;
+  lessonTitle: string;
+  createdAt: string;
+  submitted: number;
+  targets: number;
+  ungraded: number;
+}
+
+/** واجبات المعلّم مع عدّاد التسليم */
+export async function getTeacherAssignments(): Promise<AssignmentRow[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return [];
+
+  const [aRes, followRes] = await Promise.all([
+    supabase
+      .from("assignments")
+      .select(
+        "id, title, body, due_at, status, created_at, group_id, student_groups(name), lessons(title), assignment_submissions(id, graded_at)"
+      )
+      .eq("teacher_id", teacher.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("follows")
+      .select("student_id", { count: "exact", head: true })
+      .eq("teacher_id", teacher.id)
+      .eq("status", "approved"),
+  ]);
+
+  const approved = followRes.count ?? 0;
+  const memberCounts = new Map<string, number>();
+  const groupIds = ((aRes.data ?? []) as Record<string, unknown>[])
+    .map((r) => r.group_id)
+    .filter(Boolean) as string[];
+  if (groupIds.length > 0) {
+    const { data: members } = await supabase
+      .from("student_group_members")
+      .select("group_id")
+      .in("group_id", groupIds);
+    for (const m of (members ?? []) as { group_id: string }[])
+      memberCounts.set(m.group_id, (memberCounts.get(m.group_id) ?? 0) + 1);
+  }
+
+  const one = (x: unknown) => (Array.isArray(x) ? x[0] : x) as Record<string, unknown> | null;
+
+  return ((aRes.data ?? []) as Record<string, unknown>[]).map((r) => {
+    const subs = (r.assignment_submissions ?? []) as { id: string; graded_at: string | null }[];
+    const gid = r.group_id as string | null;
+    return {
+      id: String(r.id),
+      title: String(r.title ?? ""),
+      body: String(r.body ?? ""),
+      dueAt: (r.due_at as string | null) ?? null,
+      status: String(r.status ?? "draft"),
+      groupName: String(one(r.student_groups)?.name ?? "كل طلابي"),
+      lessonTitle: String(one(r.lessons)?.title ?? ""),
+      createdAt: String(r.created_at ?? ""),
+      submitted: subs.length,
+      targets: gid ? (memberCounts.get(gid) ?? 0) : approved,
+      ungraded: subs.filter((s) => !s.graded_at).length,
+    };
+  });
+}
+
+export interface SubmissionRow {
+  id: string;
+  studentId: string;
+  studentName: string;
+  body: string;
+  fileUrl: string | null;
+  submittedAt: string;
+  grade: number | null;
+  feedback: string;
+  gradedAt: string | null;
+  late: boolean;
+}
+
+/** لوحة واجبٍ واحد: من سلّم وماذا كتب */
+export async function getAssignmentBoard(assignmentId: string): Promise<{
+  assignment: AssignmentRow;
+  submissions: SubmissionRow[];
+} | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return null;
+
+  // الملكية شرطٌ في الاستعلام نفسه — معرّفٌ غريب لا يفتح شيئاً
+  const { data: a } = await supabase
+    .from("assignments")
+    .select("id, title, body, due_at, status, created_at, group_id, student_groups(name), lessons(title)")
+    .eq("id", assignmentId)
+    .eq("teacher_id", teacher.id)
+    .maybeSingle();
+  if (!a) return null;
+
+  const { data: subs } = await supabase
+    .from("assignment_submissions")
+    .select("id, student_id, body, file_url, submitted_at, grade, feedback, graded_at, profiles:student_id(full_name)")
+    .eq("assignment_id", assignmentId)
+    .order("submitted_at", { ascending: false });
+
+  const one = (x: unknown) => (Array.isArray(x) ? x[0] : x) as Record<string, unknown> | null;
+  const row = a as Record<string, unknown>;
+  const due = (row.due_at as string | null) ?? null;
+
+  return {
+    assignment: {
+      id: String(row.id),
+      title: String(row.title ?? ""),
+      body: String(row.body ?? ""),
+      dueAt: due,
+      status: String(row.status ?? "draft"),
+      groupName: String(one(row.student_groups)?.name ?? "كل طلابي"),
+      lessonTitle: String(one(row.lessons)?.title ?? ""),
+      createdAt: String(row.created_at ?? ""),
+      submitted: (subs ?? []).length,
+      targets: 0,
+      ungraded: 0,
+    },
+    submissions: ((subs ?? []) as Record<string, unknown>[]).map((s) => ({
+      id: String(s.id),
+      studentId: String(s.student_id ?? ""),
+      studentName: String(one(s.profiles)?.full_name ?? "طالب"),
+      body: String(s.body ?? ""),
+      fileUrl: (s.file_url as string | null) ?? null,
+      submittedAt: String(s.submitted_at ?? ""),
+      grade: s.grade === null || s.grade === undefined ? null : Number(s.grade),
+      feedback: String(s.feedback ?? ""),
+      gradedAt: (s.graded_at as string | null) ?? null,
+      late: Boolean(due && String(s.submitted_at) > due),
+    })),
+  };
+}
+
+export interface StudentAssignment {
+  id: string;
+  title: string;
+  body: string;
+  dueAt: string | null;
+  teacherName: string;
+  lessonTitle: string;
+  submittedAt: string | null;
+  grade: number | null;
+  feedback: string;
+  myBody: string;
+}
+
+/** واجبات الطالب — RLS يرشّح ما يخصّه */
+export async function getMyAssignments(): Promise<StudentAssignment[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from("assignments")
+    .select("id, title, body, due_at, teachers(name), lessons(title)")
+    .eq("status", "published")
+    .order("due_at", { ascending: true, nullsFirst: false })
+    .limit(50);
+
+  const rows = (data ?? []) as Record<string, unknown>[];
+  if (rows.length === 0) return [];
+
+  const { data: mine } = await supabase
+    .from("assignment_submissions")
+    .select("assignment_id, body, submitted_at, grade, feedback")
+    .eq("student_id", user.id)
+    .in("assignment_id", rows.map((r) => String(r.id)));
+
+  const byId = new Map(
+    ((mine ?? []) as Record<string, unknown>[]).map((s) => [String(s.assignment_id), s])
+  );
+  const one = (x: unknown) => (Array.isArray(x) ? x[0] : x) as Record<string, unknown> | null;
+
+  return rows.map((r) => {
+    const s = byId.get(String(r.id));
+    return {
+      id: String(r.id),
+      title: String(r.title ?? ""),
+      body: String(r.body ?? ""),
+      dueAt: (r.due_at as string | null) ?? null,
+      teacherName: String(one(r.teachers)?.name ?? ""),
+      lessonTitle: String(one(r.lessons)?.title ?? ""),
+      submittedAt: s ? String(s.submitted_at) : null,
+      grade: s && s.grade !== null && s.grade !== undefined ? Number(s.grade) : null,
+      feedback: s ? String(s.feedback ?? "") : "",
+      myBody: s ? String(s.body ?? "") : "",
+    };
+  });
+}
+
+/* ==================== النقاط والتشخيص ==================== */
+
+export interface StudentStats {
+  lessonsDone: number;
+  activities: number;
+  examsDone: number;
+  reviewsDone: number;
+  onTime: number;
+  points: number;
+  streakDays: number;
+  activeDays: number;
+}
+
+/** نقاط الطالب — **محسوبةٌ من جداول النشاط لا من سجلٍّ يُكتب** */
+export async function getStudentStats(): Promise<StudentStats> {
+  const empty: StudentStats = {
+    lessonsDone: 0, activities: 0, examsDone: 0, reviewsDone: 0,
+    onTime: 0, points: 0, streakDays: 0, activeDays: 0,
+  };
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("student_points");
+    if (error) return empty;
+    const r = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null;
+    if (!r) return empty;
+    return {
+      lessonsDone: Number(r.lessons_done ?? 0),
+      activities: Number(r.activities ?? 0),
+      examsDone: Number(r.exams_done ?? 0),
+      reviewsDone: Number(r.reviews_done ?? 0),
+      onTime: Number(r.on_time ?? 0),
+      points: Number(r.points ?? 0),
+      streakDays: Number(r.streak_days ?? 0),
+      activeDays: Number(r.active_days ?? 0),
+    };
+  } catch {
+    return empty;
+  }
+}
+
+export interface Insights {
+  hardQuestions: {
+    examId: string; examTitle: string; prompt: string;
+    answered: number; wrong: number; wrongPct: number;
+  }[];
+  quietStudents: {
+    studentId: string; name: string; grade: string;
+    lastSeen: string | null; quietDays: number;
+  }[];
+  lessonReach: {
+    lessonId: string; title: string; unit: string;
+    done: number; students: number; pct: number;
+  }[];
+}
+
+/** لوحة التشخيص — ثلاث قراءات مشتقّة، بلا جدولٍ جديد */
+export async function getInsights(): Promise<Insights> {
+  const supabase = await createClient();
+  const [hard, quiet, reach] = await Promise.all([
+    supabase.rpc("teacher_hard_questions", { top: 10 }),
+    supabase.rpc("teacher_quiet_students", { days: 14 }),
+    supabase.rpc("teacher_lesson_reach"),
+  ]);
+
+  return {
+    hardQuestions: ((hard.data ?? []) as Record<string, unknown>[]).map((r) => ({
+      examId: String(r.exam_id ?? ""),
+      examTitle: String(r.exam_title ?? ""),
+      prompt: String(r.prompt ?? ""),
+      answered: Number(r.answered ?? 0),
+      wrong: Number(r.wrong ?? 0),
+      wrongPct: Number(r.wrong_pct ?? 0),
+    })),
+    quietStudents: ((quiet.data ?? []) as Record<string, unknown>[]).map((r) => ({
+      studentId: String(r.student_id ?? ""),
+      name: String(r.name ?? "طالب"),
+      grade: String(r.grade ?? ""),
+      lastSeen: (r.last_seen as string | null) ?? null,
+      quietDays: Number(r.quiet_days ?? 0),
+    })),
+    lessonReach: ((reach.data ?? []) as Record<string, unknown>[]).map((r) => ({
+      lessonId: String(r.lesson_id ?? ""),
+      title: String(r.title ?? ""),
+      unit: String(r.unit ?? ""),
+      done: Number(r.done ?? 0),
+      students: Number(r.students ?? 0),
+      pct: Number(r.pct ?? 0),
+    })),
+  };
+}
+
+/**
+ * هل المستخدم الحالي طالبٌ قَبِله هذا المعلّم؟
+ *
+ * عبر `is_approved_of` — نفس الشرط الذي تفرضه سياسات القاعدة، فلا يختلف
+ * ما تُظهره الواجهة عمّا تسمح به القاعدة. **يفشل مغلقاً**.
+ */
+export async function isApprovedStudentOf(teacherId: string): Promise<boolean> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("is_approved_of", { t_id: teacherId });
+    if (error) return false;
+    return data === true;
+  } catch {
+    return false;
+  }
+}

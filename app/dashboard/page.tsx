@@ -7,6 +7,8 @@ import { kindSpec } from "@/lib/activityKinds";
 import MessageActions from "@/components/MessageActions";
 import RequestReportCard from "@/components/RequestReportCard";
 import Hint from "@/components/Hint";
+import StudentBadges from "@/components/StudentBadges";
+import AssignmentSubmit from "@/components/AssignmentSubmit";
 import {
   getCurrentUser,
   getMyMessages,
@@ -18,6 +20,9 @@ import {
   getMyStudentExams,
   getMyStudentProfile,
   getStudentDashboard,
+  getStudentStats,
+  getDueReviews,
+  getMyAssignments,
   getStudentName,
   isCurrentUserTeacher,
 } from "@/lib/data/queries";
@@ -43,6 +48,9 @@ export default async function StudentDashboard() {
     cardRequests,
     exams,
     activities,
+    stats,
+    dueReviews,
+    assignments,
   ] = await Promise.all([
       getStudentName(),
       getStudentDashboard(),
@@ -54,6 +62,9 @@ export default async function StudentDashboard() {
       getMyCardRequests(),
       getMyStudentExams(),
       getMyStudentActivities(),
+      getStudentStats(),
+      getDueReviews(),
+      getMyAssignments(),
     ]);
   const { following = [] } = data ?? {};
 
@@ -96,6 +107,54 @@ export default async function StudentDashboard() {
           </Link>
         </div>
       )}
+
+      {/*
+        المراجعة أولاً على اللوحة: هي السبب الوحيد لفتح المنصّة يوم لا
+        حصّة فيه، وإخفاؤها أسفل الصفحة يعني ألّا تُفتح.
+      */}
+      {dueReviews.length > 0 && (
+        <div className="continue-banner review-banner">
+          <span>
+            🔁 <strong>{dueReviews.length}</strong>{" "}
+            {dueReviews.length === 1 ? "درس ينتظر" : "دروس تنتظر"} مراجعتك اليوم
+            — دقيقةٌ واحدة تكفي.
+          </span>
+          <Link href="/dashboard/review" className="btn btn-primary btn-sm">
+            ابدأ المراجعة
+          </Link>
+        </div>
+      )}
+
+      {assignments.filter((a) => !a.submittedAt).length > 0 && (
+        <section className="dashboard-section">
+          <h2 className="section-title">
+            📋 واجبات لم تسلّمها (
+            {assignments.filter((a) => !a.submittedAt).length})
+          </h2>
+          <div className="assignment-list">
+            {assignments
+              .filter((a) => !a.submittedAt)
+              .map((a) => (
+                <AssignmentSubmit key={a.id} a={a} />
+              ))}
+          </div>
+        </section>
+      )}
+
+      {assignments.filter((a) => a.submittedAt).length > 0 && (
+        <section className="dashboard-section">
+          <h2 className="section-title">✅ واجبات سلّمتها</h2>
+          <div className="assignment-list">
+            {assignments
+              .filter((a) => a.submittedAt)
+              .map((a) => (
+                <AssignmentSubmit key={a.id} a={a} />
+              ))}
+          </div>
+        </section>
+      )}
+
+      <StudentBadges stats={stats} />
 
       {pendingJoins.length > 0 && (
         <section className="dashboard-section">
