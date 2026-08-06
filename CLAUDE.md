@@ -85,7 +85,8 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0024_labeling_activity.sql` | `labeling` kind (12 total) + `activities.image_url` — one image per activity |
 | `0025_ai_design_kind.sql` | `ai_usage.kind` accepts `design` |
 | `0026_credits_and_admin.sql` | `teachers.credits` (+ column-privilege lockout), `admins`, `spend_credits` / `refund_credits` / `admin_set_credits` / `admin_teacher_list`, `lesson_posters` |
-| `0027_lesson_audio.sql` | `lessons.audio_url`, revoked from `anon` like the other content columns |
+| `0027_lesson_audio.sql` | `lessons.audio_url` (superseded — dropped by `0028`) |
+| `0028_remove_lesson_audio.sql` | drops `lessons.audio_url` and narrows the credit kinds back to five |
 
 ### Removed: live sessions
 
@@ -450,7 +451,7 @@ Every AI tool costs **credits** from `teachers.credits` (starts at 40). This rep
 
 | Tool | Cost |
 |---|---|
-| تلخيص · تحسين التنسيق · توليد الأسئلة · تحويل إلى صوت | 1 |
+| تلخيص · تحسين التنسيق · توليد الأسئلة | 1 |
 | تصميم درس كامل · بطاقة/ملصق/مخطّط | 2 |
 
 `lib/ai/credits.ts` holds the price table **for display**; the actual guard is in the database.
@@ -478,15 +479,6 @@ Three decisions came out of measurement, not preference:
 
 Images are uploaded to `lesson-media/<auth.uid()>/posters/…` (the 0007 owner-folder policy, unchanged) and only the URL is stored — a megabyte of base64 inside a row would be read on every list query. Rendered with a plain `<img>`, not `next/image`, for the same reason as activity images.
 
-### Reading the lesson aloud (`lessons.audio_url`)
-
-One audio file per lesson, generated from the written explanation and played by a plain `<audio controls>` above the text on the student's lesson page — for students who read slowly, revise on the road, or cannot read the screen at all. 1 credit. Generated from `/teacher/me/lessons/<id>/visuals`, which is now **وسائل الدرس**: audio first, then the cards/posters/diagrams studio.
-
-- **The model is `openai/gpt-audio-mini`.** The owner asked for "google 3.1 flash tts"; OpenRouter has no such model — its Google audio models (`lyria`) are *music* generators, not readers. Override with `OPENROUTER_AUDIO_MODEL`. Measured: 22 seconds of Arabic speech in 5.4s for $0.0014.
-- **Streaming is mandatory, not an optimization.** A normal request is refused outright with `Audio output requires stream: true`, so the client parses `data:` lines and concatenates `delta.audio.data`.
-- **The reply is raw `pcm16`, never mp3** — asking for mp3 over the stream returns an empty body. Browsers cannot play raw PCM in `<audio>`, so `wavOf()` prepends a 44-byte WAV header (24 kHz, mono, 16-bit). That is why the stored file is `.wav` and why a minute costs ~2.7 MB, which is what caps the input at 6000 characters: the storage bucket rejects files over 20 MB, and hitting that limit *after* generating would burn a credit for nothing.
-- **`audio_url` is revoked from `anon`** (`0027`) and deliberately left out of `get_free_preview_content`. It carries the lesson's whole content; letting a visitor *hear* what they are blocked from *reading* would walk straight around the gate. The visitor branch of `getLesson` sets it to `null` explicitly so a future widening of that RPC cannot leak it by accident.
-
 ### Lessons with no unit are not lost
 
 `getMyTeacherContent` distributes lessons into their units — and a lesson with `unit_id = null` matched no unit, so it vanished from the content manager entirely. The teacher saw no error and no lesson, and could only conclude the save had failed. The unit is optional by design and **the lesson designer saves without one by default**, so this is the normal case, not an edge one. `TeacherContent.looseLessons` now carries them and `/teacher/me/content` renders them under «📄 دروس بلا وحدة».
@@ -498,3 +490,9 @@ One audio file per lesson, generated from the written explanation and played by 
 ### Sections collapse in the lesson editor
 
 An AI-designed lesson arrives with ten sections, and each one used to render a full TipTap editor with its own toolbar — a wall of identical boxes with no obvious starting point. `LessonForm` now collapses them when there are more than two: only the open section mounts an editor, the rest show their heading plus a one-line preview of the text (`stripPeek`). This also keeps the page light, since TipTap is instantiated once instead of ten times.
+
+### Removed: reading the lesson aloud
+
+Text-to-speech was built and then **removed at the owner's request** — there is no audio anywhere in the product. `0028` drops `lessons.audio_url` and narrows the credit kinds back to five; the `speak()` client, `LessonAudio` and `app/actions/lesson-audio.ts` are gone.
+
+Four findings are worth keeping if it ever returns, because each cost a round of trial: OpenRouter has **no Google TTS model** (its `lyria` models generate music, not speech) — `openai/gpt-audio-mini` is the working one; audio output is **refused without `stream: true`**; the stream returns **raw `pcm16` only** (asking for mp3 yields an empty body), so a 44-byte WAV header has to be prepended before a browser will play it; and at ~2.7 MB per minute the 20 MB bucket limit caps the readable text at roughly 6000 characters — which must be enforced *before* generating, or a credit is spent on a file that cannot be stored.

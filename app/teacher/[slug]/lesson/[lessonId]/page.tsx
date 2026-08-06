@@ -196,24 +196,6 @@ export default async function LessonPage({
             />
           )}
 
-          {/*
-            الصوت فوق الشرح لا تحته: من يفتح الدرس ليسمعه لا ينبغي أن
-            يمرّ على الشرح كلّه ليجد المشغّل.
-          */}
-          {content?.audio_url && (
-            <section className="lesson-audio-block">
-              <h2 className="section-title">🔊 استمع إلى الدرس</h2>
-              <audio
-                src={content.audio_url}
-                controls
-                preload="none"
-                className="lesson-audio-player"
-              >
-                متصفّحك لا يدعم تشغيل الصوت.
-              </audio>
-            </section>
-          )}
-
           {content && content.sections.length > 0 && (
             <article className="lesson-content">
               {content.sections.map((section, si) => (

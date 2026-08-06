@@ -369,7 +369,7 @@ export async function getLessonPage(
       const [contentRes, attRes, quizRes, progressRes, attemptRes] = await Promise.all([
         supabase
           .from("lessons")
-          .select("sections, gallery, video_url, audio_url")
+          .select("sections, gallery, video_url")
           .eq("id", lesson.id)
           .maybeSingle(),
         supabase
@@ -407,11 +407,7 @@ export async function getLessonPage(
         p_lesson_id: lesson.id,
       });
       const row = Array.isArray(data) ? data[0] : data;
-      /**
-       * `audio_url` صريحاً `null` للزائر: الدالّة لا تعيده أصلاً، والتصريح
-       * هنا يمنع أن يتسرّب يوماً بتوسيع الدالّة دون انتباه.
-       */
-      content = row ? { ...(row as LessonContent), audio_url: null } : null;
+      content = (row as LessonContent) ?? null;
     }
   }
 
@@ -631,8 +627,6 @@ export interface TeacherUnit {
     is_free_preview: boolean;
     is_restricted: boolean;
     position: number;
-    /** صوت الدرس المولَّد — null إن لم يُولَّد بعد */
-    audio_url: string | null;
   }[];
 }
 
@@ -674,7 +668,7 @@ export async function getMyTeacherContent(): Promise<TeacherContent | null> {
       .order("position"),
     supabase
       .from("lessons")
-      .select("id, unit_id, title, description, duration, emoji, status, is_free_preview, is_restricted, position, audio_url")
+      .select("id, unit_id, title, description, duration, emoji, status, is_free_preview, is_restricted, position")
       .eq("teacher_id", teacher.id)
       .order("position"),
   ]);
