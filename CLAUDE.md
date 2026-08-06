@@ -483,7 +483,18 @@ Images are uploaded to `lesson-media/<auth.uid()>/posters/…` (the 0007 owner-f
 
 ### Lessons with no unit are not lost
 
-`getMyTeacherContent` distributes lessons into their units — and a lesson with `unit_id = null` matched no unit, so it vanished from the content manager entirely. The teacher saw no error and no lesson, and could only conclude the save had failed. The unit is optional by design and **the lesson designer saves without one by default**, so this is the normal case, not an edge one. `TeacherContent.looseLessons` now carries them and `/teacher/me/content` renders them under «📄 دروس بلا وحدة».
+Every query that groups lessons by unit used to drop those with `unit_id = null`. The unit is optional by design and **the lesson designer saves without one by default**, so this was the normal case, not an edge one — and it broke four different things:
+
+| Query | Symptom |
+|---|---|
+| `getMyTeacherContent` | the lesson vanished from the content manager; the teacher concluded the save had failed |
+| `getTeacherProfile` | it was never listed on the public teacher page |
+| `getLessonPage` | **404 for the student** who opened its link |
+| `getStudentDashboard` | progress percentages computed from an incomplete total |
+
+All four now append the loose lessons after the units. On surfaces that group by unit they land in a synthetic unit (`LOOSE_UNIT_ID`, «دروس أخرى») that has no row in `units` and is a display key only.
+
+The 404 was only found by signing in as a real student and opening a real designed lesson — it is invisible to `npm run build`, to RLS tests, and to the teacher, who reaches the same lesson through `/teacher/me/lessons/<id>` on a different query.
 
 ### The designer takes reference material
 
