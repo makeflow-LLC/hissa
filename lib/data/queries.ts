@@ -1,4 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
+
+/**
+ * معرّفُ الوحدة الصوريّة التي تُجمع فيها الدروس بلا وحدة.
+ * ثابتٌ لا UUID حقيقيّ: لا صفّ له في `units`، وإنما مفتاح عرضٍ فقط.
+ */
+export const LOOSE_UNIT_ID = "__loose__";
 import { normalizeSubject } from "@/lib/arabic";
 import type { ExamTemplate } from "@/lib/examTemplates";
 import type {
@@ -185,6 +191,25 @@ export async function getTeacherProfile(
     lessons: lessons.filter((l) => l.unit_id === u.id),
   }));
 
+  /**
+   * الدروس بلا وحدة تُعرض في وحدةٍ صوريّة في آخر المنهج.
+   *
+   * كانت تُسقَط: التوزيع على الوحدات لا يطابق `unit_id = null`، فيختفي
+   * الدرس من صفحة المعلّم — ويعيد `getLessonPage` أدناه 404 للطالب الذي
+   * يفتح رابطه. والوحدة اختيارية أصلاً، **ومصمّم الدروس يحفظ بلا وحدة
+   * افتراضياً**، فالحالة عاديّة لا نادرة.
+   */
+  const loose = lessons.filter((l) => !l.unit_id);
+  if (loose.length > 0) {
+    units.push({
+      id: LOOSE_UNIT_ID,
+      title: "دروس أخرى",
+      description: "",
+      position: 9999,
+      lessons: loose,
+    });
+  }
+
   // حالة الطالب: طلب الانضمام، دروس منجزة، وتقييمه إن كتبه
   let followStatus: FollowStatus = "none";
   let followDecisionNote = "";
@@ -342,9 +367,11 @@ export async function getLessonPage(
 
   const units = unitRows ?? [];
   const allLessons = (lessonRows ?? []) as LessonMeta[];
-  const ordered = units.flatMap((u) =>
-    allLessons.filter((l) => l.unit_id === u.id)
-  );
+  // الدروس بلا وحدة تُلحَق بالآخر — بدونها يعود الدرس 404 لطالبٍ يفتح رابطه
+  const ordered = [
+    ...units.flatMap((u) => allLessons.filter((l) => l.unit_id === u.id)),
+    ...allLessons.filter((l) => !l.unit_id),
+  ];
 
   const index = ordered.findIndex((l) => l.id === lessonId);
   if (index === -1) return null;
@@ -503,20 +530,35 @@ export async function getStudentDashboard(): Promise<StudentDashboard | null> {
 
     const units = unitRows ?? [];
     const lessons = lessonRows ?? [];
-    const ordered = units.flatMap((u) => lessons.filter((l) => l.unit_id === u.id));
+    // وهنا كذلك: بدون الملحق تُحسب نسبة تقدّمٍ من مجموعٍ ناقص
+    const loose = lessons.filter((l) => !l.unit_id);
+    const ordered = [
+      ...units.flatMap((u) => lessons.filter((l) => l.unit_id === u.id)),
+      ...loose,
+    ];
     const nextUndone = ordered.find((l) => !doneIds.has(l.id)) ?? null;
 
     following.push({
       teacher: t,
-      units: units.map((u) => {
-        const unitLessons = lessons.filter((l) => l.unit_id === u.id);
-        return {
-          id: u.id,
-          title: u.title,
-          total: unitLessons.length,
-          done: unitLessons.filter((l) => doneIds.has(l.id)).length,
-        };
-      }),
+      units: [
+        ...units.map((u) => {
+          const unitLessons = lessons.filter((l) => l.unit_id === u.id);
+          return {
+            id: u.id,
+            title: u.title,
+            total: unitLessons.length,
+            done: unitLessons.filter((l) => doneIds.has(l.id)).length,
+          };
+        }),
+        ...(loose.length > 0
+          ? [{
+              id: LOOSE_UNIT_ID,
+              title: "دروس أخرى",
+              total: loose.length,
+              done: loose.filter((l) => doneIds.has(l.id)).length,
+            }]
+          : []),
+      ],
       total: ordered.length,
       done: ordered.filter((l) => doneIds.has(l.id)).length,
       nextLesson: nextUndone ? { id: nextUndone.id, title: nextUndone.title } : null,
