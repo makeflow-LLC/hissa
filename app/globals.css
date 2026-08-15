@@ -7229,6 +7229,201 @@ details[open] > summary.help-q::after {
 :root.ws-no-quiz .ws-quiz { display: none; }
 :root.ws-no-key  .ws-key  { display: none; }
 
+
+/* ==================== حجز موعد مع المعلّم ==================== */
+
+.pill-muted {
+  background: #f1f5f9;
+  color: var(--text-muted);
+}
+
+/* --- عند المعلّم: فتح المواعيد --- */
+
+.slot-time-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.slot-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.slot-chip {
+  border: 1px solid var(--border);
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.slot-chip:hover {
+  border-color: var(--primary);
+}
+
+.slot-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 28px;
+}
+
+.slot-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.slot-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 200px;
+}
+
+.slot-row-meta {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.slot-row-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* --- عند الطالب: اختيار الموعد --- */
+
+.booking-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin: 24px 0;
+  box-shadow: var(--shadow);
+}
+
+.booking-intro {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 14px;
+}
+
+.booking-days {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  /* شريط أيام يُمرَّر أفقياً: أسبوعٌ كامل لا يسع عرض الهاتف */
+  scroll-snap-type: x proximity;
+}
+
+.booking-day {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 140px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  font: inherit;
+  cursor: pointer;
+  text-align: start;
+}
+.booking-day.is-active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.booking-day-label {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.booking-day-free {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.booking-times {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.booking-time {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  /* ٤٤ بكسل حدّاً أدنى: الإبهام لا يصيب أصغر منها */
+  min-height: 56px;
+  justify-content: center;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  font: inherit;
+  cursor: pointer;
+}
+.booking-time span {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.booking-time:hover:not(:disabled) {
+  border-color: var(--primary);
+}
+.booking-time.is-active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+.booking-time:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f8fafc;
+}
+
+.booking-chosen {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border);
+}
+
+.booking-chosen-line {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.booking-chosen-note {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.booking-decide {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
 @media print {
   /*
    * لا شيء من هيكل الموقع على الورق.

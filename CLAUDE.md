@@ -42,11 +42,11 @@ Live project ref `mexpmtuqhvnphgeqqjuf`, region `eu-central-1`, URL `https://mex
 SUPABASE_SERVICE_ROLE_KEY=<secret key>   # npm run seed only — never NEXT_PUBLIC_
 ```
 
-> **Sandbox note:** this environment's network policy blocks `*.supabase.co`, so `npm run seed` and any runtime query fail here with "Host not in allowlist". Schema/data changes from inside a session must go through the Supabase MCP tools. Pages degrade to a server-rendered `ConnectionNotice` instead of crashing, so `npm run build` and route smoke tests still work offline.
+> **Sandbox note:** outbound HTTPS goes through an agent proxy. `curl` and the browser honour it automatically; **Node's `fetch` does not** — run the dev server and any script that talks to Supabase or OpenRouter with `NODE_USE_ENV_PROXY=1`, otherwise every call dies with "Host not in allowlist" and the pages degrade to a server-rendered `ConnectionNotice`. (An earlier note here said the host was blocked outright; it is reachable, the proxy just has to be opted into.) Schema changes from inside a session still go through the Supabase MCP tools.
 
 ### Tables
 
-In use: `teachers`, `units`, `lessons`, `lesson_attachments`, `quiz_questions`, `profiles`, `follows`, `lesson_progress`, `teacher_messages`, `student_grants`, `reviews`, `parent_reports`, `student_groups`, `student_group_members`, `report_cards`, `report_card_requests`, `exams` (+ `exam_questions` / `exam_attempts` / `exam_answers` / `exam_templates`), `activities` (+ `activity_plays` / `activity_templates`), `admins`, `lesson_posters`, `lesson_questions` (+ `question_votes`), `lesson_reviews`, `assignments` (+ `assignment_submissions`), `lesson_levels`.
+In use: `teachers`, `units`, `lessons`, `lesson_attachments`, `quiz_questions`, `profiles`, `follows`, `lesson_progress`, `teacher_messages`, `student_grants`, `reviews`, `parent_reports`, `student_groups`, `student_group_members`, `report_cards`, `report_card_requests`, `exams` (+ `exam_questions` / `exam_attempts` / `exam_answers` / `exam_templates`), `activities` (+ `activity_plays` / `activity_templates`), `admins`, `lesson_posters`, `lesson_questions` (+ `question_votes`), `lesson_reviews`, `assignments` (+ `assignment_submissions`), `lesson_levels`, `availability_slots` (+ `session_bookings`).
 
 - `lessons.is_free_preview` — the one visitor-visible lesson per teacher.
 - `lessons.is_restricted` — hidden entirely unless the student holds a `student_grants` row.
@@ -89,12 +89,15 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0028_remove_lesson_audio.sql` | drops `lessons.audio_url` and narrows the credit kinds back to five |
 | `0029_qa_reviews_assignments.sql` | `lesson_questions` / `question_votes`, `lesson_reviews`, `assignments` / `assignment_submissions`, plus derived `student_points` / `teacher_hard_questions` / `teacher_quiet_students` / `teacher_lesson_reach` |
 | `0030_lesson_levels.sql` | `lesson_levels` — the same lesson rewritten simpler or deeper; `level` added to the credit kinds |
+| `0031_session_booking.sql` | `availability_slots` / `session_bookings` — Calendly-style booking of a live session; `teacher_open_slots()` + `booking_whatsapp()` |
 
 ### Removed: live sessions
 
 Live sessions and paid enrollment were **removed from the product** — there is no way to create, browse, or enroll in one, and no pricing anywhere. Payment, when it happens, is arranged directly between student and teacher outside the platform; the app deliberately holds no record of it and offers no "confirm payment" step.
 
 The `live_sessions` and `enrollments` tables are **left in place, unused and unreferenced** (both were empty at removal). Nothing reads or writes them. Delete them only if you are sure the feature will not return.
+
+**Booking a session (`0031`) is not a revival of them.** Those two tables encode "a paid session and a subscription to it", and reusing them would bring the payment model back through the side door. Booking has its own tables and holds no money: see "Booking a live session".
 
 ### Ratings are real, never seeded
 
@@ -177,7 +180,7 @@ A student may **remove** a message from their own list. Deleting the row is only
 
 ### Live notifications
 
-`LiveNotifier` (mounted in the root layout via `LiveNotifierMount`, so it runs on **every** page — it used to sit on the two dashboards only, and a teacher editing a lesson or grading an exam got nothing) subscribes to `teacher_messages`, `follows`, `report_cards` and `report_card_requests` via Supabase Realtime, shows a toast, plays a two-note Web Audio chime, and debounces a `router.refresh()`. No filters are set on the channel — **RLS is the filter**, so a subscriber only ever receives rows it may already read.
+`LiveNotifier` (mounted in the root layout via `LiveNotifierMount`, so it runs on **every** page — it used to sit on the two dashboards only, and a teacher editing a lesson or grading an exam got nothing) subscribes to `teacher_messages`, `follows`, `report_cards`, `report_card_requests` and `session_bookings` via Supabase Realtime, shows a toast, plays a two-note Web Audio chime, and debounces a `router.refresh()`. No filters are set on the channel — **RLS is the filter**, so a subscriber only ever receives rows it may already read.
 
 Three deliberate details:
 
@@ -377,6 +380,7 @@ Security is verified with SQL that switches `role` and `request.jwt.claims` to i
 | `app/teacher/me/activities/new` · `activities/[activityId]` | build an activity (`ActivityBuilder`), preview it as a student sees it, publish, and read who played + the leaderboard |
 | `app/teacher/me/activities/guide/page.tsx` | how to build an activity: six steps plus a playable demo of all ten games (`ActivityDemo`) |
 | `app/activity/[activityId]/page.tsx` | student plays the activity (`ActivityPlayer`) and sees the leaderboard when the teacher left it on |
+| `app/teacher/me/booking/page.tsx` | open availability slots (`SlotManager`) and decide booking requests (`BookingRequests`) |
 | `app/privacy/page.tsx` · `app/terms/page.tsx` | Arabic legal pages, linked from the footer |
 
 **Teacher accounts** (Supabase Auth, same Google/magic-link as students — there is no separate teacher login): a user is a teacher iff they own a `teachers` row (`owner_id = auth.uid()`). `saveTeacherProfile` (`app/actions/teacher.ts`) creates/updates that row — name, subject, stages, qualification, `experience_years`, bio, whatsapp, avatar (resized data URL in `avatar_url`), auto-generated unique slug (reserved words blocked). `teachers` columns `qualification`, `experience_years`, `is_published` (directory shows published only; RLS: public read = published-or-owner, plus owner INSERT). `getMyTeacher()` / `isCurrentUserTeacher()` drive the navbar and teacher pages.
@@ -414,7 +418,7 @@ Two pieces carry navigation, and both exist because a back link at the top of a 
 
 ### Client vs server components
 
-Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`, `RichTextEditor`, `ExamForm`, `ExamBuilder`, `ExamPublishBar`, `ExamTaker`, `GradingBoard`, `ExamWindow`, `ExamCountdown`, `ActivityBuilder`, `ActivityPlayer`, `ActivityDemo`, `ActivityPublishBar`, `ActivityRowActions`, the ten `components/games/*` (+ `useGameSound`), `Hint`, `InfoTip`, `HelpTabs`, `AvailabilityToggle`, `GroupDetailsForm`, `GroupMembersPanel`, `GroupBroadcast`, `GroupLessonAccess`, `MessageActions`, `TemplatePicker`, `DuplicateExamButton`.
+Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`, `RichTextEditor`, `ExamForm`, `ExamBuilder`, `ExamPublishBar`, `ExamTaker`, `GradingBoard`, `ExamWindow`, `ExamCountdown`, `ActivityBuilder`, `ActivityPlayer`, `ActivityDemo`, `ActivityPublishBar`, `ActivityRowActions`, the ten `components/games/*` (+ `useGameSound`), `Hint`, `InfoTip`, `HelpTabs`, `AvailabilityToggle`, `GroupDetailsForm`, `GroupMembersPanel`, `GroupBroadcast`, `GroupLessonAccess`, `MessageActions`, `TemplatePicker`, `DuplicateExamButton`, `SlotManager`, `BookingPicker`, `BookingRequests`, `MyBookings`.
 
 `ShareProfile` (`components/ShareProfile.tsx`) on `/teacher/me`: the teacher's public profile URL (`window.location.origin + /teacher/<slug>`, so it's correct on any domain), a scannable QR code generated client-side with the `qrcode` package (downloadable PNG), a copy button, and WhatsApp/Telegram share links.
 
@@ -435,6 +439,30 @@ The six seeded demo teachers were deleted from the live database (their units, l
 **Access grants** (`student_grants` + `lessons.is_restricted` / `live_sessions.is_restricted`): a teacher marks a lesson or session "خاص", then grants specific followers access from `/teacher/me/students`. A grant row with both `lesson_id` and `session_id` null means "all of this teacher's restricted content".
 
 Enforcement is in the `lessons` / `live_sessions` SELECT policies via the `security definer` helper `has_grant()`: a restricted row is **hidden entirely** from anyone without a grant — title included. RLS filters rows, not columns, so full-row hiding is the only real guarantee here; there is no "locked but visible" state for restricted content (unlike the visitor gate, which hides columns). Consequence: lesson counts legitimately differ per student.
+
+## Booking a live session (`0031`)
+
+The student picks one of the teacher's open times, writes who is attending and what the session is about, and the request lands **قيد المراجعة**. The teacher reads it, pastes a Google Meet link, and approves — and only then does the link, and the teacher's WhatsApp number, reach the student.
+
+**No money passes through the platform, and that is not an oversight.** `availability_slots.price` is optional and purely declarative — `null` renders «السعر يُتّفق عليه», `0` renders «مجّاناً» — and nothing reads it again. There is no charge, no confirmation step, no record of payment. Price is settled between the two of them on WhatsApp, which is why the number is revealed at approval.
+
+**This is not `live_sessions` revived.** That table (with `enrollments`) encodes a paid session and a subscription to it; reusing it would drag the payment model back in. New tables, no price semantics.
+
+### The four things worth knowing
+
+- **The slots are public — the visitor sees them too.** They are signup bait, not data: a stranger who sees «٣ مواعيد متاحة» has a reason to sign in. And they reveal nothing about anyone — a time and a note the teacher wrote to publish.
+- **But "is it taken?" cannot come from reading the bookings.** A booking's topic and participants belong to whoever wrote them, so `session_bookings` is closed to everyone but the student and the teacher. Without a taken-flag the picker would show ten buttons, five of which fail on click with a unique-constraint error. `teacher_open_slots(t_id)` is `security definer` and returns exactly one extra boolean — what every calendar in the world shows.
+- **One slot, one booking — in a partial unique index, not in code.** `bookings_one_per_slot` covers only `status in ('pending','approved')`, so a rejected or cancelled request frees the time again. Two students pressing the same button in the same second is not a race any application check can win; the index wins it, and `requestBooking` translates `23505` into «حُجز هذا الموعد قبل قليل».
+- **The student has no UPDATE policy at all.** The insert policy pins `status = 'pending'` and `meet_url is null`, and there is no student UPDATE — so nobody approves themselves or writes their own meeting link. Unlike `assignment_submissions`, which needed column privileges because a student legitimately edits *part* of their row, here the refusal is total and RLS alone is enough.
+
+### Smaller decisions
+
+- **Cancelling is a delete, not a status.** A student cancelling a pending request should free the slot for someone else, and `status = 'cancelled'` rows would only accumulate as clutter the teacher has to read past. The delete policy is narrow: own row, still `pending`.
+- **Deleting a booked slot is refused.** `on delete cascade` would take the student's booking with it, and their session would vanish from their dashboard with no word. The teacher must reject the request — with a note — and only then delete.
+- **Approving without a link is refused**, with a message. An approved booking with no link leaves the student waiting for something that never arrives, unsure whether to ask.
+- **The decision rides on the button** (`name="decision"` on each submit button), not a hidden field set by `onClick`. React state updates are async and are not guaranteed to reach the DOM before the submit event fires, so the hidden-field version posts an empty decision some of the time.
+- **The teacher never sees the requester's `profiles` row.** A student may book without following the teacher at all, and `profiles_teacher_reads_followers` rightly does not cover them. The name comes from `participants`, which the student types — the session may be for two siblings anyway, so the account name was never the right answer.
+- **Times are absolute instants computed in the browser**, like the exam window and the assignment due date; `absolute()` rejects any string without a zone so the old bug cannot creep back. Repeating a slot across weeks adds **days to the date component** rather than 7×24 hours, so a DST change does not slide «الخامسة عصراً» to four or six.
 
 ## Conventions
 

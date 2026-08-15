@@ -228,6 +228,26 @@ export default function LiveNotifier({
           if (row.status === "rejected") notify("🙋", "بُتَّ في طلب انضمامك");
         }
       )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "session_bookings" },
+        (payload) => {
+          const row = payload.new as { teacher_id?: string };
+          if (role === "teacher" && row.teacher_id === teacherId) {
+            notify("🗓", "طلب حجز موعد جديد");
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "session_bookings" },
+        (payload) => {
+          const row = payload.new as { student_id?: string; status?: string };
+          if (role !== "student" || row.student_id !== userId) return;
+          if (row.status === "approved") notify("🎥", "تأكّد حجزك ووصلك رابط اللقاء");
+          if (row.status === "rejected") notify("🗓", "اعتذر المعلّم عن موعدك");
+        }
+      )
       .subscribe((status) => {
         // فشل القناة أو انقطاعها ⇒ نستعيض بالاستطلاع بدل الصمت
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {

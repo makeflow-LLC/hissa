@@ -9,6 +9,7 @@ import RequestReportCard from "@/components/RequestReportCard";
 import Hint from "@/components/Hint";
 import StudentBadges from "@/components/StudentBadges";
 import AssignmentSubmit from "@/components/AssignmentSubmit";
+import MyBookings from "@/components/MyBookings";
 import {
   getCurrentUser,
   getMyMessages,
@@ -23,6 +24,7 @@ import {
   getStudentStats,
   getDueReviews,
   getMyAssignments,
+  getMyBookings,
   getStudentName,
   isCurrentUserTeacher,
 } from "@/lib/data/queries";
@@ -51,6 +53,7 @@ export default async function StudentDashboard() {
     stats,
     dueReviews,
     assignments,
+    bookings,
   ] = await Promise.all([
       getStudentName(),
       getStudentDashboard(),
@@ -65,6 +68,7 @@ export default async function StudentDashboard() {
       getStudentStats(),
       getDueReviews(),
       getMyAssignments(),
+      getMyBookings(),
     ]);
   const { following = [] } = data ?? {};
 
@@ -123,6 +127,13 @@ export default async function StudentDashboard() {
             ابدأ المراجعة
           </Link>
         </div>
+      )}
+
+      {bookings.length > 0 && (
+        <section className="dashboard-section">
+          <h2 className="section-title">🗓 حصصي المحجوزة</h2>
+          <MyBookings bookings={bookings} />
+        </section>
       )}
 
       {assignments.filter((a) => !a.submittedAt).length > 0 && (

@@ -3297,3 +3297,232 @@ export async function getWorksheetData(lessonId: string): Promise<{
     quiz: (quizRes.data ?? []) as QuizQuestionRow[],
   };
 }
+
+/* ==================== حجز موعدٍ مع المعلّم ==================== */
+
+/** موعدٌ فتحه المعلّم، كما يراه الطالب */
+export interface SlotRow {
+  id: string;
+  startsAt: string;
+  minutes: number;
+  /** `null` = «يُتّفق عليه»، و0 = مجاني. عرضٌ فقط — لا مال يمرّ بالمنصّة */
+  price: number | null;
+  currency: string;
+  note: string;
+  /** محجوزٌ بطلبٍ معلّق أو موافَق عليه */
+  taken: boolean;
+}
+
+/** الموعد كما يراه صاحبه، ومعه من طلبه */
+export interface MySlotRow extends SlotRow {
+  isOpen: boolean;
+  booking: { id: string; status: string; topic: string; participants: string } | null;
+}
+
+export type BookingStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+export interface BookingRow {
+  id: string;
+  slotId: string;
+  startsAt: string;
+  minutes: number;
+  price: number | null;
+  currency: string;
+  topic: string;
+  participants: string;
+  status: BookingStatus;
+  meetUrl: string;
+  teacherNote: string;
+  createdAt: string;
+  /** جهة الطالب: المعلّم صاحب الموعد */
+  teacherName?: string;
+  teacherSlug?: string;
+  /** رقم واتساب المعلّم — لا يُكشف إلا بعد الموافقة (`booking_whatsapp`) */
+  whatsapp?: string;
+}
+
+/**
+ * مواعيد معلّمٍ المتاحة — للزائر أيضاً.
+ *
+ * عبر `teacher_open_slots` لا بقراءةٍ مباشرة: القراءة المباشرة لا تعرف
+ * أيّ موعدٍ محجوز (الحجوزات محجوبة عن غير صاحبها)، فيرى الطالب أزراراً
+ * ترفض عند الضغط.
+ */
+export async function getTeacherSlots(teacherId: string): Promise<SlotRow[]> {
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.rpc("teacher_open_slots", { t_id: teacherId });
+    return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+      id: String(r.id),
+      startsAt: String(r.starts_at),
+      minutes: Number(r.minutes ?? 60),
+      price: r.price === null || r.price === undefined ? null : Number(r.price),
+      currency: String(r.currency ?? "ILS"),
+      note: String(r.note ?? ""),
+      taken: r.taken === true,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/** مواعيد المعلّم نفسه — القادمة منها، مفتوحةً كانت أو مغلقة */
+export async function getMySlots(): Promise<MySlotRow[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return [];
+
+  // ساعةٌ للوراء: موعدٌ بدأ للتوّ ما زال يعني المعلّم
+  const from = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+  const [slotsRes, bookingsRes] = await Promise.all([
+    supabase
+      .from("availability_slots")
+      .select("id, starts_at, minutes, price, currency, note, is_open")
+      .eq("teacher_id", teacher.id)
+      .gte("starts_at", from)
+      .order("starts_at"),
+    supabase
+      .from("session_bookings")
+      .select("id, slot_id, status, topic, participants")
+      .eq("teacher_id", teacher.id)
+      .in("status", ["pending", "approved"]),
+  ]);
+
+  const bySlot = new Map<string, Record<string, unknown>>();
+  for (const b of (bookingsRes.data ?? []) as Record<string, unknown>[]) {
+    bySlot.set(String(b.slot_id), b);
+  }
+
+  return ((slotsRes.data ?? []) as Record<string, unknown>[]).map((r) => {
+    const b = bySlot.get(String(r.id));
+    return {
+      id: String(r.id),
+      startsAt: String(r.starts_at),
+      minutes: Number(r.minutes ?? 60),
+      price: r.price === null || r.price === undefined ? null : Number(r.price),
+      currency: String(r.currency ?? "ILS"),
+      note: String(r.note ?? ""),
+      isOpen: r.is_open !== false,
+      taken: Boolean(b),
+      booking: b
+        ? {
+            id: String(b.id),
+            status: String(b.status),
+            topic: String(b.topic ?? ""),
+            participants: String(b.participants ?? ""),
+          }
+        : null,
+    };
+  });
+}
+
+/**
+ * طلبات الحجز الواردة إلى المعلّم.
+ *
+ * اسم الطالب يأتي من `participants` الذي كتبه هو، لا من `profiles`:
+ * الحاجز قد لا يكون متابعاً لهذا المعلّم أصلاً، وسياسة قراءة ملفّات
+ * المتابعين لا تشمله — فتوسيعها لأجل اسمٍ يكتبه الطالب بنفسه في الطلب
+ * فتحُ بابٍ بلا مقابل.
+ */
+export async function getBookingRequests(): Promise<BookingRow[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("owner_id", user.id)
+    .maybeSingle();
+  if (!teacher) return [];
+
+  const { data } = await supabase
+    .from("session_bookings")
+    .select(
+      "id, slot_id, topic, participants, status, meet_url, teacher_note, created_at, availability_slots (starts_at, minutes, price, currency)"
+    )
+    .eq("teacher_id", teacher.id)
+    .order("created_at", { ascending: false })
+    .limit(80);
+
+  return ((data ?? []) as Record<string, unknown>[]).map(mapBooking);
+}
+
+function mapBooking(r: Record<string, unknown>): BookingRow {
+  const slot = (Array.isArray(r.availability_slots)
+    ? r.availability_slots[0]
+    : r.availability_slots) as Record<string, unknown> | null;
+  return {
+    id: String(r.id),
+    slotId: String(r.slot_id),
+    startsAt: String(slot?.starts_at ?? ""),
+    minutes: Number(slot?.minutes ?? 60),
+    price:
+      slot?.price === null || slot?.price === undefined ? null : Number(slot.price),
+    currency: String(slot?.currency ?? "ILS"),
+    topic: String(r.topic ?? ""),
+    participants: String(r.participants ?? ""),
+    status: String(r.status ?? "pending") as BookingStatus,
+    meetUrl: String(r.meet_url ?? ""),
+    teacherNote: String(r.teacher_note ?? ""),
+    createdAt: String(r.created_at ?? ""),
+  };
+}
+
+/**
+ * حجوزات الطالب.
+ *
+ * رقم الواتساب يُطلب من `booking_whatsapp` لكل حجزٍ موافَقٍ عليه، لا
+ * بقراءة عمود المعلّم: الدالّة هي عقد الكشف — بعد الموافقة ولصاحب الحجز
+ * وحده — فقراءةٌ جانبية تجعل للواجهة قاعدةً غير قاعدة القاعدة.
+ */
+export async function getMyBookings(): Promise<BookingRow[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from("session_bookings")
+    .select(
+      "id, slot_id, topic, participants, status, meet_url, teacher_note, created_at, availability_slots (starts_at, minutes, price, currency), teachers (name, slug)"
+    )
+    .eq("student_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(40);
+
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => {
+    const t = (Array.isArray(r.teachers) ? r.teachers[0] : r.teachers) as Record<
+      string,
+      unknown
+    > | null;
+    return {
+      ...mapBooking(r),
+      teacherName: String(t?.name ?? ""),
+      teacherSlug: String(t?.slug ?? ""),
+    };
+  });
+
+  await Promise.all(
+    rows.map(async (b) => {
+      if (b.status !== "approved") return;
+      const { data: wa } = await supabase.rpc("booking_whatsapp", { b_id: b.id });
+      b.whatsapp = typeof wa === "string" ? wa : "";
+    })
+  );
+
+  return rows;
+}

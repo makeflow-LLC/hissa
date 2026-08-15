@@ -1,8 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getCurrentUser, getMyTeacher, getTeacherProfile } from "@/lib/data/queries";
+import {
+  getCurrentUser,
+  getMyStudentProfile,
+  getMyTeacher,
+  getTeacherProfile,
+  getTeacherSlots,
+} from "@/lib/data/queries";
 import TeacherTabs from "@/components/TeacherTabs";
+import BookingPicker from "@/components/BookingPicker";
 import ReviewSection from "@/components/ReviewSection";
 import JoinTeacherPanel from "@/components/JoinTeacherPanel";
 import ConnectionNotice from "@/components/ConnectionNotice";
@@ -81,6 +88,12 @@ export default async function TeacherProfilePage({
   const { teacher, units } = profile;
   const lessonCount = units.reduce((n, u) => n + u.lessons.length, 0);
   const completedCount = profile.completedLessonIds.length;
+
+  // المواعيد تُعرض للزائر أيضاً — دعوةٌ للتسجيل لا بيانات
+  const [slots, studentProfile] = await Promise.all([
+    getTeacherSlots(teacher.id),
+    user && !isTeacherAccount ? getMyStudentProfile() : Promise.resolve(null),
+  ]);
   /**
    * مؤهّل للتقييم: طالب منضمّ إلى الصف فعلاً (قَبِله المعلّم).
    * المتابعة وحدها لا تكفي — وهي إشارة اهتمام لا علاقة دراسية.
@@ -257,6 +270,15 @@ export default async function TeacherProfilePage({
           .
         </div>
       )}
+
+      <BookingPicker
+        teacherId={teacher.id}
+        teacherSlug={teacher.slug}
+        slots={slots}
+        isAuthed={Boolean(user)}
+        isTeacherAccount={isTeacherAccount}
+        defaultName={studentProfile?.full_name ?? ""}
+      />
 
       <TeacherTabs profile={profile} isAuthed={Boolean(user)} />
 
