@@ -102,6 +102,8 @@ export default async function TeacherProfilePage({
   const canReview =
     Boolean(user) && !isTeacherAccount && profile.followStatus === "approved";
   const waDigits = teacher.whatsapp?.replace(/[^0-9]/g, "") ?? "";
+  /** أذِن المعلّم بنشر رقمه، والقارئ مسجّل — أو هو المعلّم يعاين صفحته */
+  const showContact = teacher.contact_public && (Boolean(user) || isOwner);
 
   // بيانات منظّمة تساعد جوجل على فهم الصفحة كمعلّم له منهج
   const jsonLd = {
@@ -271,13 +273,22 @@ export default async function TeacherProfilePage({
         </div>
       )}
 
+      {/*
+        رقما التواصل يُرشَّحان **هنا في الخادم** لا في المكوّن: قيمةٌ تصل
+        المتصفّح تُقرأ من مصدر الصفحة مهما أُخفيت. والشرط مزدوج — أذِن
+        المعلّم (`contact_public`) والقارئ مسجّلٌ دخولاً؛ الكاشط الذي يجمع
+        الأرقام لا يسجّل بحساب جوجل، والطالب الحقيقي مسجّلٌ أصلاً.
+      */}
       <BookingPicker
         teacherId={teacher.id}
         teacherSlug={teacher.slug}
+        teacherName={teacher.name}
         slots={slots}
         isAuthed={Boolean(user)}
         isTeacherAccount={isTeacherAccount}
         defaultName={studentProfile?.full_name ?? ""}
+        whatsapp={showContact ? (teacher.whatsapp ?? "") : ""}
+        phone={showContact ? (teacher.phone ?? "") : ""}
       />
 
       <TeacherTabs profile={profile} isAuthed={Boolean(user)} />

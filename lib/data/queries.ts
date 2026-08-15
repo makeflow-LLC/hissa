@@ -54,7 +54,7 @@ const LESSON_META_COLS =
   "id, unit_id, title, description, duration, emoji, gradient, position, is_free_preview";
 
 const TEACHER_COLS =
-  "id, slug, name, subject, stages, bio, initials, gradient, avatar_url, whatsapp, rating, rating_count, qualification, experience_years, join_instructions, availability, availability_note";
+  "id, slug, name, subject, stages, bio, initials, gradient, avatar_url, whatsapp, phone, contact_public, rating, rating_count, qualification, experience_years, join_instructions, availability, availability_note";
 
 /**
  * المستخدم الحالي (null للزائر).
@@ -160,7 +160,9 @@ export async function getTeacherProfile(
 
   const { data: teacher, error } = await supabase
     .from("teachers")
-    .select(TEACHER_COLS)
+    // `owner_id` يُقرأ هنا للتمييز بين المعلّم ومن سواه، ولا يُعاد في
+    // الصفّ المُخرَج: كل ما يخرج من هنا يصل المتصفّح
+    .select(`${TEACHER_COLS}, owner_id`)
     .eq("slug", slug)
     .maybeSingle();
   // فشل الاتصال ≠ معلم غير موجود: نرمي الخطأ فتعرض الصفحة ConnectionNotice
@@ -314,8 +316,32 @@ export async function getTeacherProfile(
     for (const n of names ?? []) namesById.set(n.id, n.full_name);
   }
 
+  /*
+   * **الرقم يُحذف من الصفّ نفسه، لا من الواجهة.**
+   *
+   * `TeacherTabs` مكوّنٌ عميل يستقبل `profile` كاملاً، فكل حقلٍ فيه
+   * يُسلسَل داخل حمولة RSC ويُقرأ من «مصدر الصفحة» مهما أخفاه الشرط في
+   * JSX. وقد كشف اختبارُ متصفّحٍ رقمَ الواتساب للزائر بهذه الطريقة
+   * بالضبط، بينما الزرّ نفسه لم يكن ظاهراً: إخفاءٌ يُطمئن ولا يحمي.
+   *
+   * فمن يستحقّ الرقم؟ صاحبه، وعضو إحدى مجموعاته، ومستخدمٌ مسجّلٌ إن أذِن
+   * المعلّم بنشره (`contact_public`). وما عدا ذلك يخرج فارغاً من هنا.
+   */
+  const { owner_id: ownerId, ...publicTeacher } = teacher as TeacherRow & {
+    owner_id: string;
+  };
+  const isOwner = Boolean(user && ownerId === user.id);
+  const maySeeContact =
+    isOwner ||
+    inTeacherGroup ||
+    (Boolean(user) && publicTeacher.contact_public !== false);
+
   return {
-    teacher: teacher as TeacherRow,
+    teacher: {
+      ...publicTeacher,
+      whatsapp: maySeeContact ? publicTeacher.whatsapp : null,
+      phone: maySeeContact ? publicTeacher.phone : null,
+    },
     units,
     followStatus,
     followDecisionNote,
@@ -3525,4 +3551,137 @@ export async function getMyBookings(): Promise<BookingRow[]> {
   );
 
   return rows;
+}
+
+/* ==================== مركز إشعارات المعلّم ==================== */
+
+export interface NotifItem {
+  key: string;
+  icon: string;
+  label: string;
+  count: number;
+  href: string;
+}
+
+/**
+ * كل ما ينتظر قرار المعلّم، في مكانٍ واحد.
+ *
+ * كانت الطلبات موزّعةً على ستّ صفحات: الانضمام في «طلابي»، الحجز في
+ * «المواعيد»، السؤال في «أسئلة الطلاب»… فمن لم يفتح الصفحة لم يعلم أن
+ * أحداً ينتظره. والجرس يقلب المعادلة: العدد يأتي إليه لا هو يذهب إليه.
+ *
+ * كلّها عدّاداتٌ بـ`head: true` — لا تُنقل صفوف، فالجرس في التخطيط الجذري
+ * ويُحسب في كل صفحة. **ويفشل مغلقاً**: خطأٌ هنا يعني جرساً فارغاً لا
+ * صفحةً منهارة.
+ */
+export async function getTeacherNotifications(): Promise<NotifItem[]> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data: teacher } = await supabase
+      .from("teachers")
+      .select("id")
+      .eq("owner_id", user.id)
+      .maybeSingle();
+    if (!teacher) return [];
+
+    const t = teacher.id as string;
+    const head = { count: "exact" as const, head: true };
+
+    const [joins, bookings, cards, questions, messages, subs] = await Promise.all([
+      // `follows` مفتاحها مركّب (طالب + معلّم) ولا عمود `id` فيها
+      supabase
+        .from("follows")
+        .select("student_id", head)
+        .eq("teacher_id", t)
+        .eq("status", "pending"),
+      supabase
+        .from("session_bookings")
+        .select("id", head)
+        .eq("teacher_id", t)
+        .eq("status", "pending"),
+      supabase
+        .from("report_card_requests")
+        .select("id", head)
+        .eq("teacher_id", t)
+        .eq("status", "pending"),
+      supabase
+        .from("lesson_questions")
+        .select("id", head)
+        .eq("teacher_id", t)
+        .is("answered_at", null),
+      // الرسائل: «بانتظار ردّك» = آخر رسالة في الخيط من الطالب
+      supabase
+        .from("teacher_messages")
+        .select("student_id, sender, created_at")
+        .eq("teacher_id", t)
+        .not("student_id", "is", null)
+        .order("created_at", { ascending: true })
+        .limit(200),
+      supabase
+        .from("assignment_submissions")
+        .select("id, assignments!inner(teacher_id)", head)
+        .eq("assignments.teacher_id", t)
+        .is("graded_at", null),
+    ]);
+
+    const lastSender = new Map<string, string>();
+    for (const m of (messages.data ?? []) as Record<string, unknown>[]) {
+      lastSender.set(String(m.student_id), String(m.sender));
+    }
+    const waiting = [...lastSender.values()].filter((s) => s === "student").length;
+
+    const items: NotifItem[] = [
+      {
+        key: "joins",
+        icon: "🙋",
+        label: "طلب انضمام",
+        count: joins.count ?? 0,
+        href: "/teacher/me/students",
+      },
+      {
+        key: "bookings",
+        icon: "🗓",
+        label: "طلب حجز موعد",
+        count: bookings.count ?? 0,
+        href: "/teacher/me/booking",
+      },
+      {
+        key: "messages",
+        icon: "✉️",
+        label: "محادثة تنتظر ردّك",
+        count: waiting,
+        href: "/teacher/me/students",
+      },
+      {
+        key: "questions",
+        icon: "❓",
+        label: "سؤال بلا إجابة",
+        count: questions.count ?? 0,
+        href: "/teacher/me/questions",
+      },
+      {
+        key: "cards",
+        icon: "🏅",
+        label: "طلب بطاقة تقييم",
+        count: cards.count ?? 0,
+        href: "/teacher/me/students",
+      },
+      {
+        key: "subs",
+        icon: "📋",
+        label: "تسليم بانتظار التصحيح",
+        count: subs.count ?? 0,
+        href: "/teacher/me/assignments",
+      },
+    ];
+
+    return items.filter((i) => i.count > 0);
+  } catch {
+    return [];
+  }
 }

@@ -90,6 +90,7 @@ Dead, kept only to avoid a destructive drop: `subscriptions` (superseded by `fol
 | `0029_qa_reviews_assignments.sql` | `lesson_questions` / `question_votes`, `lesson_reviews`, `assignments` / `assignment_submissions`, plus derived `student_points` / `teacher_hard_questions` / `teacher_quiet_students` / `teacher_lesson_reach` |
 | `0030_lesson_levels.sql` | `lesson_levels` — the same lesson rewritten simpler or deeper; `level` added to the credit kinds |
 | `0031_session_booking.sql` | `availability_slots` / `session_bookings` — Calendly-style booking of a live session; `teacher_open_slots()` + `booking_whatsapp()` |
+| `0032_teacher_contact.sql` | `teachers.phone` + `contact_public` — a contact the student may use *before* booking |
 
 ### Removed: live sessions
 
@@ -178,6 +179,14 @@ A student may **remove** a message from their own list. Deleting the row is only
 
 `Hint` no longer prints its paragraph unconditionally — it renders a small "؟ ما هذا؟" button that expands on click, and `InfoTip` is the inline variant that sits beside a field label. Every existing `<Hint>` became collapsible with no call-site change. Neither uses `title=` or hover: this audience is overwhelmingly on phones, where there is no hover.
 
+### The notification centre (`NotificationBell`)
+
+A bell in the navbar for teachers, listing everything waiting on them: join requests, booking requests, threads awaiting a reply, unanswered questions, report-card requests, ungraded submissions. Before it these lived on six different pages, so a teacher who did not open the page did not know anyone was waiting.
+
+- **No read/unread table.** An entry here is not news to be read but work not yet done, so it disappears when the work is done and nothing has to mark it. A `notification_reads` table would have added rows, a second state, and a way for the two to disagree.
+- `getTeacherNotifications()` is six `head: true` counts in parallel — no rows travel. It sits in `NavbarActions`, which is in the root layout, so it runs on every page; it **fails closed**, since an empty bell beats a broken layout.
+- `follows` has a composite primary key and **no `id` column** — count it by `student_id`.
+
 ### Live notifications
 
 `LiveNotifier` (mounted in the root layout via `LiveNotifierMount`, so it runs on **every** page — it used to sit on the two dashboards only, and a teacher editing a lesson or grading an exam got nothing) subscribes to `teacher_messages`, `follows`, `report_cards`, `report_card_requests` and `session_bookings` via Supabase Realtime, shows a toast, plays a two-note Web Audio chime, and debounces a `router.refresh()`. No filters are set on the channel — **RLS is the filter**, so a subscriber only ever receives rows it may already read.
@@ -186,7 +195,7 @@ Three deliberate details:
 
 - **No audio file.** The chime is generated with oscillators; browsers block audio before the first user gesture, so the `AudioContext` is created lazily on the first `pointerdown`/`keydown`. If it stays blocked, the visual toast still appears.
 - **A system notification only when the tab is hidden**, and only after the user grants permission from the button the component renders. Duplicating a toast that is already on screen is noise.
-- **A polling fallback.** School networks frequently block WebSockets — exactly our audience. If the channel reports `CHANNEL_ERROR`/`TIMED_OUT`/`CLOSED`, or simply never subscribes within 10s, a 20-second poll of the newest message takes over. Without it the feature would die silently on the networks that need it most.
+- **A polling fallback.** School networks frequently block WebSockets — exactly our audience. If the channel reports `CHANNEL_ERROR`/`TIMED_OUT`/`CLOSED`, or simply never subscribes within 10s, a 20-second poll takes over. It polls **the newest message *and* the newest booking**: covering messages alone would have let the booking alert die silently on precisely the networks the fallback exists for.
 
 ### Students may request a report card
 
@@ -265,9 +274,14 @@ It selects with `distinct on (student_id)` ordered by ratio, **not `max(score)` 
 
 **`/teacher/me/activities/guide` explains the feature by letting the teacher play it.** Six steps, then `ActivityDemo` — a chip row over `ActivityPlayer` in `preview` mode with sample content from `lib/activityDemos.ts`. Prose cannot convey what a game feels like, and no teacher will build a whole activity just to see a kind they have not tried. The demo content is deliberately **general knowledge**, not one subject, so a maths teacher does not read the games as "for Arabic".
 
-### The teacher's WhatsApp is not public
+### The teacher's contact, and who may see it
 
-`teachers.whatsapp` renders only for a student who is a **member of one of that teacher's groups** (or for the teacher previewing their own page). Publishing it on a public profile turns the directory into a phone-number source for any visitor or scraper. Group membership is the teacher's own decision, so it doubles as the consent signal.
+`teachers.whatsapp` and `teachers.phone` are shown to: the teacher previewing their own page, a **member of one of that teacher's groups**, and — since `0032` — any **signed-in** user when the teacher left `contact_public` on (default). A student often has a question *before* booking («هل تشرح هذا الدرس؟»), and with no way to ask they book on a guess or leave.
+
+Two guards, and the second is the one that was missing:
+
+- **Signed-in, not public.** A scraper harvesting numbers does not sign in with a Google account; a real student already is. That keeps the directory from being a phone book without hiding the number from the people it is for.
+- **The number is stripped from the row in `getTeacherProfile`, not hidden in JSX.** `TeacherTabs` is a client component receiving the whole `profile`, so every field is serialized into the RSC payload and readable from "view source" no matter what the JSX condition says. A browser test found the WhatsApp number in a visitor's page source while the button itself was correctly hidden — hiding that reassures and does not protect. `getTeacherProfile` now blanks `whatsapp`/`phone` before returning, and reads `owner_id` only to decide, dropping it from what it returns.
 
 ### Parent reports
 
@@ -418,7 +432,7 @@ Two pieces carry navigation, and both exist because a back link at the top of a 
 
 ### Client vs server components
 
-Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`, `RichTextEditor`, `ExamForm`, `ExamBuilder`, `ExamPublishBar`, `ExamTaker`, `GradingBoard`, `ExamWindow`, `ExamCountdown`, `ActivityBuilder`, `ActivityPlayer`, `ActivityDemo`, `ActivityPublishBar`, `ActivityRowActions`, the ten `components/games/*` (+ `useGameSound`), `Hint`, `InfoTip`, `HelpTabs`, `AvailabilityToggle`, `GroupDetailsForm`, `GroupMembersPanel`, `GroupBroadcast`, `GroupLessonAccess`, `MessageActions`, `TemplatePicker`, `DuplicateExamButton`, `SlotManager`, `BookingPicker`, `BookingRequests`, `MyBookings`.
+Server: pages, `NavbarActions` (reads the session directly so there is no signed-in/out flicker), `ConnectionNotice`, `Stars`. Client: `TeacherDirectory` (search/filter), `TeacherTabs` (tabs + locked badges + pricing), `EnrollButton`, `FollowButton`, `CancelEnrollmentButton`, `LessonCompleteButton`, `VideoPlayer`, `QuizSection`, `TeacherProfileForm`, `LessonForm`, `LiveForm`, `AddUnitForm`, `ShareProfile`, `RichTextEditor`, `ExamForm`, `ExamBuilder`, `ExamPublishBar`, `ExamTaker`, `GradingBoard`, `ExamWindow`, `ExamCountdown`, `ActivityBuilder`, `ActivityPlayer`, `ActivityDemo`, `ActivityPublishBar`, `ActivityRowActions`, the ten `components/games/*` (+ `useGameSound`), `Hint`, `InfoTip`, `HelpTabs`, `AvailabilityToggle`, `GroupDetailsForm`, `GroupMembersPanel`, `GroupBroadcast`, `GroupLessonAccess`, `MessageActions`, `TemplatePicker`, `DuplicateExamButton`, `SlotManager`, `BookingPicker`, `BookingRequests`, `MyBookings`, `NotificationBell`.
 
 `ShareProfile` (`components/ShareProfile.tsx`) on `/teacher/me`: the teacher's public profile URL (`window.location.origin + /teacher/<slug>`, so it's correct on any domain), a scannable QR code generated client-side with the `qrcode` package (downloadable PNG), a copy button, and WhatsApp/Telegram share links.
 
@@ -464,6 +478,8 @@ The student picks one of the teacher's open times, writes who is attending and w
 - **The teacher never sees the requester's `profiles` row.** A student may book without following the teacher at all, and `profiles_teacher_reads_followers` rightly does not cover them. The name comes from `participants`, which the student types — the session may be for two siblings anyway, so the account name was never the right answer.
 - **The teacher enters a weekly schedule, not dates.** The first version asked for a date, then times, then "repeat for N weeks" — which makes the teacher do the calendar arithmetic the computer should do. The form is now: tap the **days of your week**, tap the **hours**, and the intersection is the schedule; each cell can be lifted from one day alone by tapping it in the preview («الأحد من الخامسة، الثلاثاء من السابعة» without a second form). The day buttons start at **today**, not always at الأحد — a fixed order put «السبت ١٥ أغسطس» after «الجمعة ٢١» and read as a bug.
 - **The days and their dates are computed after mount, never during render.** The server runs in UTC and the browser in the teacher's zone, so computing them on both sides yields two different strings and breaks hydration — the same reason `ExamForm` fills its fields in an effect.
+- **A way to ask before booking.** The picker shows a WhatsApp and a call button above the calendar (subject to the contact rule above). Without it the only channel to a teacher was joining their class first, which is the wrong order for someone still deciding.
+- **The "open Google Calendar" button prefills the event and stops there.** It carries the title, the slot's start, its duration and the student's name; the teacher adds Meet, saves, copies the link, pastes it back. Creating the link for them would require the teacher to sign into Google *through us* and grant calendar access — a large permission for two saved taps, and it would make the platform custodian of a token it has no other use for.
 - **Times are absolute instants computed in the browser**, like the exam window and the assignment due date; `absolute()` rejects any string without a zone so the old bug cannot creep back. Repeating a slot across weeks adds **days to the date component** rather than 7×24 hours, so a DST change does not slide «الخامسة عصراً» to four or six.
 
 ## Conventions

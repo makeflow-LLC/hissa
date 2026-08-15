@@ -1,8 +1,10 @@
 import Link from "next/link";
+import NotificationBell from "@/components/NotificationBell";
 import {
   getCurrentUser,
   getMyTeacher,
   getStudentName,
+  getTeacherNotifications,
   isAdmin,
 } from "@/lib/data/queries";
 
@@ -46,8 +48,12 @@ export default async function NavbarActions() {
   ) : null;
 
   if (teacher) {
+    // ما ينتظر قرار المعلّم — يُقرأ هنا لأن الشريط في التخطيط الجذري،
+    // فالجرس يظهر في كل صفحة لا في لوحته وحدها
+    const notifs = await getTeacherNotifications();
     return (
       <span className="navbar-actions">
+        <NotificationBell items={notifs} />
         <Link href="/teacher/me" className="btn btn-primary btn-sm">
           لوحة المعلّم
         </Link>

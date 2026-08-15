@@ -30,6 +30,13 @@ export interface TeacherRow {
   gradient: string;
   avatar_url: string | null;
   whatsapp: string | null;
+  /** رقم هاتفٍ للاتصال — منفصلٌ عن الواتساب، وكلاهما اختياريّ */
+  phone: string | null;
+  /**
+   * هل يُعرض رقما التواصل في صندوق الحجز؟ مفتاحٌ يملكه المعلّم.
+   * والواجهة تشترط فوقه **دخول المستخدم**: الكاشط لا يسجّل بحساب جوجل.
+   */
+  contact_public: boolean;
   rating: number;
   rating_count: number;
   qualification: string;

@@ -233,18 +233,43 @@ export default function TeacherProfileForm({
         />
       </label>
 
-      <label className="form-field">
-        <span className="form-label">رقم واتساب (اختياري)</span>
-        <input
-          type="tel"
-          name="whatsapp"
-          dir="ltr"
-          className="search-input"
-          defaultValue={initial?.whatsapp ?? ""}
-          placeholder="+201001234567"
-        />
-        <span className="form-hint">يظهر زر «تواصل واتساب» في بروفايلك عند إدخاله.</span>
-      </label>
+      <div className="form-field">
+        <span className="form-label">وسيلة التواصل (اختيارية)</span>
+        <div className="form-row">
+          <label className="form-field">
+            <span className="form-label">رقم واتساب</span>
+            <input
+              type="tel"
+              name="whatsapp"
+              dir="ltr"
+              defaultValue={initial?.whatsapp ?? ""}
+              placeholder="+201001234567"
+            />
+          </label>
+          <label className="form-field">
+            <span className="form-label">رقم للاتصال</span>
+            <input
+              type="tel"
+              name="phone"
+              dir="ltr"
+              defaultValue={initial?.phone ?? ""}
+              placeholder="+201001234567"
+            />
+          </label>
+        </div>
+        <label className="check-line">
+          <input
+            type="checkbox"
+            name="contact_public"
+            defaultChecked={initial?.contact_public ?? true}
+          />
+          <span>أظهر رقمي في صندوق الحجز ليسألني الطالب قبل أن يحجز</span>
+        </label>
+        <span className="form-hint">
+          يظهر <strong>للطلاب المسجّلين دخولاً وحدهم</strong>، لا للزوّار ولا
+          لمن يجمع الأرقام آلياً. وأعضاء مجموعاتك يرونه على كل حال.
+        </span>
+      </div>
 
       {!isEdit && (
         <label className="form-field">
