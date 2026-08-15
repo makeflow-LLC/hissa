@@ -43,18 +43,29 @@ function priceLabel(s: SlotRow): string {
 export default function BookingPicker({
   teacherId,
   teacherSlug,
+  teacherName,
   slots,
   isAuthed,
   isTeacherAccount,
   defaultName,
+  whatsapp,
+  phone,
 }: {
   teacherId: string;
   teacherSlug: string;
+  teacherName: string;
   slots: SlotRow[];
   isAuthed: boolean;
   isTeacherAccount: boolean;
   /** اسم الطالب من ملفّه — يُملأ سلفاً ويبقى قابلاً للتعديل */
   defaultName: string;
+  /**
+   * رقما التواصل — يصلان فارغين ما لم يأذن المعلّم **وما لم يكن القارئ
+   * مسجّلاً**. الترشيح يقع في الخادم لا هنا: قيمةٌ تصل المتصفّح قد
+   * تُقرأ من مصدر الصفحة مهما أخفتها الواجهة.
+   */
+  whatsapp: string;
+  phone: string;
 }) {
   const [state, action, pending] = useActionState(requestBooking, initial);
   const [chosenDay, setChosenDay] = useState<string>("");
@@ -78,6 +89,10 @@ export default function BookingPicker({
   const activeDay = days.find((d) => d.key === chosenDay) ?? days[0];
   const slot = slots.find((s) => s.id === chosenSlot) ?? null;
 
+  const waDigits = whatsapp.replace(/[^0-9]/g, "");
+  const telDigits = phone.replace(/[^0-9+]/g, "");
+  const hasContact = Boolean(waDigits || telDigits);
+
   if (slots.length === 0) return null;
 
   return (
@@ -88,6 +103,37 @@ export default function BookingPicker({
         إلى المعلّم للمراجعة، وعند موافقته يصلك رابط اللقاء ورقمه على واتساب
         لتنسيق ما بقي.
       </p>
+
+      {/*
+        السؤال قبل الحجز: «هل تشرح هذا الدرس؟»، «هل يناسبك وقتٌ آخر؟».
+        وبلا وسيلةٍ للسؤال يحجز الطالب على الظنّ أو ينصرف.
+      */}
+      {hasContact && (
+        <div className="booking-contact">
+          <span className="booking-contact-label">
+            سؤالٌ قبل الحجز؟ راسل {teacherName}:
+          </span>
+          <div className="card-actions">
+            {waDigits && (
+              <a
+                href={`https://wa.me/${waDigits}?text=${encodeURIComponent(
+                  "السلام عليكم، عندي سؤال عن حجز حصّة."
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-whatsapp btn-sm"
+              >
+                💬 واتساب
+              </a>
+            )}
+            {telDigits && (
+              <a href={`tel:${telDigits}`} className="btn btn-outline btn-sm">
+                📞 {phone}
+              </a>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="booking-days">
         {days.map((d) => (

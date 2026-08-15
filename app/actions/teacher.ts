@@ -77,6 +77,8 @@ export async function saveTeacherProfile(
     Math.min(60, parseInt(String(formData.get("experience_years") ?? "0"), 10) || 0)
   );
   const whatsapp = String(formData.get("whatsapp") ?? "").trim() || null;
+  const phone = String(formData.get("phone") ?? "").trim() || null;
+  const contactPublic = formData.get("contact_public") === "on";
   const avatar = String(formData.get("avatar") ?? "").trim() || null;
   const stages = STAGES.filter((s) => formData.get(`stage_${s}`) === "on");
   const wantedSlug = String(formData.get("slug") ?? "").trim();
@@ -105,6 +107,8 @@ export async function saveTeacherProfile(
     qualification,
     experience_years: experience,
     whatsapp,
+    phone,
+    contact_public: contactPublic,
     avatar_url: avatar,
     initials: initialsOf(name),
     is_published: true,

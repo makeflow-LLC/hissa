@@ -20,6 +20,35 @@ function when(iso: string): string {
       });
 }
 
+/** «2026-08-16T14:00:00.000Z» ⇒ «20260816T140000Z» — صيغة تقويم جوجل */
+function stamp(d: Date): string {
+  return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+}
+
+/**
+ * رابطٌ يفتح تقويم جوجل بحدثٍ **معبّأ سلفاً**: العنوان والموضوع والوقت
+ * والمدّة. لا يبقى على المعلّم إلا «إضافة Google Meet» ثمّ الحفظ ونسخ
+ * الرابط.
+ *
+ * ولا سبيل إلى إنشاء رابط اللقاء نيابةً عنه: ذلك يقتضي دخوله بحساب جوجل
+ * إلى منصّتنا وإذناً بإدارة تقويمه — ثمنٌ باهظ لتوفير ضغطتين، ويجعل
+ * المنصّة مسؤولةً عن رمزٍ لا تحتاجه. فالحدث يُملأ لأجله، والرابط يظلّ
+ * ملكه ينسخه بيده.
+ */
+function calendarUrl(b: BookingRow): string {
+  const start = new Date(b.startsAt);
+  const end = new Date(start.getTime() + b.minutes * 60 * 1000);
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: `حصّة: ${b.topic}`,
+    dates: `${stamp(start)}/${stamp(end)}`,
+    details:
+      `حصّة عبر منصّة حصة\nالطالب/الطلاب: ${b.participants}\nالموضوع: ${b.topic}\n\n` +
+      `أضف «Google Meet» من زرّ الفيديو، ثمّ انسخ الرابط والصقه في لوحتك.`,
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
 const STATUS: Record<string, { label: string; cls: string }> = {
   pending: { label: "قيد المراجعة", cls: "pill-draft" },
   approved: { label: "موافَق عليه", cls: "pill-live" },
@@ -59,6 +88,21 @@ function RequestCard({ b }: { b: BookingRow }) {
         {b.status === "pending" && (
           <form action={action} className="booking-decide">
             <input type="hidden" name="bookingId" value={b.id} />
+
+            <div className="booking-meet-step">
+              <a
+                href={calendarUrl(b)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-outline btn-sm"
+              >
+                📅 افتح تقويم جوجل بموعد جاهز
+              </a>
+              <span className="form-hint">
+                يفتح الحدث بوقت هذا الطلب ومدّته واسم الطالب. اضغط «إضافة Google
+                Meet» ثمّ احفظ، وانسخ الرابط والصقه هنا.
+              </span>
+            </div>
 
             <label className="form-field">
               <span className="form-label">رابط اللقاء (Google Meet)</span>

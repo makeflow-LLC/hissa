@@ -128,6 +128,7 @@ export default function LiveNotifier({
    * (بالقراءة نفسها التي تحكمها RLS) وننبّه إن جدّ شيء.
    */
   const lastSeen = useRef<string>(new Date().toISOString());
+  const lastBooking = useRef<string>(new Date().toISOString());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startPolling = useCallback(() => {
@@ -135,12 +136,26 @@ export default function LiveNotifier({
     const supabase = createClient();
     pollRef.current = setInterval(async () => {
       if (document.visibilityState === "hidden") return;
-      const { data } = await supabase
-        .from("teacher_messages")
-        .select("created_at, sender, student_id, group_id")
-        .order("created_at", { ascending: false })
-        .limit(1);
-      const row = (data ?? [])[0] as
+
+      const [msgRes, bookRes] = await Promise.all([
+        supabase
+          .from("teacher_messages")
+          .select("created_at, sender, student_id, group_id")
+          .order("created_at", { ascending: false })
+          .limit(1),
+        /*
+          الحجز يُستطلَع أيضاً لا الرسائل وحدها: الخطّة البديلة تعمل على
+          الشبكات التي تحجب WebSocket — وهي شبكات مدارسنا — فلو اقتصرت
+          على الرسائل لمات إشعار الحجز صامتاً حيث يُحتاج أكثر ما يُحتاج.
+        */
+        supabase
+          .from("session_bookings")
+          .select("created_at, status, teacher_id, student_id, meet_url")
+          .order("created_at", { ascending: false })
+          .limit(1),
+      ]);
+
+      const row = (msgRes.data ?? [])[0] as
         | {
             created_at: string;
             sender: string;
@@ -148,12 +163,25 @@ export default function LiveNotifier({
             group_id: string | null;
           }
         | undefined;
-      if (!row || row.created_at <= lastSeen.current) return;
-      lastSeen.current = row.created_at;
-      if (role === "teacher" && row.sender === "student") {
-        notify("✉️", "رسالة جديدة من طالب");
-      } else if (role === "student" && row.sender === "teacher") {
-        notify("✉️", messageLabel(row.student_id, row.group_id));
+      if (row && row.created_at > lastSeen.current) {
+        lastSeen.current = row.created_at;
+        if (role === "teacher" && row.sender === "student") {
+          notify("✉️", "رسالة جديدة من طالب");
+        } else if (role === "student" && row.sender === "teacher") {
+          notify("✉️", messageLabel(row.student_id, row.group_id));
+        }
+      }
+
+      const b = (bookRes.data ?? [])[0] as
+        | { created_at: string; status: string }
+        | undefined;
+      // RLS ترشّح الصفّ أصلاً: المعلّم لا يرى إلا حجوزات مواعيده،
+      // والطالب إلا حجوزه هو
+      if (b && b.created_at > lastBooking.current) {
+        lastBooking.current = b.created_at;
+        if (role === "teacher" && b.status === "pending") {
+          notify("🗓", "طلب حجز موعد جديد");
+        }
       }
     }, 20000);
   }, [role, notify]);
