@@ -7246,26 +7246,112 @@ details[open] > summary.help-q::after {
   align-items: center;
 }
 
-.slot-chips {
-  display: flex;
-  flex-wrap: wrap;
+/*
+  أيّام الأسبوع وساعاته: المعلّم يفكّر بـ«الأحد والثلاثاء من الخامسة» لا
+  بالتواريخ، فالإدخال أزرارٌ تُضغط لا حقول تُملأ. وكلّها بارتفاعٍ يبلغه
+  الإبهام — جمهورنا على الهواتف.
+*/
+.week-days {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   gap: 8px;
-  margin-top: 10px;
 }
 
-.slot-chip {
+.week-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 56px;
+  justify-content: center;
+  padding: 8px 6px;
   border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  font: inherit;
+  cursor: pointer;
+}
+.week-day:hover {
+  border-color: var(--primary);
+}
+.week-day.is-on {
+  border-color: var(--primary);
   background: var(--primary-soft);
   color: var(--primary-dark);
-  border-radius: 999px;
-  padding: 6px 12px;
+}
+.week-day-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.week-day-date {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.time-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.time-pick {
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
   font: inherit;
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
 }
-.slot-chip:hover {
+.time-pick:hover {
   border-color: var(--primary);
+}
+.time-pick.is-on {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+.time-pick.is-off {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.week-table {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.week-table-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.week-table-day {
+  font-weight: 700;
+  min-width: 72px;
+}
+
+.week-table-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+.week-table-times .time-pick {
+  min-height: 36px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
 }
 
 .slot-list {

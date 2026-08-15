@@ -13,10 +13,48 @@ import type { MySlotRow } from "@/lib/data/queries";
 
 const initial: BookingState = { ok: false };
 
-function today(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+/** أيّام الأسبوع بترتيب التقويم العربي — الفهرس هو `Date#getDay` */
+const DAYS = [
+  "الأحد",
+  "الاثنين",
+  "الثلاثاء",
+  "الأربعاء",
+  "الخميس",
+  "الجمعة",
+  "السبت",
+];
+
+/** أوقاتٌ جاهزة تغطّي يوم المعلّم من الصباح إلى الليل */
+const PRESET_TIMES = [
+  "08:00",
+  "09:00",
+  "10:00",
+  "11:00",
+  "12:00",
+  "13:00",
+  "14:00",
+  "15:00",
+  "16:00",
+  "17:00",
+  "18:00",
+  "19:00",
+  "20:00",
+  "21:00",
+];
+
+/** «17:00» ⇒ «٥:٠٠ م» — المعلّم يقرأ ساعته لا ساعة الحاسوب */
+function timeLabel(t: string): string {
+  const [hh, mm] = t.split(":").map(Number);
+  const d = new Date(2000, 0, 1, hh || 0, mm || 0);
+  return d.toLocaleTimeString("ar", { hour: "numeric", minute: "2-digit" });
+}
+
+/** أقرب تاريخٍ قادم ليوم الأسبوع المطلوب (اليوم نفسه إن لم يمضِ) */
+function nextDateFor(weekday: number): Date {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  d.setDate(d.getDate() + ((weekday - d.getDay() + 7) % 7));
+  return d;
 }
 
 /**
@@ -27,19 +65,18 @@ function today(): string {
  * فيصير «الخامسة عصراً» رابعةً أو سادسة في بعض النسخ. وبناء التاريخ من
  * مكوّناته يترك للمتصفّح حساب الإزاحة الصحيحة لكل يوم.
  */
-function buildInstants(date: string, times: string[], weeks: number): string[] {
-  if (!date || times.length === 0) return [];
-  const [y, m, d] = date.split("-").map(Number);
-  if (!y || !m || !d) return [];
-  const out: string[] = [];
-  for (let w = 0; w < weeks; w++) {
-    for (const t of times) {
-      const [hh, mm] = t.split(":").map(Number);
-      const dt = new Date(y, m - 1, d + 7 * w, hh || 0, mm || 0, 0, 0);
-      if (!Number.isNaN(dt.getTime())) out.push(dt.toISOString());
-    }
-  }
-  return out.sort();
+function instantFor(weekday: number, time: string, week: number): Date {
+  const base = nextDateFor(weekday);
+  const [hh, mm] = time.split(":").map(Number);
+  return new Date(
+    base.getFullYear(),
+    base.getMonth(),
+    base.getDate() + 7 * week,
+    hh || 0,
+    mm || 0,
+    0,
+    0
+  );
 }
 
 function when(iso: string): string {
@@ -55,26 +92,79 @@ function when(iso: string): string {
       });
 }
 
+function dayDate(weekday: number): string {
+  return nextDateFor(weekday).toLocaleDateString("ar", {
+    day: "numeric",
+    month: "long",
+  });
+}
+
 export default function SlotManager({ slots }: { slots: MySlotRow[] }) {
   const [state, action, pending] = useActionState(saveSlots, initial);
 
-  const [date, setDate] = useState(today());
-  const [time, setTime] = useState("17:00");
+  const [days, setDays] = useState<number[]>([]);
   const [times, setTimes] = useState<string[]>([]);
-  const [weeks, setWeeks] = useState(1);
+  /** استثناءات من التقاطع: «هذا الوقت في هذا اليوم وحده لا يناسبني» */
+  const [skipped, setSkipped] = useState<string[]>([]);
+  const [weeks, setWeeks] = useState(2);
+  const [custom, setCustom] = useState("");
 
-  const instants = useMemo(
-    () => buildInstants(date, times, weeks),
-    [date, times, weeks]
-  );
+  const toggle = <T,>(list: T[], v: T): T[] =>
+    list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
 
   /*
-    الأوقات تُمسح بعد الفتح الناجح: بقاؤها يغري بضغطةٍ ثانية تعيد الطلب
+    الأيّام والتواريخ تُحسب **بعد التركيب** لا أثناء التصيير: الخادم يعمل
+    بـUTC والمتصفّح بتوقيت المعلّم، فحسابها في الطرفين يعطي نصّين مختلفين
+    ويكسر الترطيب. (نفس درس `toLocalInput` في نموذج الاختبار.)
+
+    والترتيب يبدأ من **اليوم** لا من الأحد أبداً: الترتيب الثابت كان يضع
+    «السبت ١٥ أغسطس» بعد «الجمعة ٢١» — صفٌّ تنزل تواريخه ثم تقفز، فيقرؤه
+    المعلّم على أنه خلل.
+  */
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const order = useMemo(() => {
+    const start = mounted ? new Date().getDay() : 0;
+    return Array.from({ length: 7 }, (_, i) => (start + i) % 7);
+  }, [mounted]);
+  const byWeekOrder = (a: number, b: number) => order.indexOf(a) - order.indexOf(b);
+
+  /** جدول الأسبوع: كل يومٍ مختار وأوقاته، ناقصاً ما استُثني */
+  const week = useMemo(
+    () =>
+      [...days]
+        .sort(byWeekOrder)
+        .map((d) => ({
+          day: d,
+          times: [...times].sort().filter((t) => !skipped.includes(`${d}|${t}`)),
+        }))
+        .filter((r) => r.times.length > 0),
+    [days, times, skipped, order]
+  );
+
+  const instants = useMemo(() => {
+    const out: string[] = [];
+    for (let w = 0; w < weeks; w++) {
+      for (const row of week) {
+        for (const t of row.times) out.push(instantFor(row.day, t, w).toISOString());
+      }
+    }
+    return [...new Set(out)].sort();
+  }, [week, weeks]);
+
+  const perWeek = week.reduce((n, r) => n + r.times.length, 0);
+
+  /*
+    الاختيار يُمسح بعد الفتح الناجح: بقاؤه يغري بضغطةٍ ثانية تعيد الطلب
     نفسه، فيردّ الخادم «هذه المواعيد مفتوحةٌ عندك أصلاً» — رسالةٌ تبدو
     عطلاً وهي في الحقيقة صحّةٌ في مكانها الخطأ.
   */
   useEffect(() => {
-    if (state.ok) setTimes([]);
+    if (state.ok) {
+      setDays([]);
+      setTimes([]);
+      setSkipped([]);
+    }
   }, [state.ok, state.message]);
 
   const [busy, startTransition] = useTransition();
@@ -87,9 +177,10 @@ export default function SlotManager({ slots }: { slots: MySlotRow[] }) {
     });
   }
 
-  function addTime() {
-    if (!time || times.includes(time)) return;
-    setTimes([...times, time].sort());
+  function addCustom() {
+    if (!custom || times.includes(custom)) return;
+    setTimes([...times, custom].sort());
+    setCustom("");
   }
 
   return (
@@ -98,28 +189,123 @@ export default function SlotManager({ slots }: { slots: MySlotRow[] }) {
         <input type="hidden" name="slots" value={JSON.stringify(instants)} />
 
         <Hint>
-          افتح مواعيدك مسبقاً كما تفعل في أي تقويم: اختر اليوم، أضف الأوقات
-          التي تناسبك فيه، وكرّرها لعدّة أسابيع إن كانت ثابتة. الطالب يرى
-          المتاح منها ويضغطه، ولا يصير الموعد حصّةً حتى توافق أنت.
+          فكّر بأيّام أسبوعك لا بالتواريخ: اختر الأيّام التي تُدرّس فيها، ثمّ
+          الساعات التي تناسبك — والباقي يُحسب وحده. إن لم يناسبك وقتٌ في يومٍ
+          بعينه فاضغطه في «جدول أسبوعك» أسفلُ ليُرفع منه وحده.
         </Hint>
 
+        {/* ①  أيّام الأسبوع */}
+        <div className="form-field">
+          <span className="form-label">١) أيّام أسبوعك *</span>
+          <div className="week-days">
+            {order.map((i) => (
+              <button
+                key={i}
+                type="button"
+                className={`week-day ${days.includes(i) ? "is-on" : ""}`}
+                aria-pressed={days.includes(i)}
+                onClick={() => setDays(toggle(days, i))}
+              >
+                <span className="week-day-name">{DAYS[i]}</span>
+                <span className="week-day-date">{mounted ? dayDate(i) : ""}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ②  ساعات اليوم */}
+        <div className="form-field">
+          <span className="form-label">٢) الساعات المتاحة *</span>
+          <div className="time-grid">
+            {PRESET_TIMES.map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={`time-pick ${times.includes(t) ? "is-on" : ""}`}
+                aria-pressed={times.includes(t)}
+                onClick={() => setTimes(toggle(times, t))}
+              >
+                {timeLabel(t)}
+              </button>
+            ))}
+            {times
+              .filter((t) => !PRESET_TIMES.includes(t))
+              .map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className="time-pick is-on"
+                  aria-pressed="true"
+                  onClick={() => setTimes(toggle(times, t))}
+                >
+                  {timeLabel(t)}
+                </button>
+              ))}
+          </div>
+          <div className="slot-time-add">
+            <input
+              type="time"
+              className="search-input"
+              value={custom}
+              onChange={(e) => setCustom(e.target.value)}
+              aria-label="وقت آخر"
+            />
+            <button type="button" className="btn btn-outline btn-sm" onClick={addCustom}>
+              ➕ وقت آخر
+            </button>
+          </div>
+        </div>
+
+        {/* ③  جدول الأسبوع الناتج */}
+        {perWeek > 0 && (
+          <div className="form-field">
+            <span className="form-label">
+              ٣) جدول أسبوعك
+              <InfoTip>
+                هذا ما سيراه الطالب. اضغط أي وقتٍ هنا لترفعه من يومه وحده — مثلاً
+                إن كنت متاحاً الأحد من الخامسة والثلاثاء من السابعة فقط.
+              </InfoTip>
+            </span>
+            <ul className="week-table">
+              {[...days]
+                .sort(byWeekOrder)
+                .map((d) => (
+                  <li key={d} className="week-table-row">
+                    <span className="week-table-day">{DAYS[d]}</span>
+                    <div className="week-table-times">
+                      {[...times].sort().map((t) => {
+                        const off = skipped.includes(`${d}|${t}`);
+                        return (
+                          <button
+                            key={t}
+                            type="button"
+                            className={`time-pick ${off ? "is-off" : "is-on"}`}
+                            onClick={() => setSkipped(toggle(skipped, `${d}|${t}`))}
+                            aria-label={`${off ? "أعِد" : "ارفع"} ${timeLabel(t)} يوم ${DAYS[d]}`}
+                          >
+                            {timeLabel(t)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        )}
+
+        {/* ④  التفاصيل */}
         <div className="form-row">
           <label className="form-field">
-            <span className="form-label">اليوم *</span>
-            <input
-              type="date"
-              value={date}
-              min={today()}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
+            <span className="form-label">مدّة الحصّة (دقيقة)</span>
+            <input type="number" name="minutes" min={10} max={480} defaultValue={60} />
           </label>
           <label className="form-field">
             <span className="form-label">
               يتكرّر كم أسبوعاً؟
               <InfoTip>
-                ١ يعني هذا اليوم وحده. ٤ تفتح الموعد نفسه في اليوم نفسه من
-                الأسابيع الأربعة القادمة.
+                ١ يعني هذا الأسبوع وحده. ٤ تفتح الجدول نفسه في الأسابيع الأربعة
+                القادمة، فلا تعود إلى هنا كل أسبوع.
               </InfoTip>
             </span>
             <input
@@ -127,45 +313,10 @@ export default function SlotManager({ slots }: { slots: MySlotRow[] }) {
               min={1}
               max={12}
               value={weeks}
-              onChange={(e) => setWeeks(Math.max(1, Math.min(12, Number(e.target.value) || 1)))}
+              onChange={(e) =>
+                setWeeks(Math.max(1, Math.min(12, Number(e.target.value) || 1)))
+              }
             />
-          </label>
-        </div>
-
-        <div className="form-field">
-          <span className="form-label">أوقات ذلك اليوم *</span>
-          <div className="slot-time-add">
-            <input
-              type="time"
-              className="search-input"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-            />
-            <button type="button" className="btn btn-outline btn-sm" onClick={addTime}>
-              ➕ أضف وقتاً
-            </button>
-          </div>
-          {times.length > 0 && (
-            <div className="slot-chips">
-              {times.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  className="slot-chip"
-                  onClick={() => setTimes(times.filter((x) => x !== t))}
-                  aria-label={`احذف ${t}`}
-                >
-                  {t} <span aria-hidden="true">×</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="form-row">
-          <label className="form-field">
-            <span className="form-label">مدّة الحصّة (دقيقة)</span>
-            <input type="number" name="minutes" min={10} max={480} defaultValue={60} />
           </label>
           <label className="form-field">
             <span className="form-label">
@@ -201,9 +352,15 @@ export default function SlotManager({ slots }: { slots: MySlotRow[] }) {
         </label>
 
         <p className="form-hint">
-          {instants.length > 0
-            ? `سيُفتح ${instants.length} موعداً — أوّلها ${when(instants[0])}`
-            : "أضف وقتاً واحداً على الأقل."}
+          {instants.length > 0 ? (
+            <>
+              📋 {perWeek} موعداً في الأسبوع × {weeks} ={" "}
+              <strong>{instants.length} موعداً</strong> — أوّلها{" "}
+              {when(instants[0])}
+            </>
+          ) : (
+            "اختر يوماً وساعةً على الأقل."
+          )}
         </p>
 
         <div className="card-actions">
