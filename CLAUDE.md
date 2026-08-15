@@ -417,7 +417,19 @@ Both roles sign in through `/login`; `?role=teacher` only switches the copy and 
 - `status` is `draft` | `published`; public queries filter `status = 'published'`, so drafts never reach students.
 - `VideoPlayer` embeds YouTube links (`youtube-nocookie`, watch/youtu.be/embed/shorts forms) and falls back to a `<video>` element for direct MP4 URLs.
 
-Brand: `public/logo.svg` is a hand-built SVG reconstruction of the platform logo (mortarboard + ring + two figures), used in the navbar, footer, and as favicon/OG icon. `metadataBase` is `https://hissa.sbs` (the live custom domain). Contact email placeholder in the legal pages is `support@hissa.sbs`.
+**Brand.** The owner's own artwork, in two files — the hand-drawn reconstruction that stood in for it is gone:
+
+- `public/logo.svg` — the **icon alone** (mortarboard + ring + two figures). Navbar, footer, favicon. It carries no word because the name is written beside it in both places; the wordmark there would print «حصة» twice.
+- `public/logo-full.svg` — icon **plus the word حصة**, used on `/login`, which has no other branding around it.
+
+Both were exported by Illustrator at `viewBox="0 0 406 469"` with the art floating inside it. Rendered at 40px in the navbar that padding shrinks the mark to a smudge, so each file's viewBox is **retightened to the art's real bounding box** (measured with `getBBox()` in a browser, not by eye), and the icon's is squared so the PNGs derive from it without distortion.
+
+The five PNGs (`icon-192/512`, `icon-maskable-192/512`, `apple-touch-icon`) are generated from that same SVG with `sharp` at `density: 600` — regenerate them from the SVG, never by resizing an existing PNG. Two of them are not plain resizes:
+
+- **Maskable** icons must survive Android's circle crop, so the art is inset to ~76% of the canvas and sits on white. A transparent maskable icon is filled with black by some launchers.
+- **apple-touch-icon** is flattened onto white for the same reason: iOS ignores the alpha channel and composites the home-screen icon on black.
+
+`metadataBase` is `https://hissa.sbs` (the live custom domain). Contact email placeholder in the legal pages is `support@hissa.sbs`.
 
 **Sign-in is Google-only.** The email magic link was removed deliberately: its links kept opening in a different browser than the one that requested them (a mail app's in-app webview, or the default browser when the request came from the installed PWA), and PKCE stores `code_verifier` in a cookie belonging to the *requesting* browser — so those opens failed with "PKCE code verifier not found in storage". Google OAuth completes the whole round trip in one browser, so that failure mode is gone along with the `/auth/confirm` route and the `token_hash` branch of `/auth/callback`.
 

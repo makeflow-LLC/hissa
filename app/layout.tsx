@@ -59,7 +59,8 @@ export default function RootLayout({
         <header className="navbar">
           <div className="navbar-inner">
             <Link href="/" className="navbar-brand">
-              {/* الشعار SVG — استبدله بملفك الأصلي في public/logo.svg */}
+              {/* الأيقونة وحدها: الاسم مكتوبٌ بجوارها، والشعار الكامل
+                  (بالكلمة) في `logo-full.svg` لصفحة الدخول */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/logo.svg" alt="" className="navbar-logo" width={40} height={40} />
               منصة حصة
