@@ -69,9 +69,10 @@ function LoginCard() {
   return (
     <main className="container container-narrow">
       <div className="login-card">
-        <span className="login-emoji" aria-hidden="true">
-          {isTeacher ? "👩‍🏫" : "🎓"}
-        </span>
+        {/* الشعار الكامل بالكلمة — هنا وحده، فبقية الصفحات تحمل الأيقونة
+            بجوار الاسم المكتوب فلا يتكرّر */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-full.svg" alt="منصة حصة" className="login-logo" width={132} height={148} />
         <h1 className="login-title">
           {isTeacher ? "دخول المعلّمين" : "دخول الطلاب"}
         </h1>

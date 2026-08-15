@@ -2329,10 +2329,6 @@ input[type="radio"]:focus-visible {
 
 /* ===== صفحة الدخول ===== */
 
-.login-emoji {
-  font-size: 2.6rem;
-}
-
 .login-divider {
   display: flex;
   align-items: center;
@@ -7525,6 +7521,13 @@ details[open] > summary.help-q::after {
   min-height: 0;
   accent-color: var(--primary);
   cursor: pointer;
+}
+
+.login-logo {
+  display: block;
+  width: 96px;
+  height: auto;
+  margin: 0 auto 4px;
 }
 
 /* --- جرس الإشعارات --- */
